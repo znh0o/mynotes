@@ -25,7 +25,8 @@ test('back stays inside the app from settings, filters, folders and the home scr
   expect(await page.evaluate(() => (window as any).appSession)).toBe('same-document');
   expect(new URL(page.url()).pathname).toBe('/mynotes/');
   // Native dialog cancel (Escape / mobile dialog Back) must not leave a stale entry.
-  await page.getByRole('button', { name: '설정 및 백업', exact: true }).click(); await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: '설정 및 백업', exact: true }).click();
+  await expect(page.locator('dialog')).toBeVisible(); await page.keyboard.press('Escape');
   await expect(page.locator('dialog')).toHaveCount(0); await back(page); await expect(page.locator('#library-title')).toContainText('나의 서재');
   await page.getByRole('button', { name: 'MyNotes 시작 가이드 메뉴', exact: true }).click();
   await expect(page.locator('.context-menu')).toBeVisible(); await back(page);
