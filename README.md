@@ -32,6 +32,9 @@ npm run test:e2e
 # Linux/macOS/CI: Chromium을 설치하고 실행
 npx playwright install --with-deps chromium
 CI=1 npm run test:e2e
+
+# 이미 배포된 사이트에서 동일한 흐름을 독립 브라우저 프로필로 검증
+PLAYWRIGHT_BASE_URL=https://znh0o.github.io/mynotes/ npm run test:e2e
 ```
 
 ## 설치 및 사용
