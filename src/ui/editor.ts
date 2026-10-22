@@ -225,7 +225,13 @@ export class EditorView {
       panel.showModal(); trackDialog(panel); target.setAttribute('aria-expanded', 'true');
     }
     if (action === 'close-writing-options') this.root.querySelector<HTMLDialogElement>('#writing-options-panel')!.close();
-    if (action === 'paper') { this.root.querySelector<HTMLDialogElement>('#writing-options-panel')?.close(); this.paperSettings(); }
+    if (action === 'paper') {
+      const panel = this.root.querySelector<HTMLDialogElement>('#writing-options-panel');
+      // Let the options dialog release its history entry before opening paper
+      // settings, so closing both never leaves an extra invisible Back step.
+      if (panel?.open) { panel.addEventListener('close', () => this.paperSettings(), { once: true }); panel.close(); }
+      else this.paperSettings();
+    }
     if (action === 'fullscreen') run(async () => { if (document.fullscreenElement) await document.exitFullscreen(); else await this.root.requestFullscreen(); });
     if (action === 'search') this.search();
     if (action === 'settings') this.settings();

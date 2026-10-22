@@ -5,6 +5,7 @@ test('writing options preserve canvas space and keep finger, paper and tool sett
   await page.getByRole('button', { name: '새 노트', exact: true }).click();
   await page.getByRole('button', { name: '노트 만들기', exact: true }).click();
   await expect(page.locator('#app .page-loading')).toBeHidden();
+  const noteIndex = await page.evaluate(() => history.state.index);
   const canvas = (await page.locator('.paper-viewport').boundingBox())!;
   const options = page.getByRole('button', { name: '필기 옵션', exact: true });
   await options.click(); await expect(page.getByRole('dialog', { name: '필기 옵션', exact: true })).toBeVisible();
@@ -23,4 +24,6 @@ test('writing options preserve canvas space and keep finger, paper and tool sett
   await page.keyboard.press('Escape'); await expect(page.getByRole('dialog')).toHaveCount(0);
   expect(await page.locator('.paper-viewport').boundingBox()).toEqual(canvas);
   await page.screenshot({ path: '../MyNotes-compact-toolbar.png' });
+  await expect.poll(() => page.evaluate(() => history.state.index)).toBe(noteIndex);
+  await page.evaluate(() => history.back()); await expect(page.locator('#library-title')).toContainText('나의 서재');
 });
