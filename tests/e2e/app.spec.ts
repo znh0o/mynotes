@@ -139,3 +139,51 @@ test('shape, lasso move/resize/copy/delete, partial eraser and zoom coordinates'
   await page.mouse.click(r!.x + middle.x * scale, r!.y + middle.y * scale);
   await expect.poll(async () => (await current()).items.filter((i: any) => i.kind === 'stroke').length).toBe(2);
 });
+
+test('pen width stays reachable in split view and pen dragging changes new strokes', async ({ page }) => {
+  await page.goto('./'); await page.getByRole('button', { name: '새 노트', exact: true }).click();
+  await page.locator('[name=title]').fill('펜 굵기 검증');
+  await page.getByRole('button', { name: '노트 만들기', exact: true }).click();
+  await expect(page.locator('.page-loading')).toBeHidden();
+  const slider = page.getByRole('slider', { name: '펜 굵기', exact: true });
+  for (const width of [1440, 1024, 834, 600, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await expect(slider).toBeVisible();
+    const r = await slider.boundingBox();
+    expect(r!.height).toBeGreaterThanOrEqual(40);
+    expect(r!.x).toBeGreaterThanOrEqual(0);
+    expect(r!.x + r!.width).toBeLessThanOrEqual(width);
+  }
+  await page.setViewportSize({ width: 834, height: 1000 });
+  const cdp = await page.context().newCDPSession(page);
+  const dragWidth = async (value: number) => {
+    const r = (await slider.boundingBox())!;
+    const x = r.x + 10 + (r.width - 20) * (value - .5) / 19.5, y = r.y + r.height / 2;
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', pointerType: 'pen', buttons: 0, x: r.x + 10, y, force: 0 });
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', pointerType: 'pen', button: 'left', buttons: 1, x: r.x + 10, y, force: .5, clickCount: 1 });
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', pointerType: 'pen', button: 'left', buttons: 1, x, y, force: .5 });
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', pointerType: 'pen', button: 'left', buttons: 0, x, y, force: 0, clickCount: 1 });
+    await expect(slider).toHaveValue(String(value));
+    await expect(page.locator('#width-value')).toHaveText(value.toFixed(1));
+  };
+  await dragWidth(2); await pen(page, 80, 140);
+  await dragWidth(12); await pen(page, 80, 240);
+  const note = (await records(page, 'notes')).find(n => n.title === '펜 굵기 검증');
+  await expect.poll(async () => (await records(page, 'pages')).find(p => p.noteId === note.id).items.map((i: any) => i.width)).toEqual([2, 12]);
+  // The transparent ink layer must also visibly render a thicker second stroke.
+  const thickness = await page.locator('#paper-ink').evaluate((canvas: HTMLCanvasElement) => {
+    const r = canvas.getBoundingClientRect(), ctx = canvas.getContext('2d')!, scaleX = canvas.width / r.width, scaleY = canvas.height / r.height;
+    const column = (centerY: number) => {
+      const x = Math.round(140 * scaleX), top = Math.floor((centerY - 35) * scaleY), height = Math.ceil(70 * scaleY);
+      const pixels = ctx.getImageData(x, top, 1, height).data;
+      let count = 0; for (let i = 3; i < pixels.length; i += 4) if (pixels[i] > 100) count++;
+      return count;
+    };
+    return [column(140), column(240)];
+  });
+  expect(thickness[1]).toBeGreaterThan(thickness[0] * 2);
+  await page.getByRole('button', { name: '펜 굵기 늘리기', exact: true }).click(); await expect(slider).toHaveValue('12.5');
+  await page.getByRole('button', { name: '펜 굵기 줄이기', exact: true }).click(); await expect(slider).toHaveValue('12');
+  await page.screenshot({ path: '../MyNotes-width-fix.png' });
+  await cdp.detach();
+});
