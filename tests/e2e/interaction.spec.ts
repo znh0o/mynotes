@@ -39,7 +39,10 @@ test('tools switch on the first stylus or touch tap even when compatibility clic
 test('pinch and wheel bursts reuse canvas buffers until the gesture ends', async ({ page, context }) => {
   await page.clock.install();
   await page.goto('./'); await page.getByRole('button', { name: '새 노트', exact: true }).click();
-  await page.getByRole('button', { name: '노트 만들기', exact: true }).click(); await expect(page.locator('.page-loading')).toBeHidden();
+  await page.getByRole('button', { name: '노트 만들기', exact: true }).click();
+  await expect(page.locator('#paper-live')).toBeVisible(); await expect(page.locator('.page-loading')).toBeHidden();
+  await expect(page.locator('.app-slide-layer')).toHaveCount(0);
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   await page.evaluate(() => {
     (window as any).resizes = 0;
     for (const dimension of ['width', 'height']) {
