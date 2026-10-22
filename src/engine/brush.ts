@@ -31,11 +31,13 @@ export function brushLayers(stroke: Stroke, points = smooth(stroke.points)): Bru
   }
   const body = [[...left, ...right.reverse()], circle(points[0], radii[0]), circle(points[points.length - 1], radii[radii.length - 1])];
   if (!pencil) return [{ opacity: 1, polygons: body }];
-  const average = points.reduce((sum, p) => sum + pressure(p.p), 0) / points.length;
   // Dense, broken graphite coverage rather than a pale solid tube with dots.
   // Adjacent irregular deposits leave the paper visible between dark grains.
-  const layers: BrushLayer[] = [{ opacity: .035 + average * .065, polygons: body }, ...[.38, .55, .72, .88].map(opacity => ({ opacity, polygons: [] as XY[][] }))];
-  const step = Math.max(.85, length / 1600), lanes = Math.max(2, Math.min(18, Math.ceil(stroke.width / .85)));
+  const layers: BrushLayer[] = [{ opacity: .06, polygons: body }, ...[.38, .55, .72, .88].map(opacity => ({ opacity, polygons: [] as XY[][] }))];
+  const step = .85, lanes = Math.max(2, Math.min(18, Math.ceil(stroke.width / .85)));
+  // Edge sampling grows during a live stroke. Give the graphite a separate
+  // stream so extending the tip never shuffles grains already on the paper.
+  state = ((stroke.textureSeed ?? 0x6d2b79f5) ^ 0xa511e9b3) >>> 0;
   let index = 1;
   for (let distance = 0; distance <= length; distance += step) {
     while (index < distances.length - 1 && distances[index] < distance) index++;

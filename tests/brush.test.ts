@@ -16,4 +16,9 @@ describe('versioned brush geometry', () => {
       expect(layers.flatMap(l => l.polygons.flat()).every(p => Number.isFinite(p.x) && Number.isFinite(p.y))).toBe(true);
     }
   });
+  it('keeps existing graphite grains in place while extending a live stroke', () => {
+    const points = [20, 180, 1500].map(x => ({ x, y: 50, p: .65, t: x }));
+    const grains = (count: number) => brushLayers({ ...pencil, points: points.slice(0, count) }).slice(1).map(layer => layer.polygons.slice(0, 30).map(polygon => polygon.map(p => [p.x.toFixed(3), p.y.toFixed(3)])));
+    expect(grains(3)).toEqual(grains(2));
+  });
 });
