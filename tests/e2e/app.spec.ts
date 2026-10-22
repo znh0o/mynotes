@@ -135,8 +135,10 @@ test('shape, lasso move/resize/copy/delete, partial eraser and zoom coordinates'
   await expect.poll(async () => (await current()).items.length).toBe(3);
   const last = (await current()).items.at(-1);
   expect(last.x).toBeCloseTo(100 * (await current()).width / zoomRect!.width, 0);
-  await page.getByRole('button', { name: '지우개', exact: true }).click(); await page.locator('#eraser-mode').selectOption('partial');
+  await page.getByRole('button', { name: '지우개', exact: true }).click();
+  await page.getByRole('button', { name: '필기 옵션', exact: true }).click(); await page.locator('#eraser-mode').selectOption('partial');
   await page.locator('#eraser-size').fill('25');
+  await page.getByRole('button', { name: '필기 옵션 닫기', exact: true }).click();
   const before = (await current()).items.filter((i: any) => i.kind === 'stroke')[0];
   const r = await page.locator('#paper-live').boundingBox(), scale = r!.width / (await current()).width;
   const middle = before.points[Math.floor(before.points.length / 2)];
@@ -157,6 +159,13 @@ test('pen width stays reachable in split view and pen dragging changes new strok
     expect(r!.height).toBeGreaterThanOrEqual(40);
     expect(r!.x).toBeGreaterThanOrEqual(0);
     expect(r!.x + r!.width).toBeLessThanOrEqual(width);
+    const colors = (await page.locator('.color-palette').boundingBox())!;
+    const toolbar = (await page.locator('.ink-toolbar').boundingBox())!;
+    const writing = (await page.locator('.paper-viewport').boundingBox())!;
+    expect(Math.abs(r!.y + r!.height / 2 - colors.y - colors.height / 2)).toBeLessThan(2);
+    expect(r!.x).toBeGreaterThan(colors.x + colors.width);
+    expect(toolbar.height).toBeLessThanOrEqual(68);
+    expect(writing.y).toBeCloseTo(toolbar.y + toolbar.height, 0);
   }
   await page.setViewportSize({ width: 834, height: 1000 });
   const cdp = await page.context().newCDPSession(page);
