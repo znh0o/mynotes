@@ -5,6 +5,7 @@ import { InkEngine } from '../engine/InkEngine';
 import { button, contextMenu, escape, icon, modal, pickFile, report, run, toast, confirmAction } from './common';
 import { bindToolTaps } from './tool-taps';
 import { isAppReloadApproved } from '../pwa/navigation';
+import { PagePreviews } from './page-previews';
 
 export class EditorView {
   private engine!: InkEngine;
@@ -27,6 +28,7 @@ export class EditorView {
   private viewportUpdate: (() => void) | null = null;
   private zoomTimer: ReturnType<typeof setTimeout> | undefined;
   private pendingScale: number | null = null;
+  private previews!: PagePreviews;
   constructor(private root: HTMLElement, public note: Note,
     private tabs: { id: string; title: string }[], private open: (id: string) => Promise<void>,
     private home: () => Promise<void>, private closeTab: (id: string) => Promise<void>, private settings: () => void) {
@@ -51,6 +53,9 @@ export class EditorView {
       this.root.querySelector<HTMLElement>('.selection-toolbar')!.hidden = !count;
       this.root.querySelector('#selection-count')!.textContent = `${count}개 선택 · 드래그로 이동`;
     }, (p, tool) => this.insert(p, tool));
+    this.previews = new PagePreviews(this.root.querySelector('#page-thumbnails')!, this.root.querySelector('.page-sidebar')!,
+      () => this.engine.activePointer !== null || this.viewport.classList.contains('zoom-preview'),
+      (id, preview, revision) => { if (this.page?.id === id && this.page.revision === revision) this.page.thumbnail = preview; });
     bindToolTaps(this.root, e => this.click(e), this.abort.signal);
     this.setWidth(this.engine.options.width);
     const widthSlider = this.root.querySelector<HTMLInputElement>('#ink-width')!;
@@ -125,8 +130,9 @@ export class EditorView {
   private async renderThumbnails() {
     const rows = await db.pages.bulkGet(this.note.pageIds);
     if (this.abort.signal.aborted) return;
-    this.root.querySelector('#page-thumbnails')!.innerHTML = rows.map((p, i) => p ? `<div class="page-thumb-row ${i === this.index ? 'active' : ''}"><button class="page-thumb" data-action="page" data-id="${i}" aria-label="${i + 1}페이지"><div class="page-thumb-paper ${p.paper}">${p.thumbnail ? `<img src="${p.thumbnail}" alt="${i + 1}페이지 미리보기"/>` : `<span>${p.pdfAssetId ? 'PDF' : paperNames[p.paper]}</span>`}</div><span>${i + 1}</span></button>${button('MoreHorizontal', `${i + 1}페이지 메뉴`, 'page-menu', `data-id="${i}"`)}</div>` : '').join('');
+    this.root.querySelector('#page-thumbnails')!.innerHTML = rows.map((p, i) => p ? `<div class="page-thumb-row ${i === this.index ? 'active' : ''}"><button class="page-thumb" data-action="page" data-id="${i}" data-page-id="${p.id}" aria-label="${i + 1}페이지"><div class="page-thumb-paper ${p.paper}" style="aspect-ratio:${p.width}/${p.height}">${p.thumbnail ? `<img src="${p.thumbnail}" alt="${i + 1}페이지 미리보기"/>` : `<span>${p.pdfAssetId ? 'PDF' : paperNames[p.paper]}</span>`}</div><span>${i + 1}</span></button>${button('MoreHorizontal', `${i + 1}페이지 메뉴`, 'page-menu', `data-id="${i}"`)}</div>` : '').join('');
     this.root.querySelector('.page-sidebar-heading > span')!.textContent = String(this.note.pageIds.length);
+    this.previews.observe(rows);
   }
   private changed() {
     this.updateHistory();
@@ -402,5 +408,5 @@ export class EditorView {
       }
     }, { signal, passive: false });
   }
-  destroy() { this.cancelViewportUpdate(); clearTimeout(this.thumbTimer); this.generation++; this.engine?.destroy(); this.abort.abort(); this.resizeObserver?.disconnect(); }
+  destroy() { this.previews?.destroy(); this.cancelViewportUpdate(); clearTimeout(this.thumbTimer); this.generation++; this.engine?.destroy(); this.abort.abort(); this.resizeObserver?.disconnect(); }
 }

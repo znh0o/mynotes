@@ -1,0 +1,47 @@
+/* A more vivid blue palette with readable secondary text. Paper and saved ink
+   keep their original colors; these rules only style the app interface. */
+:root{color:#243b5a;background:#f4f7ff;--blue:#386be5;--blue-dark:#2353c9;--blue-light:#e9f0ff;--muted:#657c9d;--border:#dfe7f5}
+.muted,.page-heading p,.workspace-label,.sidebar-empty,.add-folder,.text-button,.local-badge{color:#677f9f}
+.eyebrow,.sidebar-section-title{color:#5575b3}
+.brand{color:#21395d}.brand-dot{color:#386be5}.brand-mark{background:#e1eaff;color:#3265dc}
+.library-topbar{background:#ffffffd9}.breadcrumb{color:#7387a6}.breadcrumb strong{color:#3e587d}
+.avatar{background:#386be5;color:white;box-shadow:0 0 0 1px #cbd9f7}.status-dot{background:#22a77b}
+.nav-item{color:#536b8c}.nav-item>small{color:#7489a8}.nav-item:hover{background:#eef3ff}
+.nav-item.active{background:#3b6fe7;color:#fff;box-shadow:0 4px 10px #3b6fe71c}
+.nav-item.active small{background:#ffffff2e;color:white}.nav-item.active>span:first-child{color:white}
+.device-note{color:#5f7899}.device-note div span{color:#8395af}
+.button.secondary{border-color:#d2def2;color:#43618d}.button.primary{box-shadow:0 4px 10px #386be52b}
+.welcome-banner{background:linear-gradient(115deg,#dae6ff,#ebeaff 65%,#e0eaff);border-color:#ccdbfa}
+.welcome-banner h2{color:#244f9f}.welcome-banner p{color:#56729c}.banner-label{color:#587dc2}.banner-label>span{background:#5b88e7}
+.banner-link{color:#285bce}.banner-link:hover{color:#1b45ad}.art-notebook.front{background:#7298e9}.art-notebook.back{background:#b1c1f0}.art-star{color:#7096df}.art-dot{background:#8caaf0}
+.section-heading h2{color:#314d74}.section-heading h2 svg{color:#5c81c0}.recent-note{border-color:#dce5f5}
+.recent-note:hover{border-color:#8dace9;box-shadow:0 3px 9px #456fbe0d}.recent-note strong{color:#2c466d}.recent-note span{color:#748bab}
+.collection-tab{color:#6f83a3}.collection-tab.active{color:#2e60d5}.collection-tab.active:after{background:#3b6fe5}
+.collection-tab>span{background:#dce8ff;color:#3f6ed3}.search-field{border-color:#d6e1f5;color:#7291bf}.search-field input{color:#395478}.search-field input::placeholder{color:#8195b4}
+.sort-field select{color:#5f789e}.view-toggle .icon-button{color:#8da2c1}.icon-button.active{color:#2d63dc;background:#e2ebff}
+.notebook-cover{box-shadow:3px 5px 10px #365b8c25;border-bottom-color:#d6e0ef}.cover-title,.cover-brand,.cover-edition{color:var(--cover-ink,#fff)}
+.cover-title{font-weight:650}.note-title{color:#304d76}.note-info span{color:#748aaa}.note-menu{color:#6c87b0}
+.new-note-tile{background:#eff4ff;border-color:#b7cbef}.new-note-tile:hover{background:#e7efff;border-color:#729ce8}
+.new-note-tile>span{background:#dfebff;color:#4e7edd}.new-note-tile strong{color:#4b70aa}.new-note-tile small{color:#7e98bd}
+.template-card{border-color:#dae5f7}.template-card strong{color:#395781}.template-card>div>span{color:#7c91af}.template-card>svg{color:#7593c1}
+.library-footer{color:#7b91b2}.paper-mini span{color:#6b8ab6}.empty-state{color:#7b9ac8}.empty-state h3{color:#5579ac}
+.editor-header{background:#f2f6ff;border-bottom-color:#d8e3f6}.editor-home{color:#486b9d}.note-tab{color:#6b84a6}.note-tab.active{color:#2f61d7;border-color:#d5e1f6}
+.editor-header-actions .icon-button{color:#6181ae}.save-indicator{color:#3e8c79}
+.ink-toolbar{border-bottom-color:#dce6f6}.tool-group>.icon-button{color:#6f88ad}.tool-button{color:#627ea7}.tool-button span{font-size:9px}
+.tool-button:hover{background:#eaf0fc}.tool-button.active,.tool-button.active:hover{background:#3e70e4;color:#fff;box-shadow:0 3px 8px #3e70e42a}
+.tool-options{background:#f1f5ff;border-bottom-color:#dbe5f8;color:#6280a9}.tool-options .text-button{color:#5277ae}.tool-options select{color:#456b9e;border-color:#d4e1f5}
+.pen-width-control{color:#5376a8}.pen-width-control>output{color:#2c61d5;font-weight:600}.pen-width-control>button{color:#4274d2}
+.pen-width-control input::-webkit-slider-runnable-track{background:linear-gradient(to right,#4e80e3 var(--width-progress,13%),#ccdaf4 var(--width-progress,13%))}
+.pen-width-control input::-webkit-slider-thumb{background:#3f73df}.pen-width-control input::-moz-range-thumb{background:#3f73df}.pen-width-control input::-moz-range-progress{background:#4e80e3}
+.finger-switch input:checked+span{background:#4b7ce2}.finger-switch span{background:#d1dcf0}
+.page-sidebar{background:#f3f6fe;border-right-color:#d7e2f5}.page-sidebar-heading{color:#5579ad}.page-thumb{color:#718bad}.page-thumb-paper{border-color:#cddbf0}
+.page-thumb-paper>span{color:#8098bb}.page-thumb-row.active .page-thumb-paper{outline-color:#3f74e3}.page-thumb-row.active .page-thumb>span{background:#3f74e3;color:white}
+.add-page-button{border-color:#b9cdef;color:#537fc2}.paper-viewport{background:#e3eaf6}.editor-footer{background:#f5f8ff;color:#7189ac;border-top-color:#d7e2f5}
+.zoom-controls>button:not(.icon-button){color:#5b7fb5}.page-navigation{color:#4d73ab}.selection-toolbar{color:#4777bc;border-color:#c3d6f5}
+.form-label{color:#526f98}.form-label>input:not([type=color]),.form-label>select,.form-label>textarea{color:#35557e;border-color:#cfdef4}
+.dialog-description{color:#6b83a5}.modal header .eyebrow{color:#4773c3}.settings-intro p,.settings-section p{color:#7188a8}.settings-section h3{color:#456fae}
+.storage-row{color:#6a82a5}.storage-row strong{color:#3868bd}.paper-options label:has(:checked){border-color:#4b7de2;background:#eaf1ff}.paper-options label>span{color:#6280ac}
+.context-menu button{color:#45648d}.context-menu button:hover{background:#eaf1ff}.context-menu button.danger{color:#c45d75}
+.app-slide-layer{position:fixed;inset:0;z-index:60;overflow:hidden;pointer-events:none;background:#f4f7ff;box-shadow:0 0 35px #203e7020;will-change:transform,opacity}
+.app-slide-layer>div{position:relative;min-height:100dvh;width:100%}
+@media(hover:none){.tool-button:hover:not(.active){background:transparent}}

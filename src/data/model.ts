@@ -34,7 +34,7 @@ export const uid = () => crypto.randomUUID();
 export const paperNames: Record<Paper, string> = {
   blank: '무지', lined: '줄노트', grid: '모눈', dots: '도트', cornell: '코넬', planner: '주간 플래너'
 };
-export const covers = ['#b9cee5', '#c4d4c4', '#d9bfd1', '#e4d4bd', '#bcc5df', '#495c75'];
+export const covers = ['#5482da', '#50a08c', '#bd73a4', '#c69b63', '#8575ce', '#344e7c'];
 export function newPage(noteId: string, options: Partial<Page> = {}): Page {
   return { id: uid(), noteId, width: 794, height: 1123, paper: 'lined',
     paperColor: '#fffefb', spacing: 32, items: [], revision: 0, ...options };

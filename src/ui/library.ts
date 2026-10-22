@@ -2,6 +2,7 @@ import { db, persistNew, deletePermanently } from '../data/store';
 import { covers, createNote, paperNames, uid, type Folder, type Note, type Paper } from '../data/model';
 import { importPDF, thumbnail } from '../data/pdf';
 import { icon, button, escape, safeColor, modal, toast, run, pickFile, contextMenu, confirmAction, formatDate } from './common';
+export interface LibraryState { filter: string; query: string; sort: string; list: boolean }
 
 export class LibraryView {
   private notes: Note[] = [];
@@ -11,7 +12,10 @@ export class LibraryView {
   private sort = 'updated';
   private list = false;
   private abort = new AbortController();
-  constructor(private root: HTMLElement, private openNote: (id: string) => Promise<void>, private settings: () => void) {
+  private previewVersion = 0;
+  constructor(private root: HTMLElement, private openNote: (id: string) => Promise<void>, private settings: () => void,
+    private navigateFilter: (filter: string) => Promise<void> = async filter => this.setFilter(filter), initial?: LibraryState) {
+    if (initial) { this.filter = initial.filter; this.query = initial.query; this.sort = initial.sort; this.list = initial.list; }
     root.addEventListener('click', e => this.click(e), { signal: this.abort.signal });
     root.addEventListener('input', e => {
       const el = e.target as HTMLInputElement;
@@ -22,18 +26,32 @@ export class LibraryView {
   async show() {
     this.notes = await db.notes.toArray(); this.folders = await db.folders.toArray();
     this.render();
-    for (const note of this.notes.filter(n => !n.thumbnail && !n.deleted).slice(0, 12)) {
-      const page = await db.pages.get(note.pageIds[0]);
-      if (page) try { note.thumbnail = await thumbnail(page); await db.notes.update(note.id, { thumbnail: note.thumbnail }); } catch { /* Preview failure never blocks opening a note. */ }
-    }
-    if (!this.abort.signal.aborted) this.renderResults();
+    void this.previews(++this.previewVersion);
   }
+  private async previews(version: number) {
+    for (const note of this.notes.filter(n => !n.thumbnail && !n.deleted).slice(0, 12)) {
+      if (this.abort.signal.aborted || version !== this.previewVersion) return;
+      const page = await db.pages.get(note.pageIds[0]);
+      if (page) try {
+        const preview = await thumbnail(page);
+        if (this.abort.signal.aborted || version !== this.previewVersion) return;
+        const accepted = await db.transaction('rw', db.pages, db.notes, async () => {
+          const latest = await db.pages.get(page.id); if (!latest || latest.revision !== page.revision) return false;
+          await db.notes.update(note.id, { thumbnail: preview }); return true;
+        });
+        if (accepted) note.thumbnail = preview;
+      } catch { /* Preview failure never blocks opening a note. */ }
+    }
+    if (!this.abort.signal.aborted && version === this.previewVersion) this.renderResults();
+  }
+  snapshot(): LibraryState { return { filter: this.filter, query: this.query, sort: this.sort, list: this.list }; }
+  setFilter(filter: string) { this.filter = filter; this.renderResults(); }
   private render() {
     document.title = 'MyNotes · 나의 서재';
     const active = this.notes.filter(n => !n.deleted);
     this.root.innerHTML = `<div class="library-shell">
       <aside class="library-sidebar">
-        <a class="brand" href="#" aria-label="MyNotes 홈"><span class="brand-mark">${icon('PenLine', 24)}</span>MyNotes<span class="brand-dot">.</span></a>
+        <button class="brand" data-action="filter" data-id="all" aria-label="MyNotes 홈"><span class="brand-mark">${icon('PenLine', 24)}</span>MyNotes<span class="brand-dot">.</span></button>
         <div class="workspace-label">나만의 작은 서재</div>
         <nav aria-label="서재 탐색">
           ${this.nav('all', 'Library', '모든 노트', active.length)}
@@ -68,7 +86,11 @@ export class LibraryView {
     return `<button class="nav-item ${this.filter === id ? 'active' : ''}" data-action="filter" data-id="${id}"><span ${color ? `style="color:${safeColor(color)}"` : ''}>${icon(name)}</span><span>${escape(label)}</span>${count !== undefined ? `<small>${count}</small>` : ''}</button>`;
   }
   private card(note: Note) {
-    return `<article class="note-card"><button class="note-open" data-action="open" data-id="${note.id}" aria-label="${escape(note.title)} 열기"><div class="notebook-cover" style="--cover:${safeColor(note.cover)}"><div class="cover-spine"></div><span class="cover-brand">MYNOTES</span><div class="cover-title">${escape(note.title)}</div><div class="cover-preview">${note.thumbnail ? `<img src="${note.thumbnail}" alt="첫 페이지 미리보기" loading="lazy" />` : `<div class="preview-lines"></div>`}</div><span class="cover-edition">PERSONAL COLLECTION <i>01</i></span></div></button><div class="note-info"><div><button class="note-title" data-action="open" data-id="${note.id}">${escape(note.title)}</button><span>${note.pageIds.length}페이지 <i>·</i> ${note.deleted ? '휴지통' : formatDate(note.updated)}</span></div><button class="note-menu icon-button" data-action="note-menu" data-id="${note.id}" aria-label="${escape(note.title)} 메뉴">${icon('MoreHorizontal', 19)}</button></div>${note.favorite ? `<span class="note-star">${icon('Star', 13)}</span>` : ''}</article>`;
+    const cover = safeColor(note.cover);
+    const channels = [1, 3, 5].map(i => parseInt(cover.slice(i, i + 2), 16) / 255);
+    const light = channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722;
+    const coverInk = light > .67 ? '#25416b' : '#ffffff';
+    return `<article class="note-card"><button class="note-open" data-action="open" data-id="${note.id}" aria-label="${escape(note.title)} 열기"><div class="notebook-cover" style="--cover:${cover};--cover-ink:${coverInk}"><div class="cover-spine"></div><span class="cover-brand">MYNOTES</span><div class="cover-title">${escape(note.title)}</div><div class="cover-preview">${note.thumbnail ? `<img src="${note.thumbnail}" alt="첫 페이지 미리보기" loading="lazy" />` : `<div class="preview-lines"></div>`}</div><span class="cover-edition">PERSONAL COLLECTION <i>01</i></span></div></button><div class="note-info"><div><button class="note-title" data-action="open" data-id="${note.id}">${escape(note.title)}</button><span>${note.pageIds.length}페이지 <i>·</i> ${note.deleted ? '휴지통' : formatDate(note.updated)}</span></div><button class="note-menu icon-button" data-action="note-menu" data-id="${note.id}" aria-label="${escape(note.title)} 메뉴">${icon('MoreHorizontal', 19)}</button></div>${note.favorite ? `<span class="note-star">${icon('Star', 13)}</span>` : ''}</article>`;
   }
   private renderResults() {
     if (this.abort.signal.aborted) return;
@@ -92,7 +114,7 @@ export class LibraryView {
   private click(event: Event) {
     const target = (event.target as Element).closest<HTMLElement>('[data-action]'); if (!target) return;
     const { action, id } = target.dataset;
-    if (action === 'filter') { this.filter = id!; this.root.querySelector('.library-sidebar')?.classList.remove('mobile-open'); this.renderResults(); }
+    if (action === 'filter') { this.root.querySelector('.library-sidebar')?.classList.remove('mobile-open'); run(() => this.navigateFilter(id!)); }
     if (action === 'new' || action === 'template') this.newNote(action === 'template' ? id as Paper : 'lined');
     if (action === 'open') run(() => this.openNote(id!));
     if (action === 'new-folder') this.folderDialog();

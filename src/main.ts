@@ -1,8 +1,11 @@
 import './style.css';
+import './theme.css';
 import { registerSW } from 'virtual:pwa-register';
 import { backup, db, initialize, restore } from './data/store';
 import { EditorView } from './ui/editor';
-import { LibraryView } from './ui/library';
+import { LibraryView, type LibraryState } from './ui/library';
+import { AppHistory, type AppRoute, type Direction } from './ui/history';
+import { finishSlide, slidePreviousView } from './ui/transitions';
 import { escape, icon, modal, pickFile, report, run, toast } from './ui/common';
 import { checkForUpdate, applyWaitingUpdate } from './pwa/updates';
 import { version as appVersion } from '../package.json';
@@ -10,6 +13,9 @@ import { version as appVersion } from '../package.json';
 const root = document.querySelector<HTMLElement>('#app')!;
 let library: LibraryView | undefined, editor: EditorView | undefined;
 const tabs: { id: string; title: string }[] = [];
+let libraryState: LibraryState = { filter: 'all', query: '', sort: 'updated', list: false };
+let libraryScroll = 0;
+const navigation = new AppHistory(renderRoute, report, () => toast('서재에 있어요. 노트를 열어 계속 사용할 수 있어요.'));
 let installPrompt: (Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> }) | undefined;
 let updateAvailable = false;
 let serviceWorkerRegistration: ServiceWorkerRegistration | undefined;
@@ -43,23 +49,39 @@ window.addEventListener('appinstalled', () => { installPrompt = undefined; toast
 window.addEventListener('offline', () => toast('오프라인이에요. 이 기기에서 계속 필기할 수 있어요.'));
 
 async function home() {
-  if (editor) { await editor.flush(); editor.destroy(); editor = undefined; }
-  library?.destroy(); library = new LibraryView(root, open, settings); await library.show();
+  if (editor) await navigation.goHome();
+  else await library?.show();
 }
 async function open(id: string) {
-  const note = await db.notes.get(id); if (!note || note.deleted) throw new Error('노트를 찾을 수 없어요.');
+  await navigation.navigate({ screen: 'note', id });
+}
+async function renderRoute(route: AppRoute, direction: Direction) {
+  if (route.screen === 'library' && library && !editor) {
+    library.setFilter(route.filter); libraryState = library.snapshot(); return;
+  }
+  const note = route.screen === 'note' ? await db.notes.get(route.id) : undefined;
+  if (route.screen === 'note' && (!note || note.deleted)) throw new Error('노트를 찾을 수 없어요.');
+  finishSlide(); const previous = root.firstElementChild, oldScroll = window.scrollY, wasEditor = !!editor;
+  if (library) { libraryState = library.snapshot(); libraryScroll = oldScroll; library.destroy(); library = undefined; }
   if (editor) { await editor.flush(); editor.destroy(); editor = undefined; }
-  library?.destroy(); library = undefined;
-  const existing = tabs.find(t => t.id === id);
-  if (existing) existing.title = note.title; else tabs.push({ id, title: note.title });
-  await db.notes.update(id, { opened: Date.now() });
-  editor = new EditorView(root, note, tabs, open, home, closeTab, settings); await editor.start();
+  if (route.screen === 'library') {
+    const restoreScroll = libraryState.filter === route.filter ? libraryScroll : 0;
+    libraryState = { ...libraryState, filter: route.filter };
+    library = new LibraryView(root, open, settings, filter => navigation.navigate({ screen: 'library', filter }), libraryState);
+    await library.show(); window.scrollTo(0, restoreScroll);
+  } else {
+    const existing = tabs.find(t => t.id === note!.id);
+    if (existing) existing.title = note!.title; else tabs.push({ id: note!.id, title: note!.title });
+    await db.notes.update(note!.id, { opened: Date.now() });
+    editor = new EditorView(root, note!, tabs, open, home, closeTab, settings); await editor.start(); window.scrollTo(0, 0);
+  }
+  slidePreviousView(root, previous, wasEditor && route.screen === 'note' ? 'none' : direction, oldScroll);
 }
 async function closeTab(id: string) {
   const current = editor?.note.id; if (current === id) await editor?.flush();
   const index = tabs.findIndex(t => t.id === id); if (index !== -1) tabs.splice(index, 1);
   if (current === id) { if (tabs.length) await open(tabs[Math.min(index, tabs.length - 1)].id); else await home(); }
-  else if (current) await open(current);
+  else if (current) await renderRoute({ screen: 'note', id: current }, 'none');
 }
 function settings() {
   run(async () => {
@@ -96,7 +118,7 @@ function settings() {
   });
 }
 async function boot() {
-  await initialize(); await home();
+  await initialize(); await navigation.start();
   const estimate = await navigator.storage?.estimate?.();
   if (estimate?.usage && estimate.quota && estimate.usage / estimate.quota > .8) toast('저장 공간이 거의 찼어요. 설정에서 백업해 주세요.', true);
 }

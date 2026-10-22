@@ -1,4 +1,5 @@
 import { createElement, BookOpen, Library, Folder, Star, Clock, Trash2, Plus, Search, Settings2, Upload, Download, ChevronDown, ChevronLeft, ChevronRight, Check, X, MoreHorizontal, Grid2X2, List, PenLine, Feather, Highlighter, Eraser, Lasso, Shapes, Type, Image, Hand, Undo2, Redo2, Maximize, Minimize, PanelLeft, Copy, Minus, FileText, ArrowUp, ArrowDown, WifiOff, HardDrive, ShieldCheck, ArrowUpRight, Menu, FolderPlus, RefreshCw, HelpCircle, ExternalLink, LayoutTemplate, Move, Pencil } from 'lucide';
+import { trackDialog } from './history';
 const iconSet = { BookOpen, Library, Folder, Star, Clock, Trash2, Plus, Search, Settings2, Upload, Download, ChevronDown, ChevronLeft, ChevronRight, Check, X, MoreHorizontal, Grid2X2, List, PenLine, Feather, Highlighter, Eraser, Lasso, Shapes, Type, Image, Hand, Undo2, Redo2, Maximize, Minimize, PanelLeft, Copy, Minus, FileText, ArrowUp, ArrowDown, WifiOff, HardDrive, ShieldCheck, ArrowUpRight, Menu, FolderPlus, RefreshCw, HelpCircle, ExternalLink, LayoutTemplate, Move, Pencil };
 export type IconName = keyof typeof iconSet;
 export function icon(name: IconName, size = 20) { const [tag, attrs, children] = iconSet[name]; return createElement([tag, { ...attrs, width: size, height: size, 'stroke-width': 1.7, 'aria-hidden': 'true' }, children]).outerHTML; }
@@ -24,7 +25,7 @@ export function modal(title: string, content: string, submitLabel: string, submi
     try { await submit(new FormData(e.target as HTMLFormElement), dialog); dialog.close(); }
     catch (error) { report(error); } finally { btn.disabled = false; }
   });
-  document.body.append(dialog); dialog.showModal(); return dialog;
+  document.body.append(dialog); dialog.showModal(); trackDialog(dialog); return dialog;
 }
 export function confirmAction(title: string, description: string, label: string, action: () => Promise<void>) {
   return modal(title, `<p class="dialog-description">${escape(description)}</p>`, label, action);
