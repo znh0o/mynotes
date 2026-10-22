@@ -37,6 +37,7 @@ test('tools switch on the first stylus or touch tap even when compatibility clic
 });
 
 test('pinch and wheel bursts reuse canvas buffers until the gesture ends', async ({ page, context }) => {
+  await page.clock.install();
   await page.goto('./'); await page.getByRole('button', { name: '새 노트', exact: true }).click();
   await page.getByRole('button', { name: '노트 만들기', exact: true }).click(); await expect(page.locator('.page-loading')).toBeHidden();
   await page.evaluate(() => {
@@ -58,13 +59,18 @@ test('pinch and wheel bursts reuse canvas buffers until the gesture ends', async
   await expect(page.locator('.zoom-preview')).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => (window as any).resizes)).toBeGreaterThan(0);
   expect(await page.evaluate(() => (window as any).resizes)).toBeLessThanOrEqual(6);
+  // Keep the 140ms wheel settle timer from expiring between remote assertions
+  // on a busy CI runner. Advance browser frames and timer boundaries explicitly.
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
   await page.evaluate(() => {
     (window as any).resizes = 0;
     const viewport = document.querySelector('.paper-viewport')!;
     for (let i = 0; i < 30; i++) viewport.dispatchEvent(new WheelEvent('wheel', { deltaY: -2, ctrlKey: true, bubbles: true, cancelable: true }));
   });
-  await page.evaluate(() => new Promise(requestAnimationFrame));
+  await page.clock.runFor(16);
   expect(await page.evaluate(() => (window as any).resizes)).toBe(0);
+  await expect(page.locator('.zoom-preview')).toHaveCount(1);
+  await page.clock.runFor(160);
   await expect(page.locator('.zoom-preview')).toHaveCount(0, { timeout: 5000 });
   expect(await page.evaluate(() => (window as any).resizes)).toBeLessThanOrEqual(6);
   await cdp.detach();
