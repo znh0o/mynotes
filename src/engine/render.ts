@@ -1,26 +1,33 @@
-import type { Item, Page, Point, Stroke } from '../data/model';
+import { smooth, brushLayers } from './brush';
+export { smooth } from './brush';
+import type { Item, Page, Stroke } from '../data/model';
 export const imageCache = new Map<string, HTMLImageElement>();
-
-export function smooth(points: Point[]): Point[] {
-  if (points.length < 3) return points;
-  const output: Point[] = [points[0]];
-  for (let i = 1; i < points.length; i++) {
-    const a = points[i - 1], b = points[i], c = points[i + 1] || b;
-    const start = i === 1 ? a : { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, p: (a.p + b.p) / 2, t: a.t };
-    const end = { x: (b.x + c.x) / 2, y: (b.y + c.y) / 2, p: (b.p + c.p) / 2, t: b.t };
-    const steps = Math.max(2, Math.min(12, Math.ceil(Math.hypot(end.x - start.x, end.y - start.y) / 3)));
-    for (let n = 1; n <= steps; n++) {
-      const t = n / steps, u = 1 - t;
-      output.push({ x: u * u * start.x + 2 * u * t * b.x + t * t * end.x,
-        y: u * u * start.y + 2 * u * t * b.y + t * t * end.y,
-        p: start.p + (end.p - start.p) * t, t: b.t });
+interface CachedBrush { width: number; seed?: number; tool: Stroke['tool']; points: Float64Array; layers: { opacity: number; path: Path2D }[] }
+const brushCache = new WeakMap<Stroke, CachedBrush>();
+function brushPaths(stroke: Stroke) {
+  const previous = brushCache.get(stroke);
+  if (previous && previous.width === stroke.width && previous.seed === stroke.textureSeed && previous.tool === stroke.tool && previous.points.length === stroke.points.length * 3 &&
+    stroke.points.every((point, i) => previous.points[i * 3] === point.x && previous.points[i * 3 + 1] === point.y && previous.points[i * 3 + 2] === point.p)) return previous.layers;
+  const layers = brushLayers(stroke).map(layer => {
+    const path = new Path2D();
+    for (const polygon of layer.polygons) {
+      path.moveTo(polygon[0].x, polygon[0].y);
+      for (let i = 1; i < polygon.length; i++) path.lineTo(polygon[i].x, polygon[i].y);
+      path.closePath();
     }
-  }
-  output.push(points[points.length - 1]);
-  return output;
+    return { opacity: layer.opacity, path };
+  });
+  brushCache.set(stroke, { width: stroke.width, seed: stroke.textureSeed, tool: stroke.tool, points: new Float64Array(stroke.points.flatMap(point => [point.x, point.y, point.p])), layers });
+  return layers;
 }
+
 export function drawStroke(ctx: CanvasRenderingContext2D, stroke: Stroke) {
   if (!stroke.points.length) return;
+  if (stroke.tool === 'pencil' || stroke.tool === 'fountain' && stroke.brushVersion === 2) {
+    ctx.save(); ctx.fillStyle = stroke.color;
+    for (const layer of brushPaths(stroke)) { ctx.globalAlpha = layer.opacity; ctx.fill(layer.path); }
+    ctx.restore(); return;
+  }
   const pts = smooth(stroke.points);
   ctx.save(); ctx.fillStyle = stroke.color; ctx.strokeStyle = stroke.color;
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';

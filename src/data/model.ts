@@ -1,10 +1,11 @@
 export type Paper = 'blank' | 'lined' | 'grid' | 'dots' | 'cornell' | 'planner';
-export type Tool = 'pen' | 'fountain' | 'highlighter' | 'eraser' | 'lasso' | 'shape' | 'text' | 'image' | 'hand';
+export type Tool = 'pen' | 'fountain' | 'pencil' | 'highlighter' | 'eraser' | 'lasso' | 'shape' | 'text' | 'image' | 'hand';
 export type Shape = 'line' | 'rect' | 'ellipse' | 'triangle';
 export interface Point { x: number; y: number; p: number; t: number }
 export interface Stroke {
-  id: string; kind: 'stroke'; tool: 'pen' | 'fountain' | 'highlighter';
+  id: string; kind: 'stroke'; tool: 'pen' | 'fountain' | 'pencil' | 'highlighter';
   color: string; width: number; pressure: boolean; points: Point[];
+  brushVersion?: 2; textureSeed?: number;
 }
 export interface ShapeItem {
   id: string; kind: 'shape'; shape: Shape; x: number; y: number; w: number; h: number;

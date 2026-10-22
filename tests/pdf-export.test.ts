@@ -8,7 +8,8 @@ describe('vector PDF export', () => {
   it('writes pressure outlines, highlighter and shapes as PDF paths without bitmap overlays', async () => {
     const { note, page } = createNote('Vector', '#b9cee5', null, { paper: 'grid' });
     page.items = [
-      { id: 'ink', kind: 'stroke', tool: 'fountain', width: 4, color: '#30445e', pressure: true, points: [{ x: 40, y: 80, p: .2, t: 0 }, { x: 80, y: 100, p: .9, t: 1 }, { x: 130, y: 80, p: .4, t: 2 }] },
+      { id: 'ink', kind: 'stroke', tool: 'fountain', brushVersion: 2, width: 4, color: '#30445e', pressure: true, points: [{ x: 40, y: 80, p: .2, t: 0 }, { x: 80, y: 100, p: .9, t: 1 }, { x: 130, y: 80, p: .4, t: 2 }] },
+      { id: 'graphite', kind: 'stroke', tool: 'pencil', brushVersion: 2, textureSeed: 42, width: 6, color: '#30445e', pressure: true, points: [{ x: 40, y: 120, p: .2, t: 0 }, { x: 200, y: 120, p: .9, t: 1 }] },
       { id: 'marker', kind: 'stroke', tool: 'highlighter', width: 18, color: '#e5c360', pressure: false, points: [{ x: 40, y: 150, p: .5, t: 0 }, { x: 200, y: 150, p: .5, t: 1 }] },
       { id: 'shape', kind: 'shape', shape: 'ellipse', x: 40, y: 200, w: 180, h: 90, color: '#5e85bd', width: 2 }
     ];

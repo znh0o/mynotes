@@ -3,11 +3,11 @@ import { bounds, erase, inside, transform } from './geometry';
 import { drawItem, drawItems } from './render';
 
 export interface InkOptions {
-  tool: Tool; color: string; width: number; pressure: boolean; fingerDrawing: boolean;
+  tool: Tool; color: string; width: number; fingerDrawing: boolean;
   eraserSize: number; partialEraser: boolean; shape: Shape;
 }
 export class InkEngine {
-  options: InkOptions = { tool: 'pen', color: '#30445e', width: 3, pressure: true, fingerDrawing: false, eraserSize: 24, partialEraser: false, shape: 'rect' };
+  options: InkOptions = { tool: 'pen', color: '#30445e', width: 3, fingerDrawing: false, eraserSize: 24, partialEraser: false, shape: 'rect' };
   page!: Page;
   selected = new Set<string>();
   activePointer: number | null = null;
@@ -139,7 +139,8 @@ export class InkEngine {
     } else if (tool === 'shape') this.shape = { id: uid(), kind: 'shape', shape: this.options.shape, x: p.x, y: p.y, w: 0, h: 0, color: this.options.color, width: this.options.width };
     else this.stroke = { id: uid(), kind: 'stroke', tool: tool as Stroke['tool'], color: this.options.color,
       width: tool === 'highlighter' ? Math.max(14, this.options.width * 5) : this.options.width,
-      pressure: tool === 'fountain' || this.options.pressure, points: [p] };
+      pressure: tool === 'fountain' || tool === 'pencil', brushVersion: 2,
+      ...(tool === 'pencil' ? { textureSeed: Math.floor(Math.random() * 0x100000000) } : {}), points: [p] };
     this.schedule();
   }
   private move(e: PointerEvent) {

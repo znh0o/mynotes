@@ -130,7 +130,8 @@ export async function restore(file: File) {
       if (i.kind === 'stroke' && (!Array.isArray(i.points) || i.points.some(v => !Number.isFinite(v.x) || !Number.isFinite(v.y) || !Number.isFinite(v.p)))) throw new Error('손상된 획');
       if (i.kind === 'image' && !assetIds.has(i.assetId)) throw new Error('누락된 이미지');
       if (i.kind !== 'image') color(i.color);
-      if (i.kind === 'stroke' && (!['pen', 'fountain', 'highlighter'].includes(i.tool) || !finite(i.width, 1000) || i.width <= 0 || i.points.some(v => !finite(v.x) || !finite(v.y) || !finite(v.p, 1) || !finite(v.t, 1e15)))) throw new Error('잘못된 펜 데이터');
+      if (i.kind === 'stroke' && (!['pen', 'fountain', 'pencil', 'highlighter'].includes(i.tool) || !finite(i.width, 1000) || i.width <= 0 || i.points.some(v => !finite(v.x) || !finite(v.y) || !finite(v.p, 1) || !finite(v.t, 1e15)))) throw new Error('잘못된 펜 데이터');
+      if (i.kind === 'stroke' && (i.brushVersion !== undefined && i.brushVersion !== 2 || i.textureSeed !== undefined && (!Number.isSafeInteger(i.textureSeed) || i.textureSeed < 0 || i.textureSeed > 0xffffffff))) throw new Error('잘못된 펜 질감 데이터');
       if (i.kind !== 'stroke' && ![i.x, i.y, i.w, i.h].every(v => finite(v))) throw new Error('잘못된 오브젝트 좌표');
       if (i.kind === 'text' && (typeof i.text !== 'string' || !finite(i.size, 1000) || i.size <= 0)) throw new Error('잘못된 텍스트');
       if (i.kind === 'shape' && (!['line', 'rect', 'ellipse', 'triangle'].includes(i.shape) || !finite(i.width, 1000) || i.width <= 0)) throw new Error('잘못된 도형');
