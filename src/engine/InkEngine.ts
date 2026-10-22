@@ -39,15 +39,19 @@ export class InkEngine {
   }
   load(page: Page) {
     this.cancel(); this.page = page; this.selected.clear(); this.selection(0);
-    this.history = []; this.future = []; this.resize();
+    this.history = []; this.future = []; this.resize(true);
   }
-  resize() {
+  resize(force = false) {
     if (!this.page) return;
     const rect = this.live.getBoundingClientRect();
     const target = Math.max(1, (rect.width / this.page.width) * devicePixelRatio);
-    this.ratio = Math.min(target, Math.sqrt(14000000 / (this.page.width * this.page.height)));
+    const ratio = Math.min(target, Math.sqrt(14000000 / (this.page.width * this.page.height)));
+    const width = Math.ceil(this.page.width * ratio), height = Math.ceil(this.page.height * ratio);
+    if (!force && this.ink.width === width && this.ink.height === height && this.live.width === width && this.live.height === height) return;
+    this.ratio = ratio;
     for (const canvas of [this.ink, this.live]) {
-      canvas.width = Math.ceil(this.page.width * this.ratio); canvas.height = Math.ceil(this.page.height * this.ratio);
+      if (canvas.width !== width) canvas.width = width;
+      if (canvas.height !== height) canvas.height = height;
     }
     this.render(); this.preview();
   }
@@ -119,7 +123,7 @@ export class InkEngine {
   private down(e: PointerEvent) {
     if (!this.page || this.activePointer !== null || e.button > 0 && e.button !== 5) return;
     if (e.pointerType === 'pen') this.lastPen = performance.now();
-    if (e.pointerType === 'touch' && (!this.options.fingerDrawing || performance.now() - this.lastPen < 800)) return;
+    if (e.pointerType === 'touch' && (!this.options.fingerDrawing || this.lastPen > 0 && performance.now() - this.lastPen < 800)) return;
     if (this.options.tool === 'hand') return;
     e.preventDefault();
     const p = this.point(e), tool = e.button === 5 || e.buttons === 32 ? 'eraser' : this.options.tool;

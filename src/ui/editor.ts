@@ -3,6 +3,8 @@ import { newPage, paperNames, uid, type Item, type Note, type Page, type Paper, 
 import { background, exportPDF, loadImages, thumbnail } from '../data/pdf';
 import { InkEngine } from '../engine/InkEngine';
 import { button, contextMenu, escape, icon, modal, pickFile, report, run, toast, confirmAction } from './common';
+import { bindToolTaps } from './tool-taps';
+import { isAppReloadApproved } from '../pwa/navigation';
 
 export class EditorView {
   private engine!: InkEngine;
@@ -21,6 +23,10 @@ export class EditorView {
   private pan: { id: number; x: number; y: number; left: number; top: number } | null = null;
   private viewport!: HTMLElement;
   private widthPointer: number | null = null;
+  private viewportFrame = 0;
+  private viewportUpdate: (() => void) | null = null;
+  private zoomTimer: ReturnType<typeof setTimeout> | undefined;
+  private pendingScale: number | null = null;
   constructor(private root: HTMLElement, public note: Note,
     private tabs: { id: string; title: string }[], private open: (id: string) => Promise<void>,
     private home: () => Promise<void>, private closeTab: (id: string) => Promise<void>, private settings: () => void) {
@@ -45,6 +51,7 @@ export class EditorView {
       this.root.querySelector<HTMLElement>('.selection-toolbar')!.hidden = !count;
       this.root.querySelector('#selection-count')!.textContent = `${count}개 선택 · 드래그로 이동`;
     }, (p, tool) => this.insert(p, tool));
+    bindToolTaps(this.root, e => this.click(e), this.abort.signal);
     this.setWidth(this.engine.options.width);
     const widthSlider = this.root.querySelector<HTMLInputElement>('#ink-width')!;
     const widthFromPointer = (e: PointerEvent) => {
@@ -75,7 +82,7 @@ export class EditorView {
     }, { signal: this.abort.signal });
     document.addEventListener('keydown', e => this.keyboard(e), { signal: this.abort.signal });
     document.addEventListener('visibilitychange', () => { if (document.hidden) run(() => this.flush()); }, { signal: this.abort.signal });
-    window.addEventListener('beforeunload', e => { if (this.queue.busy || this.engine.activePointer !== null) { e.preventDefault(); e.returnValue = ''; } }, { signal: this.abort.signal });
+    window.addEventListener('beforeunload', e => { if (!isAppReloadApproved()) { e.preventDefault(); e.returnValue = ''; } }, { signal: this.abort.signal });
     this.setupGestures();
     await this.showPage(0);
     this.resizeObserver = new ResizeObserver(() => { if (this.fit && this.page) this.setScale(this.fitScale(), true); });
@@ -85,7 +92,10 @@ export class EditorView {
   async showPage(index: number) {
     if (index < 0 || index >= this.note.pageIds.length || this.switching) return;
     this.switching = true;
+    this.cancelViewportUpdate();
     const loading = this.root.querySelector<HTMLElement>('.page-loading')!; loading.hidden = false;
+    let failed = false;
+    loading.classList.remove('page-load-error'); loading.textContent = '페이지를 불러오는 중…';
     try {
       if (this.page) { this.engine.cancel(); await this.flush(); }
       const page = await db.pages.get(this.note.pageIds[index]); if (!page) throw new Error('페이지를 찾을 수 없어요.');
@@ -97,7 +107,12 @@ export class EditorView {
       await this.renderBackground(); await this.renderThumbnails(); this.updateHistory();
       this.root.querySelector<HTMLButtonElement>('[data-action=prev-page]')!.disabled = index === 0;
       this.root.querySelector<HTMLButtonElement>('[data-action=next-page]')!.disabled = index === this.note.pageIds.length - 1;
-    } finally { this.switching = false; loading.hidden = true; }
+    } catch (error) {
+      failed = true;
+      loading.classList.add('page-load-error');
+      loading.innerHTML = `<div><h2>페이지를 표시하지 못했어요</h2><p>${escape(error instanceof Error ? error.message : '페이지를 다시 열어 주세요.')}</p><div><button class="button secondary" data-action="retry-page">다시 시도</button><button class="button primary" data-action="home">서재로 돌아가기</button></div></div>`;
+      console.warn('Page rendering failed; notebook data is preserved.', error);
+    } finally { this.switching = false; loading.hidden = !failed; }
   }
   private async renderBackground() {
     const generation = ++this.generation, p = this.page, temp = document.createElement('canvas');
@@ -116,6 +131,7 @@ export class EditorView {
   private changed() {
     this.updateHistory();
     const page = this.page;
+    page.thumbnail = undefined;
     void this.queue.save(page).catch(report);
     clearTimeout(this.thumbTimer);
     this.thumbTimer = setTimeout(() => run(() => this.saveThumbnail(page)), 1400);
@@ -128,26 +144,49 @@ export class EditorView {
   }
   async flush() {
     clearTimeout(this.thumbTimer);
-    if (this.page) { await this.queue.save(this.page); await this.queue.flush(); await this.saveThumbnail(this.page); }
+    // Navigation and PWA updates depend only on durable data. PDF rendering is
+    // optional presentation work and must never prevent leaving the editor.
+    if (this.page) { await this.queue.save(this.page); await this.queue.flush(); }
   }
   private updateHistory() {
     this.root.querySelector<HTMLButtonElement>('[data-action=undo]')!.disabled = !this.engine.canUndo;
     this.root.querySelector<HTMLButtonElement>('[data-action=redo]')!.disabled = !this.engine.canRedo;
   }
-  private setScale(scale: number, fit = false) {
+  private setScale(scale: number, fit = false, rasterize = true) {
     this.scale = Math.max(.2, Math.min(4, scale)); this.fit = fit;
     const size = this.root.querySelector<HTMLElement>('.paper-sizing')!;
     size.style.width = `${this.page.width * this.scale}px`; size.style.height = `${this.page.height * this.scale}px`;
     this.root.querySelector('#zoom-value')!.textContent = `${Math.round(this.scale * 100)}%`;
-    this.engine.resize();
+    if (rasterize) this.engine.resize();
   }
   private zoom(scale: number) {
+    this.cancelViewportUpdate();
     this.engine.cancel(); this.setScale(scale); run(() => this.renderBackground());
+  }
+  private queueViewportUpdate(update: () => void) {
+    this.viewportUpdate = update;
+    if (this.viewportFrame) return;
+    this.viewportFrame = requestAnimationFrame(() => {
+      this.viewportFrame = 0; const latest = this.viewportUpdate; this.viewportUpdate = null; latest?.();
+    });
+  }
+  private cancelViewportUpdate() {
+    clearTimeout(this.zoomTimer); cancelAnimationFrame(this.viewportFrame);
+    this.viewportFrame = 0; this.viewportUpdate = null; this.pendingScale = null;
+    this.viewport?.classList.remove('zoom-preview');
+  }
+  private finishViewportUpdate() {
+    clearTimeout(this.zoomTimer); this.zoomTimer = undefined;
+    cancelAnimationFrame(this.viewportFrame); this.viewportFrame = 0;
+    const latest = this.viewportUpdate; this.viewportUpdate = null; latest?.(); this.pendingScale = null;
+    this.engine.resize(); this.viewport.classList.remove('zoom-preview');
+    run(() => this.renderBackground());
   }
   private click(e: Event) {
     const target = (e.target as Element).closest<HTMLElement>('[data-action]'); if (!target) return;
     const { action, id } = target.dataset;
     if (action === 'home') run(this.home);
+    if (action === 'retry-page') run(() => this.showPage(this.index));
     if (action === 'tab' && id !== this.note.id) run(() => this.open(id!));
     if (action === 'close-tab') run(() => this.closeTab(id!));
     if (action === 'tool') this.selectTool(id as Tool);
@@ -287,6 +326,9 @@ export class EditorView {
     dialog.querySelector<HTMLInputElement>('[name=query]')!.placeholder = '입력한 텍스트 검색';
   }
   private keyboard(e: KeyboardEvent) {
+    if (e.key === 'F5' || (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r') {
+      e.preventDefault(); toast('필기 화면에서는 새로고침을 막았어요. 서재로 돌아가거나 설정에서 업데이트해 주세요.'); return;
+    }
     if ((e.target as Element).matches('input,textarea,select,[contenteditable]') || document.querySelector('dialog[open]')) return;
     const mod = e.ctrlKey || e.metaKey;
     if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? this.engine.redo() : this.engine.undo(); }
@@ -305,14 +347,18 @@ export class EditorView {
     this.viewport.addEventListener('pointerdown', e => {
       if (e.pointerType === 'pen' && this.engine.options.tool !== 'hand') return;
       if (e.pointerType === 'touch') {
-        if (this.engine.activePointer !== null && !this.engine.options.fingerDrawing || performance.now() - this.engine.lastPen < 800) return;
+        if (this.engine.activePointer !== null && !this.engine.options.fingerDrawing) return;
         this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
         if (this.touches.size === 2) {
+          this.cancelViewportUpdate(); this.viewport.classList.add('zoom-preview');
           this.engine.cancel(); const [a, b] = [...this.touches.values()], r = this.viewport.getBoundingClientRect();
           this.pinch = { distance: Math.hypot(b.x - a.x, b.y - a.y), scale: this.scale, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2,
             scrollX: this.viewport.scrollLeft, scrollY: this.viewport.scrollTop, centerX: (a.x + b.x) / 2 - r.left, centerY: (a.y + b.y) / 2 - r.top };
           this.pan = null;
         }
+        // A deliberate two-finger pinch is allowed after lifting the pen;
+        // one-finger palm contacts during the brief pen hover window stay ignored.
+        if (this.touches.size === 1 && this.engine.lastPen > 0 && performance.now() - this.engine.lastPen < 800) return;
       }
       if ((e.pointerType === 'touch' && !this.engine.options.fingerDrawing && this.touches.size === 1) || this.engine.options.tool === 'hand') {
         this.pan = { id: e.pointerId, x: e.clientX, y: e.clientY, left: this.viewport.scrollLeft, top: this.viewport.scrollTop };
@@ -323,22 +369,32 @@ export class EditorView {
       if (e.pointerType === 'touch' && this.touches.has(e.pointerId)) this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (this.pinch && this.touches.size === 2) {
         const [a, b] = [...this.touches.values()], p = this.pinch;
-        this.setScale(p.scale * Math.hypot(b.x - a.x, b.y - a.y) / Math.max(1, p.distance));
-        const ratio = this.scale / p.scale;
-        this.viewport.scrollLeft = (p.scrollX + p.centerX) * ratio - p.centerX - ((a.x + b.x) / 2 - p.x);
-        this.viewport.scrollTop = (p.scrollY + p.centerY) * ratio - p.centerY - ((a.y + b.y) / 2 - p.y);
+        this.queueViewportUpdate(() => {
+          this.setScale(p.scale * Math.hypot(b.x - a.x, b.y - a.y) / Math.max(1, p.distance), false, false);
+          const ratio = this.scale / p.scale;
+          this.viewport.scrollLeft = (p.scrollX + p.centerX) * ratio - p.centerX - ((a.x + b.x) / 2 - p.x);
+          this.viewport.scrollTop = (p.scrollY + p.centerY) * ratio - p.centerY - ((a.y + b.y) / 2 - p.y);
+        });
       } else if (this.pan?.id === e.pointerId) {
         this.viewport.scrollLeft = this.pan.left - (e.clientX - this.pan.x); this.viewport.scrollTop = this.pan.top - (e.clientY - this.pan.y);
       }
     }, { signal });
     const end = (e: PointerEvent) => {
       this.touches.delete(e.pointerId);
-      if (this.touches.size < 2 && this.pinch) { this.pinch = null; run(() => this.renderBackground()); }
+      if (this.touches.size < 2 && this.pinch) { this.pinch = null; this.finishViewportUpdate(); }
       if (this.pan?.id === e.pointerId) this.pan = null;
     };
     this.viewport.addEventListener('pointerup', end, { signal }); this.viewport.addEventListener('pointercancel', end, { signal });
     this.viewport.addEventListener('wheel', e => {
-      if (e.ctrlKey || e.metaKey) { e.preventDefault(); this.zoom(this.scale * (e.deltaY > 0 ? .94 : 1.06)); }
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        if (!this.viewport.classList.contains('zoom-preview')) this.engine.cancel();
+        this.viewport.classList.add('zoom-preview');
+        this.pendingScale = Math.max(.2, Math.min(4, (this.pendingScale ?? this.scale) * Math.exp(-e.deltaY * .002)));
+        const target = this.pendingScale;
+        this.queueViewportUpdate(() => this.setScale(target, false, false));
+        clearTimeout(this.zoomTimer); this.zoomTimer = setTimeout(() => this.finishViewportUpdate(), 140);
+      }
       // At page boundaries a normal wheel gesture can continue to the adjacent page.
       else if (Math.abs(e.deltaY) > 45 && !this.switching) {
         const bottom = this.viewport.scrollTop + this.viewport.clientHeight >= this.viewport.scrollHeight - 2;
@@ -346,5 +402,5 @@ export class EditorView {
       }
     }, { signal, passive: false });
   }
-  destroy() { clearTimeout(this.thumbTimer); this.generation++; this.engine?.destroy(); this.abort.abort(); this.resizeObserver?.disconnect(); }
+  destroy() { this.cancelViewportUpdate(); clearTimeout(this.thumbTimer); this.generation++; this.engine?.destroy(); this.abort.abort(); this.resizeObserver?.disconnect(); }
 }

@@ -33,7 +33,7 @@ export class SaveQueue {
         await this.database.pages.put(snapshot);
         const note = await this.database.notes.get(snapshot.noteId);
         if (note) await this.database.notes.update(note.id, {
-          updated: Date.now(), ...(note.pageIds[0] === snapshot.id && thumbnail ? { thumbnail } : {})
+          updated: Date.now(), ...(note.pageIds[0] === snapshot.id ? { thumbnail: thumbnail ?? snapshot.thumbnail } : {})
         });
       });
       this.failed = null;

@@ -1,7 +1,7 @@
 import type { Item, Page, Point, Stroke } from '../data/model';
 export const imageCache = new Map<string, HTMLImageElement>();
 
-function smooth(points: Point[]): Point[] {
+export function smooth(points: Point[]): Point[] {
   if (points.length < 3) return points;
   const output: Point[] = [points[0]];
   for (let i = 1; i < points.length; i++) {

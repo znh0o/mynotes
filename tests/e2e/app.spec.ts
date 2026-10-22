@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, PDFRawStream, PDFName, StandardFonts, rgb } from 'pdf-lib';
 import { readFile } from 'node:fs/promises';
 
 async function records(page: Page, table: string) {
@@ -36,6 +36,7 @@ test('notebook creation, pressure ink, undo, reload, page management, trash reco
   await page.getByRole('button', { name: '다시 실행 (Ctrl+Shift+Z)', exact: true }).click();
   await expect.poll(async () => (await records(page, 'pages')).find(p => p.id === writtenPageId)?.items.length).toBe(1);
   await page.locator('#save-status').click(); await expect(page.locator('#save-status')).toContainText('모든 변경사항');
+  page.once('dialog', dialog => dialog.accept());
   await page.reload(); await expect(page.locator('h1')).toBeVisible();
   await page.getByRole('button', { name: 'S펜 학습 노트 열기', exact: true }).click();
   await expect(page.locator('.page-loading')).toBeHidden();
@@ -77,6 +78,9 @@ test('installable PWA, offline PDF annotation, export and backup restore', async
   await page.getByRole('button', { name: 'PDF 내보내기', exact: true }).click();
   const exported = await downloadEvent, path = await exported.path();
   const result = await PDFDocument.load(await readFile(path!)); expect(result.getPageCount()).toBe(2); expect(result.getPage(0).getWidth()).toBe(600);
+  // Original text plus handwriting must remain vector, with no full-page PNG overlay.
+  const bitmaps = result.context.enumerateIndirectObjects().filter(([, object]) => object instanceof PDFRawStream && object.dict.get(PDFName.of('Subtype'))?.toString() === '/Image');
+  expect(bitmaps).toHaveLength(0);
   await page.getByRole('button', { name: '노트 설정', exact: true }).click();
   const backupEvent = page.waitForEvent('download'); await page.getByRole('button', { name: '전체 백업', exact: true }).click();
   const backupDownload = await backupEvent, backupPath = await backupDownload.path();

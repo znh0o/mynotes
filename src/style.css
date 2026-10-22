@@ -28,3 +28,14 @@
 .pen-width-control input::-moz-range-progress{height:4px;border-radius:4px;background:#8fadd3}
 .pen-width-control input::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#85a5d0;border:3px solid white;box-shadow:0 1px 4px #5275a33b}
 @media(max-width:760px){.tool-options{padding:0 12px;column-gap:10px}.tool-options #tool-hint{display:none}.tool-options #context-options{order:2}.tool-options>.finger-switch{margin-left:auto}.pen-width-control>#width-preview{width:16px}.tool-options .pen-width-control input[type=range]{width:80px}}
+.page-load-error{background:#edf1f7;overflow:auto;padding:30px;cursor:default}
+.page-load-error>div{max-width:440px;text-align:center}
+.page-load-error h2{font-size:19px;font-weight:600;color:#647e9f;margin-bottom:14px}
+.page-load-error p{font-size:12px;line-height:1.8;overflow-wrap:anywhere;color:#899ab0;margin-bottom:23px}
+.page-load-error>div>div{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
+.settings-update-status{min-height:22px}
+.zoom-preview .paper-surface{will-change:transform;transform:translateZ(0)}
+.tool-button.active:hover{background:#eaf1fb}
+@media(hover:none){.tool-button:hover:not(.active){background:transparent}}
+html,body{overscroll-behavior:none}
+.editor-shell,.paper-viewport{overscroll-behavior:none}

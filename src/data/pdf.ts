@@ -3,16 +3,18 @@ import { uid, type Note, type Page, type Asset } from './model';
 import { drawItems, drawPaper, imageCache } from '../engine/render';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 
-let pdfModule: Promise<typeof import('pdfjs-dist')> | undefined;
+let pdfModule: Promise<typeof import('pdfjs-dist/legacy/build/pdf.mjs')> | undefined;
 const documents = new Map<string, PDFDocumentProxy>();
 const pdfOptions = { cMapUrl: `${import.meta.env.BASE_URL}pdf/cmaps/`, cMapPacked: true,
   standardFontDataUrl: `${import.meta.env.BASE_URL}pdf/standard_fonts/`, wasmUrl: `${import.meta.env.BASE_URL}pdf/wasm/` };
 async function pdfjs() {
-  if (!pdfModule) pdfModule = import('pdfjs-dist').then(async lib => {
-    const worker = await import('pdfjs-dist/build/pdf.worker.min.mjs?url');
+  // Both realms need PDF.js's maintained compatibility shims (Samsung Internet
+  // may not provide Map/WeakMap.getOrInsertComputed yet).
+  if (!pdfModule) pdfModule = import('pdfjs-dist/legacy/build/pdf.mjs').then(async lib => {
+    const worker = await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url');
     lib.GlobalWorkerOptions.workerSrc = worker.default;
     return lib;
-  });
+  }).catch(error => { pdfModule = undefined; throw error; });
   return pdfModule;
 }
 async function documentFor(id: string) {
@@ -20,7 +22,8 @@ async function documentFor(id: string) {
   if (!doc) {
     const asset = await db.assets.get(id); if (!asset) throw new Error('PDF 원본을 찾을 수 없어요.');
     const lib = await pdfjs();
-    doc = await lib.getDocument({ ...pdfOptions, data: new Uint8Array(await asset.blob.arrayBuffer()) }).promise;
+    const task = lib.getDocument({ ...pdfOptions, data: new Uint8Array(await asset.blob.arrayBuffer()) });
+    try { doc = await task.promise; } catch (error) { await task.destroy(); throw error; }
     documents.set(id, doc);
     if (documents.size > 2) { const key = documents.keys().next().value!; const old = documents.get(key); documents.delete(key); await old?.loadingTask.destroy(); }
   }
@@ -28,8 +31,9 @@ async function documentFor(id: string) {
 }
 export async function importPDF(file: File, folderId: string | null): Promise<Note> {
   if (file.size > 150 * 1024 * 1024) throw new Error('PDF는 150MB 이하로 가져올 수 있어요.');
-  const lib = await pdfjs(), task = lib.getDocument({ ...pdfOptions, data: new Uint8Array(await file.arrayBuffer()) }), doc = await task.promise;
+  const lib = await pdfjs(), task = lib.getDocument({ ...pdfOptions, data: new Uint8Array(await file.arrayBuffer()) });
   try {
+    const doc = await task.promise;
     const id = uid(), assetId = uid(), pages: Page[] = [];
     for (let i = 1; i <= doc.numPages; i++) {
       const p = await doc.getPage(i), v = p.getViewport({ scale: 1 });
@@ -69,25 +73,7 @@ export async function thumbnail(page: Page) {
   return canvas.toDataURL('image/webp', .7);
 }
 export async function exportPDF(note: Note, progress: (n: number, total: number) => void) {
-  const { PDFDocument } = await import('pdf-lib'), output = await PDFDocument.create();
-  const originals = new Map<string, Awaited<ReturnType<typeof PDFDocument.load>>>();
-  for (let index = 0; index < note.pageIds.length; index++) {
-    const page = await db.pages.get(note.pageIds[index]); if (!page) throw new Error('페이지가 누락되었어요.');
-    await loadImages(page);
-    const canvas = document.createElement('canvas'), scale = Math.min(2, 2400 / Math.max(page.width, page.height));
-    let outPage;
-    if (page.pdfAssetId && page.pdfIndex) {
-      let original = originals.get(page.pdfAssetId);
-      if (!original) { const a = await db.assets.get(page.pdfAssetId); if (!a) throw new Error('PDF 원본 누락'); original = await PDFDocument.load(await a.blob.arrayBuffer()); originals.set(page.pdfAssetId, original); }
-      const source = original.getPage(page.pdfIndex - 1);
-      if (source.getRotation().angle === 0) { const [copied] = await output.copyPages(original, [page.pdfIndex - 1]); outPage = output.addPage(copied); canvas.width = Math.ceil(page.width * scale); canvas.height = Math.ceil(page.height * scale); }
-      else { outPage = output.addPage([page.width, page.height]); await background(canvas, page, scale); }
-    } else { outPage = output.addPage([page.width, page.height]); await background(canvas, page, scale); }
-    const ctx = canvas.getContext('2d')!; ctx.setTransform(scale, 0, 0, scale, 0, 0); drawItems(ctx, page.items);
-    const overlay = await output.embedPng(canvas.toDataURL('image/png'));
-    outPage.drawImage(overlay, { x: 0, y: 0, width: page.width, height: page.height });
-    canvas.width = 0; canvas.height = 0; progress(index + 1, note.pageIds.length);
-  }
-  const bytes = await output.save();
+  const { renderPDF } = await import('./pdf-export');
+  const bytes = await renderPDF(note, id => db.pages.get(id), id => db.assets.get(id), progress);
   download(new Blob([bytes as BlobPart], { type: 'application/pdf' }), `${note.title.replace(/[<>:"/\\|?*]/g, '_')}.pdf`);
 }
