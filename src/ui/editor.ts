@@ -348,16 +348,27 @@ export class EditorView {
   }
   private showEraserPicker(anchor: HTMLElement) {
     this.root.querySelector('#eraser-picker')?.remove();
-    const panel = document.createElement('div'); panel.id = 'eraser-picker'; panel.className = 'eraser-picker'; panel.popover = 'auto';
+    // Fast pen/touch taps activate on pointerup. Native auto light-dismiss can
+    // otherwise close a newly opened popover in that same pointerup event.
+    const panel = document.createElement('div'); panel.id = 'eraser-picker'; panel.className = 'eraser-picker'; panel.popover = 'manual';
     panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', '지우개 설정');
     panel.innerHTML = `<div class="writing-options-heading"><strong>지우개</strong>${button('X', '지우개 설정 닫기', 'close-eraser')}</div><div class="eraser-modes">${([['stroke', '스트로크 지우개', '닿은 획 전체를 지워요'], ['partial', '펜 지우개', '문지른 부분만 지워요']] as const).map(([id, name, description]) => `<button data-action="eraser-mode" data-id="${id}" aria-label="${name}" aria-pressed="${this.engine.options.partialEraser === (id === 'partial')}">${icon(id === 'stroke' ? 'PenLine' : 'Eraser', 20)}<span><strong>${name}</strong><small>${description}</small></span>${icon('Check', 16)}</button>`).join('')}</div><label class="eraser-size-label" for="eraser-size">지우개 크기 <output id="eraser-size-value">${this.engine.options.eraserSize}</output></label><input id="eraser-size" type="range" min="8" max="100" value="${this.engine.options.eraserSize}" aria-label="지우개 크기"/><p>S펜 버튼을 누른 채 문지르면 선택한 방식으로 지워요.</p>`;
     this.root.querySelector('.editor-shell')!.append(panel);
     const rect = anchor.getBoundingClientRect();
     panel.style.left = `${Math.max(8, Math.min(rect.left, innerWidth - 296))}px`;
     panel.style.top = `${this.root.querySelector('.ink-toolbar')!.getBoundingClientRect().bottom + 6}px`;
+    const dismiss = new AbortController();
+    this.abort.signal.addEventListener('abort', () => dismiss.abort(), { once: true, signal: dismiss.signal });
+    document.addEventListener('pointerdown', event => {
+      if (!panel.contains(event.target as Node) && !anchor.contains(event.target as Node)) panel.hidePopover();
+    }, { capture: true, signal: dismiss.signal });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); panel.hidePopover(); }
+    }, { capture: true, signal: dismiss.signal });
     panel.addEventListener('toggle', () => {
-      const open = panel.matches(':popover-open'); anchor.setAttribute('aria-expanded', String(open));
-      if (!open) panel.remove();
+      const open = panel.matches(':popover-open');
+      if (this.root.querySelector('#eraser-picker') === panel) anchor.setAttribute('aria-expanded', String(open));
+      if (!open) { panel.remove(); dismiss.abort(); }
     });
     panel.showPopover(); anchor.setAttribute('aria-expanded', 'true');
   }

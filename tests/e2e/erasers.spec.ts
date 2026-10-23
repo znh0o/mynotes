@@ -1,4 +1,5 @@
 import { test, expect, type Page, type CDPSession } from '@playwright/test';
+test.use({ hasTouch: true });
 
 async function start(page: Page) {
   await page.goto('./'); await page.getByRole('button', { name: '새 노트', exact: true }).click();
@@ -26,11 +27,11 @@ async function saved(page: Page) {
 
 test('eraser tap offers both modes, partial erases only the crossing and settings survive reopening', async ({ page, context }) => {
   await start(page); const cdp = await context.newCDPSession(page); await line(page, cdp, 180); await line(page, cdp, 240);
-  await page.getByRole('button', { name: '지우개', exact: true }).click();
+  await page.getByRole('button', { name: '지우개', exact: true }).tap();
   await expect(page.getByRole('dialog', { name: '지우개 설정' })).toBeVisible();
   await expect(page.getByRole('button', { name: '스트로크 지우개', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('slider', { name: '지우개 크기' }).fill('30');
-  await page.getByRole('button', { name: '펜 지우개', exact: true }).click();
+  await page.getByRole('button', { name: '펜 지우개', exact: true }).tap();
   await expect(page.getByRole('dialog', { name: '지우개 설정' })).toHaveCount(0);
   await pen(page, cdp, 'mousePressed', 250, 160); await pen(page, cdp, 'mouseMoved', 250, 200); await pen(page, cdp, 'mouseReleased', 250, 200, 0, 0);
   await expect.poll(async () => (await saved(page)).length).toBe(3);
