@@ -64,7 +64,7 @@ test('settings can check, download and apply a real worker update without losing
     release = 3;
     // Reopening the app checks the deployment marker, then bypasses a cached sw.js.
     await page.reload();
-    await expect(page.locator('.welcome-banner h2')).toHaveText('새로운 업데이트가 준비됐어요.');
+    await expect(page.locator('.welcome-banner h2')).toHaveText('업데이트가 있어요.');
     const bannerUpdate = page.getByRole('button', { name: '지금 업데이트', exact: true }); await expect(bannerUpdate).toBeVisible();
     await page.screenshot({ path: '../MyNotes-update-banner.png' });
     await Promise.all([page.waitForEvent('load'), bannerUpdate.click()]);
@@ -80,6 +80,6 @@ test('settings can check, download and apply a real worker update without losing
       Date.now = () => now + 20_000;
       window.dispatchEvent(new Event('focus'));
     });
-    await expect(page.locator('.welcome-banner h2')).toHaveText('새로운 업데이트가 준비됐어요.');
+    await expect(page.locator('.welcome-banner h2')).toHaveText('업데이트가 있어요.');
   } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }
 });

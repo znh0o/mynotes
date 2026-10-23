@@ -131,11 +131,10 @@ export class LibraryView {
     this.root.querySelectorAll('.nav-item[data-id],.collection-tab').forEach(e => e.classList.toggle('active', (e as HTMLElement).dataset.id === this.filter));
     const recent = [...active].sort((a, b) => b.opened - a.opened).slice(0, 3);
     this.root.querySelector('#recent-notes')!.innerHTML = recent.map(n => `<button class="recent-note" data-action="open" data-id="${n.id}"><div class="recent-cover" style="--cover:${safeColor(n.cover)}">${icon('BookOpen', 23)}</div><div><strong>${escape(n.title)}</strong><span>${formatDate(n.opened)}에 열었어요</span></div>${icon('ChevronRight', 16)}</button>`).join('') || '<p class="muted">최근 사용한 노트가 없어요.</p>';
-    const newTile = this.filter === 'all' && !this.query ? `<button class="new-note-tile" data-action="new"><span>${icon('Plus', 26)}</span><strong>새 노트</strong></button>` : '';
     const cards = notes.map(n => this.card(n)).join('');
     const gridSetting = this.columns === 'auto' ? '' : `data-columns="${this.columns}" style="--note-columns:${this.columns}"`;
     this.root.querySelector<HTMLSelectElement>('#note-columns')!.value = String(this.columns);
-    this.root.querySelector('#note-results')!.innerHTML = `<div class="notes-grid ${this.list ? 'list-view' : ''}" ${gridSetting}>${this.columns === 'auto' ? newTile + cards : cards + newTile}</div>${!notes.length && (this.filter !== 'all' || this.query) ? `<div class="empty-state">${icon(this.filter === 'trash' ? 'Trash2' : 'BookOpen', 40)}<h3>${this.query ? '검색 결과가 없어요' : '아직 노트가 없어요'}</h3></div>` : ''}`;
+    this.root.querySelector('#note-results')!.innerHTML = `<div class="notes-grid ${this.list ? 'list-view' : ''}" ${gridSetting}>${cards}</div>${!notes.length ? `<div class="empty-state">${icon(this.filter === 'trash' ? 'Trash2' : 'BookOpen', 40)}<h3>${this.query ? '검색 결과가 없어요' : '아직 노트가 없어요'}</h3></div>` : ''}`;
     this.root.querySelectorAll('.view-toggle button').forEach(e => e.classList.toggle('active', (e as HTMLElement).dataset.action === (this.list ? 'list' : 'grid')));
   }
   private click(event: Event) {
