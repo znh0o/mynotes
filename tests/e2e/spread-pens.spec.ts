@@ -67,6 +67,18 @@ test('custom palette and combined pen presets stay separate for each note', asyn
   await page.getByRole('button', { name: '펜', exact: true }).click();
   const pens = page.getByRole('dialog', { name: '펜 선택' });
   await expect(pens.locator('.pen-preset-row')).toHaveCount(3);
+  await expect(pens.locator('.pen-picker-hero .pen-preview')).toBeVisible();
+  await expect(pens.locator('.pen-preset-row .pen-preview')).toHaveCount(3);
+  const cards = await pens.locator('.pen-preset-row').evaluateAll(rows => rows.map(row => {
+    const art = row.querySelector('.pen-preset-art')!.getBoundingClientRect();
+    const name = row.querySelector('.pen-preset-name')!.getBoundingClientRect();
+    return { x: art.x, y: art.y, bottom: art.bottom, labelTop: name.top };
+  }));
+  expect(cards[0].x).toBeLessThan(cards[1].x);
+  expect(cards[1].x).toBeLessThan(cards[2].x);
+  expect(cards[0].y).toBe(cards[1].y);
+  expect(cards[0].bottom).toBeLessThan(cards[0].labelTop);
+  await expect(pens.locator('.pen-preset-row[aria-pressed=true]')).toHaveCount(1);
   await pens.getByRole('button', { name: '펜 추가' }).click();
   await pens.locator('#pen-edit-name').fill('빨간 연필');
   await pens.getByRole('button', { name: '연필', exact: true }).click();
@@ -79,6 +91,9 @@ test('custom palette and combined pen presets stay separate for each note', asyn
   await pens.locator('#pen-edit-darkness').fill('75');
   await pens.getByRole('button', { name: '펜 저장' }).click();
   await expect(pens.getByRole('button', { name: /빨간 연필/ })).toBeVisible();
+  const redPencil = pens.getByRole('button', { name: /빨간 연필/ }).locator('.pen-preview');
+  await expect(redPencil).toHaveCSS('--ink', '#dd3344');
+  await expect(redPencil.locator('.pen-ink-sample path')).toHaveAttribute('stroke', '#dd3344');
   await expect(page.locator('#ink-width')).toHaveValue('2.5');
   await pens.getByRole('button', { name: '펜 메뉴 닫기' }).click();
   const canvas = (await page.locator('#paper-live').boundingBox())!;

@@ -34,6 +34,13 @@ test('writing options preserve canvas space and keep finger, paper and tool sett
   await page.getByRole('button', { name: '새 노트', exact: true }).click();
   await page.getByRole('button', { name: '노트 만들기', exact: true }).click();
   await expect(page.locator('#app .page-loading')).toBeHidden();
+  const addColor = await page.getByRole('button', { name: '색상 선택', exact: true }).evaluate(button => {
+    const outer = button.getBoundingClientRect(), plus = button.querySelector('svg')!.getBoundingClientRect();
+    return { horizontal: (outer.left + outer.right - plus.left - plus.right) / 2, vertical: (outer.top + outer.bottom - plus.top - plus.bottom) / 2 };
+  });
+  expect(Math.abs(addColor.horizontal)).toBeLessThan(.6);
+  expect(Math.abs(addColor.vertical)).toBeLessThan(.6);
+  expect((await page.locator('.ink-toolbar').boundingBox())!.height).toBeLessThanOrEqual(44);
   const noteIndex = await page.evaluate(() => history.state.index);
   const canvas = (await page.locator('.paper-viewport').boundingBox())!;
   const options = page.getByRole('button', { name: '필기 옵션', exact: true });
