@@ -98,7 +98,6 @@ export class LibraryView {
           <section class="welcome-banner ${this.updateAvailable ? 'update-banner' : ''}">${this.bannerContent()}</section>
           <section class="recent-section"><div class="section-heading"><h2>${icon('Clock', 18)} 최근 펼쳐본 노트</h2><button class="text-button" data-action="filter" data-id="recent">모두 보기 ${icon('ChevronRight', 15)}</button></div><div id="recent-notes" class="recent-grid"></div></section>
           <section class="notes-section"><div class="collection-toolbar"><div class="collection-tabs"><button class="collection-tab active" data-action="filter" data-id="all">모든 노트 <span>${active.length}</span></button><button class="collection-tab" data-action="filter" data-id="favorites">즐겨찾기 ${icon('Star', 14)}</button></div><div class="collection-controls"><label class="search-field">${icon('Search', 17)}<input id="library-search" type="search" placeholder="노트 검색" aria-label="노트 검색" value="${escape(this.query)}" /></label><label class="sort-field"><select id="sort" aria-label="노트 정렬"><option value="updated">최근 수정순</option><option value="name">이름순</option><option value="created">최근 생성순</option></select>${icon('ChevronDown', 13)}</label><label class="note-density">한 줄<select id="note-columns" aria-label="한 줄 노트 개수"><option value="auto">자동</option><option value="4">4개</option><option value="5">5개</option><option value="6">6개</option></select></label><div class="view-toggle">${button('Grid2X2', '그리드 보기', 'grid')}${button('List', '목록 보기', 'list')}</div></div></div><div id="note-results"></div></section>
-          <section class="template-section"><div class="section-heading"><div><span class="eyebrow">START WITH A FRESH PAGE</span><h2>생각에 맞는 한 장</h2></div><span class="muted">어떤 이야기를 써볼까요?</span></div><div class="template-grid">${(['blank', 'lined', 'grid', 'cornell'] as Paper[]).map((p, i) => `<button class="template-card" data-action="template" data-id="${p}"><div class="paper-mini ${p}"><span>${['Aa', '오늘의 기록', 'x + y =', 'IDEA / NOTE'][i]}</span></div><div><strong>${paperNames[p]}</strong><span>${['자유롭게 펼치는 아이디어', '차곡차곡 쌓이는 기록', '정리할수록 선명한 생각', '배움을 나만의 언어로'][i]}</span></div>${icon('ArrowUpRight', 16)}</button>`).join('')}</div></section>
           <footer class="library-footer"><span>Made for your thoughts.</span><span>${icon('Check', 13)} 로그인 없이 · 이 기기에 저장</span></footer>
         </main>
       </div>
@@ -129,7 +128,7 @@ export class LibraryView {
     this.root.querySelector('#breadcrumb-title')!.textContent = title;
     this.root.querySelector('#library-subtitle')!.textContent = this.filter === 'trash' ? '삭제한 노트는 영구 삭제하기 전까지 복구할 수 있어요.' : '작은 아이디어부터 깊은 배움까지, 모두 이곳에.';
     this.root.querySelector<HTMLElement>('.heading-actions')!.hidden = this.filter === 'trash';
-    this.root.querySelectorAll<HTMLElement>('.welcome-banner,.recent-section,.template-section').forEach(e => e.hidden = this.filter !== 'all' || !!this.query);
+    this.root.querySelectorAll<HTMLElement>('.welcome-banner,.recent-section').forEach(e => e.hidden = this.filter !== 'all' || !!this.query);
     this.root.querySelectorAll('.nav-item[data-id],.collection-tab').forEach(e => e.classList.toggle('active', (e as HTMLElement).dataset.id === this.filter));
     const recent = [...active].sort((a, b) => b.opened - a.opened).slice(0, 3);
     this.root.querySelector('#recent-notes')!.innerHTML = recent.map(n => `<button class="recent-note" data-action="open" data-id="${n.id}"><div class="recent-cover" style="--cover:${safeColor(n.cover)}">${icon('BookOpen', 23)}</div><div><strong>${escape(n.title)}</strong><span>${formatDate(n.opened)}에 열었어요</span></div>${icon('ChevronRight', 16)}</button>`).join('') || '<p class="muted">새 노트를 펼쳐 이야기를 시작해 보세요.</p>';
@@ -143,10 +142,10 @@ export class LibraryView {
   private click(event: Event) {
     const target = (event.target as Element).closest<HTMLElement>('[data-action]'); if (!target) return;
     const { action, id } = target.dataset;
-    if (this.filter === 'trash' && ['new', 'template', 'import'].includes(action || '')) return;
+    if (this.filter === 'trash' && ['new', 'import'].includes(action || '')) return;
     if (action === 'apply-update') run(this.applyUpdate);
     if (action === 'filter') { this.root.querySelector('.library-sidebar')?.classList.remove('mobile-open'); run(() => this.navigateFilter(id!)); }
-    if (action === 'new' || action === 'template') this.newNote(action === 'template' ? id as Paper : 'lined');
+    if (action === 'new') this.newNote();
     if (action === 'open') run(() => this.openNote(id!));
     if (action === 'new-folder') this.folderDialog();
     if (action === 'folder-menu') this.folderMenu(target, id!);
@@ -161,8 +160,8 @@ export class LibraryView {
     if (action === 'mobile-menu') this.root.querySelector('.library-sidebar')?.classList.toggle('mobile-open');
   }
   private folderId() { return this.folders.some(f => f.id === this.filter) ? this.filter : null; }
-  newNote(paper: Paper = 'lined') {
-    const dialog = modal('새로운 노트', `<p class="dialog-description">첫 페이지를, 당신의 취향으로.</p><label class="form-label">노트 이름<input name="title" placeholder="예: 나의 생각 노트" value="제목 없는 노트" maxlength="100" required autofocus /></label><span class="form-label">표지 색상</span><div class="cover-options">${covers.map((c, i) => `<label style="--cover:${c}"><input type="radio" name="cover" value="${c}" ${i === 0 ? 'checked' : ''} aria-label="표지 색상 ${i + 1}" /><span>${icon('Check', 18)}</span></label>`).join('')}</div><span class="form-label">속지 선택</span><div class="paper-options">${Object.entries(paperNames).map(([p, label]) => `<label><input type="radio" name="paper" value="${p}" ${p === paper ? 'checked' : ''}/><div class="paper-mini ${p}"></div><span>${label}</span></label>`).join('')}</div><div class="form-row"><label class="form-label">페이지 크기<select name="size"><option value="a4">A4</option><option value="a5">A5</option><option value="b5">B5</option></select></label><label class="form-label">방향<select name="orientation"><option value="portrait">세로</option><option value="landscape">가로</option></select></label><label class="form-label">종이 색<input name="paperColor" type="color" value="#fffefb" /></label></div>`, '노트 만들기', async data => {
+  newNote() {
+    const dialog = modal('새로운 노트', `<p class="dialog-description">첫 페이지를, 당신의 취향으로.</p><label class="form-label">노트 이름<input name="title" placeholder="예: 나의 생각 노트" value="제목 없는 노트" maxlength="100" required autofocus /></label><span class="form-label">표지 색상</span><div class="cover-options">${covers.map((c, i) => `<label style="--cover:${c}"><input type="radio" name="cover" value="${c}" ${i === 0 ? 'checked' : ''} aria-label="표지 색상 ${i + 1}" /><span>${icon('Check', 18)}</span></label>`).join('')}</div><span class="form-label">속지 선택</span><div class="paper-options">${Object.entries(paperNames).map(([p, label]) => `<label><input type="radio" name="paper" value="${p}" ${p === 'lined' ? 'checked' : ''}/><div class="paper-mini ${p}"></div><span>${label}</span></label>`).join('')}</div><div class="form-row"><label class="form-label">페이지 크기<select name="size"><option value="a4">A4</option><option value="a5">A5</option><option value="b5">B5</option></select></label><label class="form-label">방향<select name="orientation"><option value="portrait">세로</option><option value="landscape">가로</option></select></label><label class="form-label">종이 색<input name="paperColor" type="color" value="#fffefb" /></label></div>`, '노트 만들기', async data => {
       const size = ({ a4: [794, 1123], a5: [559, 794], b5: [665, 945] } as Record<string, number[]>)[String(data.get('size'))];
       const [width, height] = data.get('orientation') === 'landscape' ? [...size].reverse() : size;
       const { note, page } = createNote(String(data.get('title')).trim() || '제목 없는 노트', String(data.get('cover')), this.folderId(), { paper: data.get('paper') as Paper, paperColor: String(data.get('paperColor')), width, height });
