@@ -100,6 +100,94 @@ test('mid-contact button transitions do not connect across erased ink or erase o
   await cdp.detach();
 });
 
+test('Samsung primary-button hover log neither creates ink nor erases and light contact still works', async ({ page, context }) => {
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  await start(page); const cdp = await context.newCDPSession(page);
+  await page.locator('#paper-live').evaluate(canvas => canvas.addEventListener('pointerdown', event => { (window as any).penId = (event as PointerEvent).pointerId; }, { once: true }));
+  await line(page, cdp, 180); await expect.poll(async () => (await saved(page)).length).toBe(1);
+  const hover = () => page.locator('#paper-live').evaluate((canvas: HTMLCanvasElement) => {
+    const r = canvas.getBoundingClientRect(), scale = r.width / 794;
+    // Replay the zero-pressure primary-button sequence from the S10+ report.
+    for (const [button, buttons] of [[-1, 0], [0, 1], [-1, 0]]) canvas.dispatchEvent(new PointerEvent('pointermove', {
+      bubbles: true, pointerType: 'pen', pointerId: (window as any).penId, button, buttons, pressure: 0,
+      clientX: r.x + 250 * scale, clientY: r.y + 180 * scale,
+    }));
+  });
+  await hover();
+  // A real stroke also flushes any accidental hover dot into IndexedDB.
+  await line(page, cdp, 280); await expect.poll(async () => (await saved(page)).length).toBe(2);
+  expect((await saved(page))[1].points.every((p: any) => Math.abs(p.y - 280) < .1)).toBe(true);
+  await page.getByRole('button', { name: '지우개', exact: true }).tap();
+  await page.getByRole('button', { name: '스트로크 지우개', exact: true }).tap();
+  await hover();
+  await page.getByRole('button', { name: '볼펜', exact: true }).tap();
+  await pen(page, cdp, 'mousePressed', 100, 360, 1, .001);
+  await pen(page, cdp, 'mouseMoved', 220, 360, 1, .001);
+  await page.locator('#paper-live').evaluate((canvas: HTMLCanvasElement) => {
+    const r = canvas.getBoundingClientRect(), scale = r.width / 794;
+    const sample = (y: number, pressure: number) => new PointerEvent('pointermove', { bubbles: true,
+      pointerType: 'pen', pointerId: (window as any).penId, buttons: 1, pressure,
+      clientX: r.x + 240 * scale, clientY: r.y + y * scale });
+    const packet = sample(360, .001);
+    Object.defineProperty(packet, 'getCoalescedEvents', { value: () => [sample(180, 0), sample(360, .001)] });
+    canvas.dispatchEvent(packet);
+  });
+  await pen(page, cdp, 'mouseReleased', 220, 360, 0, 0);
+  await expect.poll(async () => (await saved(page)).length).toBe(3);
+  const items = await saved(page);
+  for (const [index, y] of [180, 280, 360].entries()) expect(items[index].points[0].y).toBeCloseTo(y, 1);
+  expect(items[2].points.every((p: any) => Math.abs(p.y - 360) < .1)).toBe(true);
+  expect(errors).toEqual([]); await cdp.detach();
+});
+
+test('Samsung Internet compatibility toggles once, waits for contact, restores pencil and saves its switch', async ({ page, context }) => {
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  await page.addInitScript(() => Object.defineProperty(navigator, 'userAgent', { get: () => 'SamsungBrowser/30.0 Chrome/143.0.0.0' }));
+  await start(page); const cdp = await context.newCDPSession(page);
+  await page.locator('#paper-live').evaluate(canvas => canvas.addEventListener('pointerdown', event => { (window as any).penId = (event as PointerEvent).pointerId; }, { once: true }));
+  await line(page, cdp, 180);
+  await page.getByRole('button', { name: '지우개', exact: true }).tap();
+  await expect(page.getByRole('checkbox', { name: '삼성인터넷 버튼 호환' })).toBeChecked();
+  await page.getByRole('button', { name: '스트로크 지우개', exact: true }).tap();
+  await page.getByRole('button', { name: '연필', exact: true }).tap();
+  await line(page, cdp, 280); await expect.poll(async () => (await saved(page)).length).toBe(2);
+  const before = await saved(page);
+  const primaryMove = (button: number, buttons: number) => page.locator('#paper-live').evaluate((canvas: HTMLCanvasElement, input) => {
+    const r = canvas.getBoundingClientRect(), scale = r.width / 794;
+    canvas.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerType: 'pen', pointerId: (window as any).penId,
+      button: input.button, buttons: input.buttons, pressure: 0, clientX: r.x + 250 * scale, clientY: r.y + 180 * scale }));
+  }, { button, buttons });
+  await primaryMove(0, 1);
+  await expect(page.getByRole('button', { name: '지우개', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.eraser-picker:popover-open')).toHaveCount(0);
+  await expect(page.locator('.eraser-cursor')).toBeVisible();
+  // Repeated zero-pressure samples must neither toggle back nor erase ink.
+  await primaryMove(0, 1); await primaryMove(-1, 1);
+  await expect(page.getByRole('button', { name: '지우개', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await primaryMove(-1, 0); expect(await saved(page)).toEqual(before);
+  await pen(page, cdp, 'mousePressed', 250, 170);
+  await pen(page, cdp, 'mouseMoved', 250, 195);
+  await pen(page, cdp, 'mouseReleased', 250, 195, 0, 0);
+  await expect.poll(async () => (await saved(page)).length).toBe(1);
+  await primaryMove(0, 1); await primaryMove(-1, 0);
+  await expect(page.getByRole('button', { name: '연필', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await line(page, cdp, 360); await expect.poll(async () => (await saved(page)).length).toBe(2);
+  expect((await saved(page)).every((s: any) => s.tool === 'pencil')).toBe(true);
+  await page.getByRole('button', { name: '지우개', exact: true }).tap();
+  await page.getByText('삼성인터넷 버튼 호환', { exact: true }).tap();
+  await expect(page.getByRole('checkbox', { name: '삼성인터넷 버튼 호환' })).not.toBeChecked();
+  await page.getByRole('button', { name: '스트로크 지우개', exact: true }).tap();
+  await page.getByRole('button', { name: '연필', exact: true }).tap();
+  await primaryMove(0, 1); await primaryMove(-1, 0);
+  await expect(page.getByRole('button', { name: '연필', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).tap();
+  await page.getByRole('button', { name: '지우개 검증 열기', exact: true }).tap();
+  await expect(page.locator('.page-loading')).toBeHidden();
+  await page.getByRole('button', { name: '지우개', exact: true }).tap();
+  await expect(page.getByRole('checkbox', { name: '삼성인터넷 버튼 호환' })).not.toBeChecked();
+  expect(errors).toEqual([]); await cdp.detach();
+});
+
 test.afterEach(async ({ page }, testInfo) => {
   if (testInfo.status !== testInfo.expectedStatus) console.log('cursor input events', await page.evaluate(() => (window as any).cursorEvents).catch(() => []));
 });
@@ -169,4 +257,22 @@ test('pen check distinguishes pen input from a real barrel signal without changi
   expect(await saved(page)).toHaveLength(0);
   await dialog.getByRole('button', { name: '닫기', exact: true }).last().tap();
   await expect(dialog).toHaveCount(0); await expect(page.locator('#paper-live')).toBeVisible(); await cdp.detach();
+});
+
+test('pen check keeps the Samsung compatibility sample separate from a standard barrel signal', async ({ page }) => {
+  await start(page); await page.getByRole('button', { name: '지우개', exact: true }).tap();
+  await page.getByRole('button', { name: 'S펜 버튼 입력 확인', exact: true }).tap();
+  const dialog = page.getByRole('dialog', { name: 'S펜 버튼 입력 확인', exact: true });
+  await dialog.locator('.pen-check-pad').evaluate(pad => {
+    pad.dispatchEvent(new PointerEvent('pointermove', { pointerType: 'pen', button: 0, buttons: 1, pressure: 0 }));
+    pad.dispatchEvent(new PointerEvent('pointermove', { pointerType: 'pen', button: -1, buttons: 0, pressure: 0 }));
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (text: string) => { (window as any).penReport = JSON.parse(text); } } });
+  });
+  await expect(dialog.locator('[role=status]')).toContainText('호환 전환 입력');
+  await dialog.getByRole('button', { name: '버튼을 누르고 테스트했어요', exact: true }).tap();
+  await dialog.getByRole('button', { name: '진단 결과 복사', exact: true }).tap();
+  const report = await page.evaluate(() => (window as any).penReport);
+  expect(report.penSeen).toBe(true); expect(report.buttonSeen).toBe(false); expect(report.primaryHoverSeen).toBe(true);
+  expect(report.checked).toBe(true); expect(report.events[0]).toMatchObject({ buttons: 1, pressure: 0, contact: false });
+  expect(await saved(page)).toHaveLength(0);
 });

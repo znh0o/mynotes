@@ -3,15 +3,15 @@ import { bounds, erase, inside, transform } from './geometry';
 import { drawItem, drawItems } from './render';
 import { LiveStroke } from './LiveStroke';
 import { canStraighten, straightPoints } from './straight-line';
-import { penContact, penEraser } from './pen-input';
+import { penContact, penEraser, SamsungPenToggle } from './pen-input';
 import { EraserCursor } from './EraserCursor';
 
 export interface InkOptions {
   tool: Tool; color: string; width: number; fingerDrawing: boolean;
-  eraserSize: number; partialEraser: boolean; shape: Shape; pencilDarkness: number; holdToLine: boolean;
+  eraserSize: number; partialEraser: boolean; shape: Shape; pencilDarkness: number; holdToLine: boolean; samsungButtonToggle: boolean;
 }
 export class InkEngine {
-  options: InkOptions = { tool: 'pen', color: '#30445e', width: 3, fingerDrawing: false, eraserSize: 24, partialEraser: false, shape: 'rect', pencilDarkness: .7, holdToLine: true };
+  options: InkOptions = { tool: 'pen', color: '#30445e', width: 3, fingerDrawing: false, eraserSize: 24, partialEraser: false, shape: 'rect', pencilDarkness: .7, holdToLine: true, samsungButtonToggle: false };
   page!: Page;
   selected = new Set<string>();
   activePointer: number | null = null;
@@ -38,22 +38,30 @@ export class InkEngine {
   private straightSource?: Point[];
   private textSession?: { id: string; before: Item[] };
   private eraserCursor: EraserCursor;
+  private samsungButton = new SamsungPenToggle();
   constructor(private ink: HTMLCanvasElement, private live: HTMLCanvasElement,
     private changed: () => void, private selection: (count: number) => void,
-    private insert: (point: Point, tool: Tool) => void, private straightened: () => void = () => {}) {
+    private insert: (point: Point, tool: Tool) => void, private straightened: () => void = () => {},
+    private toggleEraser: () => void = () => {}) {
     const options = { signal: this.abort.signal };
-    live.addEventListener('pointerdown', e => this.down(e), options);
-    live.addEventListener('pointermove', e => this.move(e), options);
-    live.addEventListener('pointerup', e => this.up(e), options);
-    live.addEventListener('pointercancel', e => { if (e.pointerId === this.activePointer) this.cancel(); }, options);
+    const button = (e: PointerEvent) => {
+      if (!this.samsungButton.update(e, this.options.samsungButtonToggle, this.activePointer !== null)) return false;
+      this.lastPen = performance.now(); e.preventDefault(); this.toggleEraser(); return true;
+    };
+    live.addEventListener('pointerdown', e => { if (!button(e)) this.down(e); }, options);
+    live.addEventListener('pointermove', e => { if (!button(e)) this.move(e); }, options);
+    live.addEventListener('pointerup', e => { button(e); this.up(e); }, options);
+    live.addEventListener('pointercancel', e => { button(e); if (e.pointerId === this.activePointer) this.cancel(); }, options);
+    live.addEventListener('pointerleave', e => button(e), options);
     live.addEventListener('lostpointercapture', e => { if (e.pointerId === this.activePointer) this.cancel(); }, options);
     live.addEventListener('contextmenu', e => e.preventDefault(), options);
     this.eraserCursor = new EraserCursor(live, () => ({ pageWidth: this.page?.width, tool: this.options.tool,
       size: this.options.eraserSize, activePointer: this.activePointer, rect: this.inputRect }), this.abort.signal);
-    window.addEventListener('blur', () => { if (this.activePointer !== null) this.cancel(); }, options);
+    window.addEventListener('blur', () => { this.samsungButton.reset(); if (this.activePointer !== null) this.cancel(); }, options);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) this.samsungButton.reset(); }, options);
   }
   load(page: Page) {
-    this.cancel(); this.page = page; this.selected.clear(); this.selection(0);
+    this.samsungButton.reset(); this.cancel(); this.page = page; this.selected.clear(); this.selection(0);
     this.history = []; this.future = []; this.resize(true);
   }
   resize(force = false) {
@@ -236,6 +244,7 @@ export class InkEngine {
     // the new tool, which would draw back across a freshly erased segment.
     const events = !switched && typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : [];
     for (const event of events.length ? events : [e]) {
+      if (e.pointerType === 'pen' && !penContact(event)) continue;
       const p = this.point(event);
       if (this.stroke) {
         if (this.straightSource) this.stroke.points = straightPoints(this.straightSource, p);
