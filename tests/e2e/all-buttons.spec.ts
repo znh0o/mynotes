@@ -47,3 +47,15 @@ test('swiping across a button does not activate it', async ({ page }) => {
   });
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
+
+test('a delayed click landing on a newly opened dialog does not close it', async ({ page }) => {
+  await page.goto('./'); const button = page.getByRole('button', { name: '새 노트', exact: true }); await expect(button).toBeVisible();
+  const open = await button.evaluate(button => {
+    const r = button.getBoundingClientRect(), x = r.x + r.width / 2, y = r.y + r.height / 2;
+    for (const type of ['pointerdown', 'pointerup']) button.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerType: 'pen', pointerId: 7, button: 0, clientX: x, clientY: y }));
+    const dialog = document.querySelector('dialog')!;
+    dialog.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1, clientX: x, clientY: y }));
+    return dialog.open;
+  });
+  expect(open).toBe(true); await expect(page.getByRole('dialog')).toBeVisible();
+});
