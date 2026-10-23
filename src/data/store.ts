@@ -143,6 +143,7 @@ export async function restore(file: File) {
       if (i.kind === 'stroke' && i.pencilDarkness !== undefined && (!finite(i.pencilDarkness, 1) || i.pencilDarkness < .1)) throw new Error('잘못된 연필 진하기');
       if (i.kind !== 'stroke' && ![i.x, i.y, i.w, i.h].every(v => finite(v))) throw new Error('잘못된 오브젝트 좌표');
       if (i.kind === 'text' && (typeof i.text !== 'string' || !finite(i.size, 1000) || i.size <= 0)) throw new Error('잘못된 텍스트');
+      if (i.kind === 'text' && (i.wrap !== undefined && typeof i.wrap !== 'boolean' || i.bold !== undefined && typeof i.bold !== 'boolean' || i.italic !== undefined && typeof i.italic !== 'boolean' || i.align !== undefined && !['left', 'center', 'right'].includes(i.align))) throw new Error('잘못된 글자 서식');
       if (i.kind === 'shape' && (!['line', 'rect', 'ellipse', 'triangle'].includes(i.shape) || !finite(i.width, 1000) || i.width <= 0)) throw new Error('잘못된 도형');
     }
     return { ...p, id: remap(p.id), noteId: remap(p.noteId), thumbnail: preview(p.thumbnail), pdfAssetId: p.pdfAssetId ? remap(p.pdfAssetId) : undefined,

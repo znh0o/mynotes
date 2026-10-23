@@ -10,8 +10,10 @@ import { escape, icon, modal, pickFile, report, run, toast } from './ui/common';
 import { checkForUpdate, applyWaitingUpdate } from './pwa/updates';
 import { version as appVersion } from '../package.json';
 import { installFastTaps } from './ui/tool-taps';
+import { installAppZoomGuard } from './ui/app-zoom';
 
 installFastTaps();
+installAppZoomGuard();
 
 const root = document.querySelector<HTMLElement>('#app')!;
 let library: LibraryView | undefined, editor: EditorView | undefined;

@@ -2,6 +2,7 @@ import { PDFDocument, type PDFPage, type PDFFont, rgb, degrees, LineCapStyle, pu
 import { smooth, drawItem } from '../engine/render';
 import { brushLayers } from '../engine/brush';
 import { graphitePDF } from './graphite-pdf';
+import { textFont, textLines } from '../engine/text';
 import type { Asset, Item, Note, Page, Point, Stroke } from './model';
 
 const color = (hex: string) => rgb(parseInt(hex.slice(1, 3), 16) / 255, parseInt(hex.slice(3, 5), 16) / 255, parseInt(hex.slice(5, 7), 16) / 255);
@@ -95,9 +96,10 @@ async function drawObject(output: PDFDocument, out: PDFPage, item: Item, page: P
   // Unicode text keeps the browser's font appearance. Rasterize only this tight
   // text box at 4x, rather than flattening the complete page and all pen paths.
   const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d')!;
-  ctx.font = `400 ${item.size}px "Segoe UI", "Malgun Gothic", sans-serif`;
-  const w = Math.max(1, ...item.text.split('\n').map(line => ctx.measureText(line).width)) + item.size * .4;
-  const h = Math.max(item.size * 1.7, item.text.split('\n').length * item.size * 1.55);
+  ctx.font = textFont(item);
+  const lines = textLines(item, line => ctx.measureText(line).width);
+  const w = Math.max(item.wrap || item.align ? item.w : 1, ...lines.map(line => ctx.measureText(line).width)) + item.size * .4;
+  const h = Math.max(item.size * 1.7, lines.length * item.size * 1.55);
   const scale = Math.min(4, 8192 / Math.max(w, h), Math.sqrt(16000000 / (w * h)));
   canvas.width = Math.ceil(w * scale); canvas.height = Math.ceil(h * scale); ctx.setTransform(scale, 0, 0, scale, 0, 0);
   drawItem(ctx, { ...item, x: 0, y: 0 });

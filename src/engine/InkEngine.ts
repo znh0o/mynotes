@@ -1,14 +1,15 @@
-import { uid, type Item, type Page, type Point, type Shape, type ShapeItem, type Stroke, type Tool } from '../data/model';
+import { uid, type Item, type Page, type Point, type Shape, type ShapeItem, type Stroke, type TextItem, type Tool } from '../data/model';
 import { bounds, erase, inside, transform } from './geometry';
 import { drawItem, drawItems } from './render';
 import { LiveStroke } from './LiveStroke';
+import { canStraighten, straightPoints } from './straight-line';
 
 export interface InkOptions {
   tool: Tool; color: string; width: number; fingerDrawing: boolean;
-  eraserSize: number; partialEraser: boolean; shape: Shape; pencilDarkness: number;
+  eraserSize: number; partialEraser: boolean; shape: Shape; pencilDarkness: number; holdToLine: boolean;
 }
 export class InkEngine {
-  options: InkOptions = { tool: 'pen', color: '#30445e', width: 3, fingerDrawing: false, eraserSize: 24, partialEraser: false, shape: 'rect', pencilDarkness: .7 };
+  options: InkOptions = { tool: 'pen', color: '#30445e', width: 3, fingerDrawing: false, eraserSize: 24, partialEraser: false, shape: 'rect', pencilDarkness: .7, holdToLine: true };
   page!: Page;
   selected = new Set<string>();
   activePointer: number | null = null;
@@ -29,9 +30,13 @@ export class InkEngine {
   private abort = new AbortController();
   private liveStroke = new LiveStroke();
   private inputRect?: DOMRect;
+  private holdTimer?: ReturnType<typeof setTimeout>;
+  private holdAnchor?: Point;
+  private straightSource?: Point[];
+  private textSession?: { id: string; before: Item[] };
   constructor(private ink: HTMLCanvasElement, private live: HTMLCanvasElement,
     private changed: () => void, private selection: (count: number) => void,
-    private insert: (point: Point, tool: Tool) => void) {
+    private insert: (point: Point, tool: Tool) => void, private straightened: () => void = () => {}) {
     const options = { signal: this.abort.signal };
     live.addEventListener('pointerdown', e => this.down(e), options);
     live.addEventListener('pointermove', e => this.move(e), options);
@@ -69,9 +74,9 @@ export class InkEngine {
     const ctx = canvas.getContext('2d')!; ctx.setTransform(1, 0, 0, 1, 0, 0); if (clear) ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.setTransform(this.ratio, 0, 0, this.ratio, 0, 0); return ctx;
   }
-  render() { if (this.page) drawItems(this.context(this.ink), this.page.items); }
+  render() { if (this.page) drawItems(this.context(this.ink), this.textSession ? this.page.items.filter(i => i.id !== this.textSession!.id) : this.page.items); }
   private preview() {
-    if (this.stroke && this.liveStroke.draw(this.context(this.live, false), this.stroke, this.ratio)) return;
+    if (this.stroke && !this.straightSource && this.liveStroke.draw(this.context(this.live, false), this.stroke, this.ratio)) return;
     this.liveStroke.reset();
     const ctx = this.context(this.live);
     if (this.stroke) drawItem(ctx, this.stroke);
@@ -99,6 +104,26 @@ export class InkEngine {
     this.future = []; this.before = null; this.page.revision++; this.changed();
   }
   mutate(fn: () => void) { this.checkpoint(); fn(); this.commit(); this.render(); this.preview(); }
+  beginText(id: string) {
+    this.cancel(); this.clearSelection();
+    this.textSession = { id, before: this.page.items.slice() }; this.render();
+  }
+  updateText(item: TextItem) {
+    if (this.textSession?.id !== item.id) return;
+    const index = this.page.items.findIndex(i => i.id === item.id);
+    const items = this.page.items.filter(i => i.id !== item.id);
+    if (item.text.trim()) items.splice(index < 0 ? items.length : index, 0, { ...item });
+    this.page.items = items; this.page.revision++; this.changed();
+  }
+  finishText(cancel = false) {
+    const session = this.textSession; if (!session) return;
+    this.textSession = undefined;
+    if (cancel) this.page.items = session.before;
+    else if (JSON.stringify(session.before.find(i => i.id === session.id)) !== JSON.stringify(this.page.items.find(i => i.id === session.id))) {
+      this.history.push(session.before); if (this.history.length > 40) this.history.shift(); this.future = [];
+    }
+    this.page.revision++; this.render(); this.changed();
+  }
   undo() {
     if (this.activePointer !== null) this.cancel();
     const previous = this.history.pop(); if (!previous) return;
@@ -128,6 +153,7 @@ export class InkEngine {
     this.selection(this.selected.size);
   }
   cancel() {
+    clearTimeout(this.holdTimer); this.holdTimer = undefined; this.holdAnchor = undefined; this.straightSource = undefined;
     if (this.before && this.page) { this.page.items = this.before; this.before = null; if (!this.stroke && !this.shape) this.render(); }
     this.stroke = null; this.shape = null; this.lasso = []; this.activePointer = null; this.moving = false; this.inputRect = undefined;
     if (this.page) this.preview();
@@ -135,12 +161,12 @@ export class InkEngine {
   private down(e: PointerEvent) {
     if (!this.page || this.activePointer !== null || e.button > 0 && e.button !== 5) return;
     if (e.pointerType === 'pen') this.lastPen = performance.now();
-    if (e.pointerType === 'touch' && (!this.options.fingerDrawing || this.lastPen > 0 && performance.now() - this.lastPen < 800)) return;
+    if (e.pointerType === 'touch' && !['text', 'image'].includes(this.options.tool) && (!this.options.fingerDrawing || this.lastPen > 0 && performance.now() - this.lastPen < 800)) return;
     if (this.options.tool === 'hand') return;
     e.preventDefault();
     this.inputRect = this.live.getBoundingClientRect();
     const p = this.point(e), tool = e.button === 5 || e.buttons === 32 ? 'eraser' : this.options.tool;
-    if (tool === 'text' || tool === 'image') { this.insert(p, tool); return; }
+    if (tool === 'text' || tool === 'image') { this.inputRect = undefined; this.insert(p, tool); return; }
     this.activePointer = e.pointerId; this.live.setPointerCapture(e.pointerId); this.start = this.last = p;
     this.checkpoint();
     if (tool === 'lasso') {
@@ -154,7 +180,20 @@ export class InkEngine {
       width: tool === 'highlighter' ? Math.max(14, this.options.width * 5) : this.options.width,
       pressure: tool === 'fountain', brushVersion: 2,
       ...(tool === 'pencil' ? { textureSeed: Math.floor(Math.random() * 0x100000000), pencilDarkness: this.options.pencilDarkness } : {}), points: [p] };
-    this.schedule();
+    this.armStraightLine(p); this.schedule();
+  }
+  private armStraightLine(point: Point) {
+    if (!this.stroke || !this.options.holdToLine || this.straightSource) return;
+    const tolerance = 3 * this.page.width / (this.inputRect?.width || this.page.width);
+    if (this.holdAnchor && Math.hypot(point.x - this.holdAnchor.x, point.y - this.holdAnchor.y) <= tolerance) return;
+    this.holdAnchor = point; clearTimeout(this.holdTimer);
+    this.holdTimer = setTimeout(() => {
+      this.holdTimer = undefined;
+      if (!this.stroke || this.activePointer === null || !this.options.holdToLine || !canStraighten(this.stroke.points)) return;
+      this.straightSource = this.stroke.points;
+      this.stroke.points = straightPoints(this.straightSource, this.last!);
+      this.liveStroke.reset(); this.preview(); this.straightened();
+    }, 600);
   }
   private move(e: PointerEvent) {
     if (e.pointerType === 'pen') this.lastPen = performance.now();
@@ -164,8 +203,12 @@ export class InkEngine {
     for (const event of events.length ? events : [e]) {
       const p = this.point(event);
       if (this.stroke) {
-        const previous = this.stroke.points[this.stroke.points.length - 1];
-        if (Math.hypot(p.x - previous.x, p.y - previous.y) > .35) this.stroke.points.push({ ...p, p: previous.p * .25 + p.p * .75 });
+        if (this.straightSource) this.stroke.points = straightPoints(this.straightSource, p);
+        else {
+          const previous = this.stroke.points[this.stroke.points.length - 1];
+          if (Math.hypot(p.x - previous.x, p.y - previous.y) > .35) this.stroke.points.push({ ...p, p: previous.p * .25 + p.p * .75 });
+          this.armStraightLine(p);
+        }
       } else if (this.shape && this.start) { this.shape.w = p.x - this.start.x; this.shape.h = p.y - this.start.y; }
       else if (this.moving) { transform(this.page.items.filter(i => this.selected.has(i.id)), p.x - this.last.x, p.y - this.last.y); this.dirtyInk = true; }
       else if (this.lasso.length) this.lasso.push(p);
@@ -176,6 +219,7 @@ export class InkEngine {
   }
   private up(e: PointerEvent) {
     if (e.pointerId !== this.activePointer) return;
+    clearTimeout(this.holdTimer); this.holdTimer = undefined; this.holdAnchor = undefined;
     if (e.pointerType === 'pen') this.lastPen = performance.now();
     cancelAnimationFrame(this.frame); this.frame = 0;
     if (this.stroke) {
@@ -196,7 +240,7 @@ export class InkEngine {
       }
       this.before = null; this.selection(this.selected.size);
     } else this.commit();
-    this.stroke = null; this.shape = null; this.lasso = []; this.moving = false;
+    this.stroke = null; this.shape = null; this.lasso = []; this.moving = false; this.straightSource = undefined;
     this.activePointer = null; this.inputRect = undefined; this.dirtyInk = false; this.preview();
     if (this.live.hasPointerCapture(e.pointerId)) this.live.releasePointerCapture(e.pointerId);
   }

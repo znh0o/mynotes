@@ -1,5 +1,6 @@
 import { smooth, brushLayers } from './brush';
 import { graphitePattern } from './graphite-pattern';
+import { drawText } from './text';
 export { smooth } from './brush';
 import type { Item, Page, Stroke } from '../data/model';
 export const imageCache = new Map<string, HTMLImageElement>();
@@ -67,9 +68,7 @@ export function drawItem(ctx: CanvasRenderingContext2D, item: Item) {
   if (item.kind === 'stroke') return drawStroke(ctx, item);
   ctx.save();
   if (item.kind === 'text') {
-    ctx.fillStyle = item.color; ctx.font = `400 ${item.size}px "Segoe UI", "Malgun Gothic", sans-serif`;
-    ctx.textBaseline = 'top';
-    item.text.split('\n').forEach((line, index) => ctx.fillText(line, item.x, item.y + index * item.size * 1.55));
+    drawText(ctx, item);
   } else if (item.kind === 'image') {
     const image = imageCache.get(item.assetId); if (image) ctx.drawImage(image, item.x, item.y, item.w, item.h);
   } else {

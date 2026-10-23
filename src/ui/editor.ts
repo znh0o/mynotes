@@ -6,6 +6,7 @@ import { button, contextMenu, escape, icon, modal, pickFile, report, run, toast,
 import { isAppReloadApproved } from '../pwa/navigation';
 import { PagePreviews } from './page-previews';
 import { trackDialog } from './history';
+import { InlineTextEditor } from './inline-text';
 
 export class EditorView {
   private engine!: InkEngine;
@@ -31,6 +32,7 @@ export class EditorView {
   private previews!: PagePreviews;
   private toolHint = '볼펜 · 힘을 줘도 굵기가 일정한 선';
   private inkAdjustment: 'width' | 'darkness' = 'width';
+  private textEditor!: InlineTextEditor;
   constructor(private root: HTMLElement, public note: Note,
     private tabs: { id: string; title: string }[], private open: (id: string) => Promise<void>,
     private home: () => Promise<void>, private closeTab: (id: string) => Promise<void>, private settings: () => void) {
@@ -40,7 +42,7 @@ export class EditorView {
     });
   }
   async start() {
-    const pencilSetting = await db.settings.get('pencil-darkness');
+    const [pencilSetting, lineSetting] = await db.settings.bulkGet(['pencil-darkness', 'hold-to-line']);
     document.title = `${this.note.title} · MyNotes`;
     this.root.innerHTML = `<div class="editor-shell">
       <header class="editor-header"><button class="editor-home" data-action="home" aria-label="서재로 돌아가기">${icon('ChevronLeft', 19)}<span class="brand-mark small">${icon('PenLine', 18)}</span><span>서재</span></button><div class="open-tabs">${this.tabs.map(t => `<div class="note-tab ${t.id === this.note.id ? 'active' : ''}"><button data-action="tab" data-id="${t.id}">${icon('BookOpen', 15)}<span>${escape(t.title)}</span></button><button data-action="close-tab" data-id="${t.id}" aria-label="${escape(t.title)} 탭 닫기">${icon('X', 13)}</button></div>`).join('')}</div><div class="editor-header-actions"><button class="save-indicator" id="save-status" data-action="save" title="지금 저장">${icon('Check', 13)} 모든 변경사항 저장됨</button>${button('Search', '노트 내 텍스트 검색', 'search')}${button('Download', 'PDF 내보내기', 'export')}${button('Maximize', '전체 화면', 'fullscreen')}${button('MoreHorizontal', '노트 설정', 'settings')}</div></header>
@@ -54,7 +56,9 @@ export class EditorView {
     this.engine = new InkEngine(this.root.querySelector('#paper-ink')!, this.root.querySelector('#paper-live')!, () => this.changed(), count => {
       this.root.querySelector<HTMLElement>('.selection-toolbar')!.hidden = !count;
       this.root.querySelector('#selection-count')!.textContent = `${count}개 선택 · 드래그로 이동`;
-    }, (p, tool) => this.insert(p, tool));
+    }, (p, tool) => this.insert(p, tool), () => toast('직선으로 정리했어요. 펜을 댄 채 끝점을 움직일 수 있어요.'));
+    this.textEditor = new InlineTextEditor(this.root.querySelector('.paper-surface')!, this.root.querySelector('.editor-shell')!, this.engine);
+    if (typeof lineSetting?.value === 'boolean') this.engine.options.holdToLine = lineSetting.value;
     this.previews = new PagePreviews(this.root.querySelector('#page-thumbnails')!, this.root.querySelector('.page-sidebar')!,
       () => this.engine.activePointer !== null || this.viewport.classList.contains('zoom-preview'),
       (id, preview, revision) => { if (this.page?.id === id && this.page.revision === revision) this.page.thumbnail = preview; });
@@ -157,6 +161,7 @@ export class EditorView {
     if (page.id === this.page.id && !this.abort.signal.aborted) await this.renderThumbnails();
   }
   async flush() {
+    this.textEditor?.finish();
     clearTimeout(this.thumbTimer);
     // Navigation and PWA updates depend only on durable data. PDF rendering is
     // optional presentation work and must never prevent leaving the editor.
@@ -170,6 +175,7 @@ export class EditorView {
     this.scale = Math.max(.2, Math.min(4, scale)); this.fit = fit;
     const size = this.root.querySelector<HTMLElement>('.paper-sizing')!;
     size.style.width = `${this.page.width * this.scale}px`; size.style.height = `${this.page.height * this.scale}px`;
+    this.textEditor.setScale(this.scale);
     this.root.querySelector('#zoom-value')!.textContent = `${Math.round(this.scale * 100)}%`;
     if (rasterize) this.engine.resize();
   }
@@ -199,6 +205,7 @@ export class EditorView {
   private click(e: Event) {
     const target = (e.target as Element).closest<HTMLElement>('[data-action]'); if (!target) return;
     const { action, id } = target.dataset;
+    if (action && !['color', 'pen-thinner', 'pen-thicker'].includes(action)) this.textEditor.finish();
     if (action === 'home') run(this.home);
     if (action === 'retry-page') run(() => this.showPage(this.index));
     if (action === 'tab' && id !== this.note.id) run(() => this.open(id!));
@@ -223,7 +230,7 @@ export class EditorView {
     if (action === 'page-menu') this.pageMenu(target, Number(id));
     if (action === 'writing-options') {
       const panel = document.createElement('dialog'); panel.className = 'writing-options-panel'; panel.id = 'writing-options-panel'; panel.setAttribute('aria-label', '필기 옵션');
-      panel.innerHTML = `<div class="writing-options-heading"><strong>필기 옵션</strong>${button('X', '필기 옵션 닫기', 'close-writing-options')}</div><p id="tool-hint">${escape(this.toolHint)}</p><div id="context-options">${this.contextOptions()}</div><label class="finger-switch"><input id="finger-drawing" type="checkbox" ${this.engine.options.fingerDrawing ? 'checked' : ''}/><span></span>손가락 필기</label><button class="text-button" data-action="paper">${icon('LayoutTemplate', 15)} 속지 설정</button>`;
+      panel.innerHTML = `<div class="writing-options-heading"><strong>필기 옵션</strong>${button('X', '필기 옵션 닫기', 'close-writing-options')}</div><p id="tool-hint">${escape(this.toolHint)}</p><div id="context-options">${this.contextOptions()}</div><label class="finger-switch"><input id="hold-to-line" type="checkbox" ${this.engine.options.holdToLine ? 'checked' : ''}/><span></span>길게 멈추면 직선으로</label><label class="finger-switch"><input id="finger-drawing" type="checkbox" ${this.engine.options.fingerDrawing ? 'checked' : ''}/><span></span>손가락 필기</label><button class="text-button" data-action="paper">${icon('LayoutTemplate', 15)} 속지 설정</button>`;
       this.root.querySelector('.editor-options')!.append(panel);
       panel.style.top = `${this.root.querySelector('.ink-toolbar')!.getBoundingClientRect().bottom + 8}px`;
       panel.addEventListener('close', () => { panel.remove(); target.setAttribute('aria-expanded', 'false'); }, { once: true });
@@ -264,9 +271,11 @@ export class EditorView {
     if (el.id === 'eraser-size') this.engine.options.eraserSize = Number(el.value);
     if (el.id === 'eraser-mode') this.engine.options.partialEraser = el.value === 'partial';
     if (el.id === 'shape-type') this.engine.options.shape = el.value as 'rect';
+    if (el.id === 'hold-to-line') { this.engine.options.holdToLine = el.checked; void db.settings.put({ key: 'hold-to-line', value: el.checked }).catch(report); }
   }
   private setColor(color: string) {
     this.engine.options.color = color;
+    this.textEditor?.setColor(color);
     this.root.querySelector<HTMLElement>('#width-preview')!.style.backgroundColor = color;
     this.root.querySelectorAll<HTMLElement>('[data-action=color]').forEach(e => e.classList.toggle('active', e.dataset.id === color));
     this.root.querySelector<HTMLInputElement>('#ink-color')!.value = color;
@@ -309,11 +318,12 @@ export class EditorView {
     }
   }
   private selectTool(tool: Tool) {
+    this.textEditor.finish();
     this.engine.cancel(); this.engine.clearSelection(); this.engine.options.tool = tool;
     this.root.querySelectorAll<HTMLElement>('[data-action=tool]').forEach(e => { const active = e.dataset.id === tool; e.classList.toggle('active', active); e.setAttribute('aria-pressed', String(active)); });
     this.viewport.classList.toggle('hand-mode', tool === 'hand');
     this.syncInkControl();
-    const hints: Record<Tool, string> = { pen: '볼펜 · 힘을 줘도 굵기가 일정한 선', fountain: '만년필 · 필압과 펜촉 방향에 따라 달라지는 굵기', pencil: '연필 · 굵기와 진하기를 직접 조절 · 필압과 관계없이 고정', highlighter: '형광펜 · 중요한 부분을 선명하게', eraser: '지우개 · S펜 버튼도 지우개로 사용할 수 있어요', lasso: '올가미 · 둘러싸서 선택한 다음 드래그로 이동', shape: '도형 · 드래그로 반듯한 도형 그리기', text: '텍스트 · 종이를 눌러 글상자 추가', image: '이미지 · 종이를 눌러 이미지 추가', hand: '이동 · 드래그로 종이 이동, 두 손가락으로 확대' };
+    const hints: Record<Tool, string> = { pen: '볼펜 · 일정한 굵기 · 선 끝에서 0.6초 멈추면 직선으로', fountain: '만년필 · 필압과 펜촉 방향에 따라 달라지는 굵기', pencil: '연필 · 굵기와 진하기를 직접 조절 · 필압과 관계없이 고정', highlighter: '형광펜 · 중요한 부분을 선명하게', eraser: '지우개 · S펜 버튼도 지우개로 사용할 수 있어요', lasso: '올가미 · 둘러싸서 선택한 다음 드래그로 이동', shape: '도형 · 드래그로 반듯한 도형 그리기', text: '텍스트 · 종이에 바로 입력 · 기존 글을 누르면 다시 편집 · 글상자 손잡이로 이동과 너비 조절', image: '이미지 · 종이를 눌러 이미지 추가', hand: '이동 · 드래그로 종이 이동, 두 손가락으로 확대' };
     this.toolHint = hints[tool];
   }
   private contextOptions() {
@@ -323,11 +333,7 @@ export class EditorView {
   private insert(point: Point, tool: Tool) {
     const page = this.page;
     if (tool === 'text') {
-      modal('텍스트 추가', `<label class="form-label">내용<textarea name="text" rows="5" required autofocus placeholder="생각을 글로 남겨보세요"></textarea></label><label class="form-label">글자 크기<input type="number" name="size" min="10" max="100" value="22" required /></label>`, '추가', data => {
-        if (this.page !== page) return;
-        const size = Number(data.get('size')), text = String(data.get('text'));
-        this.engine.mutate(() => page.items.push({ id: uid(), kind: 'text', x: point.x, y: point.y, w: Math.max(...text.split('\n').map(t => t.length)) * size, h: text.split('\n').length * size * 1.55, color: this.engine.options.color, size, text }));
-      });
+      this.textEditor.open(point);
     } else run(async () => {
       const file = await pickFile('image/png,image/jpeg,image/webp'); if (!file) return;
       if (file.size > 20 * 1024 * 1024) throw new Error('이미지는 20MB 이하로 추가해 주세요.');
@@ -410,6 +416,7 @@ export class EditorView {
   private setupGestures() {
     const signal = this.abort.signal;
     this.viewport.addEventListener('pointerdown', e => {
+      if ((e.target as Element).closest('.inline-text-box') || this.engine.options.tool === 'text' && e.defaultPrevented) return;
       if (e.pointerType === 'pen' && this.engine.options.tool !== 'hand') return;
       if (e.pointerType === 'touch') {
         if (this.engine.activePointer !== null && !this.engine.options.fingerDrawing) return;
@@ -467,5 +474,5 @@ export class EditorView {
       }
     }, { signal, passive: false });
   }
-  destroy() { this.previews?.destroy(); this.cancelViewportUpdate(); clearTimeout(this.thumbTimer); this.generation++; this.engine?.destroy(); this.abort.abort(); this.resizeObserver?.disconnect(); }
+  destroy() { this.textEditor?.destroy(); this.previews?.destroy(); this.cancelViewportUpdate(); clearTimeout(this.thumbTimer); this.generation++; this.engine?.destroy(); this.abort.abort(); this.resizeObserver?.disconnect(); }
 }
