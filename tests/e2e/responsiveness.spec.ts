@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { selectPen } from './helpers';
 
 test('long pencil input leaves time for a toolbar tap', async ({ page, context }) => {
   await page.goto('./'); await page.getByRole('button', { name: '새 노트', exact: true }).click();
   await page.getByRole('button', { name: '노트 만들기', exact: true }).click();
   await expect(page.locator('.page-loading')).toBeHidden(); await expect(page.locator('.app-slide-layer')).toHaveCount(0);
-  await page.getByRole('button', { name: '연필', exact: true }).click();
+  await selectPen(page, '연필');
   const cdp = await context.newCDPSession(page);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
   const r = (await page.locator('#paper-live').boundingBox())!;
@@ -36,8 +37,8 @@ test('long pencil input leaves time for a toolbar tap', async ({ page, context }
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
   console.log('pencil frames', JSON.stringify({ first: measured.slice(0, 3), last: measured.slice(-3), max: Math.max(...measured.map(s => s.ms)) }));
   expect(Math.max(...measured.slice(3).map(s => s.commands))).toBeLessThan(2500);
-  await page.getByRole('button', { name: '볼펜', exact: true }).click();
-  await expect(page.getByRole('button', { name: '볼펜', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await selectPen(page, '볼펜');
+  await expect(page.locator('.pen-tool')).toHaveAttribute('aria-pressed', 'true');
   await cdp.detach();
 });
 
@@ -46,11 +47,16 @@ test('rapid stylus taps ignore delayed clicks from every earlier button', async 
   await page.getByRole('button', { name: '노트 만들기', exact: true }).click();
   await expect(page.locator('#paper-live')).toBeVisible(); await expect(page.locator('.page-loading')).toBeHidden();
   const tool = await page.evaluate(() => {
-    for (const id of ['fountain', 'highlighter']) {
-      const button = document.querySelector<HTMLElement>(`[data-action=tool][data-id=${id}]`)!;
+    const tap = (button: HTMLElement) => {
       for (const type of ['pointerdown', 'pointerup']) button.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerType: 'pen', pointerId: 9, button: 0 }));
-    }
-    for (const id of ['fountain', 'highlighter']) document.querySelector(`[data-action=tool][data-id=${id}]`)!.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    };
+    const pen = document.querySelector<HTMLElement>('[data-action=pen-menu]')!;
+    tap(pen);
+    const fountain = document.querySelector<HTMLElement>('.pen-preset-row[data-id=starter-1]')!;
+    tap(fountain);
+    const highlighter = document.querySelector<HTMLElement>('[data-action=tool][data-id=highlighter]')!;
+    tap(highlighter);
+    for (const button of [pen, fountain, highlighter]) button.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
     return document.querySelector('.drawing-tools .active')?.getAttribute('data-id');
   });
   expect(tool).toBe('highlighter');

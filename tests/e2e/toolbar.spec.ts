@@ -1,11 +1,12 @@
 import { test, expect } from '@playwright/test';
+import { selectPen } from './helpers';
 
 test('pencil width and fixed darkness share the existing row on a small screen', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 }); await page.goto('./');
   await page.getByRole('button', { name: '새 노트', exact: true }).click(); await page.getByRole('button', { name: '노트 만들기', exact: true }).click();
   await expect(page.locator('#paper-live')).toBeVisible(); await expect(page.locator('.page-loading')).toBeHidden();
   const before = (await page.locator('.paper-viewport').boundingBox())!;
-  await page.getByRole('button', { name: '연필', exact: true }).click();
+  await selectPen(page, '연필');
   const adjustment = page.locator('#ink-adjustment');
   await adjustment.click();
   await expect(page.locator('#pencil-mode-menu')).toBeVisible();

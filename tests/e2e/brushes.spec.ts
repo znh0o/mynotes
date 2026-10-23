@@ -1,12 +1,13 @@
 import { test, expect } from '@playwright/test';
+import { selectPen, setInkColor } from './helpers';
 
 test('pencil PDF preserves the paper grain and its position', async ({ page, context }) => {
   await page.addInitScript(() => { Math.random = () => .12345; });
   await page.goto('./'); await page.getByRole('button', { name: '새 노트', exact: true }).click();
   await page.locator('[name=title]').fill('흑연 PDF'); await page.locator('.paper-options label').filter({ hasText: '무지' }).click();
   await page.getByRole('button', { name: '노트 만들기', exact: true }).click(); await expect(page.locator('.page-loading')).toBeHidden();
-  await page.getByRole('button', { name: '연필', exact: true }).click();
-  await page.getByRole('slider', { name: '펜 굵기', exact: true }).fill('8'); await page.locator('#ink-color').fill('#252525');
+  await selectPen(page, '연필');
+  await page.getByRole('slider', { name: '펜 굵기', exact: true }).fill('8'); await setInkColor(page, '#252525');
   const r = (await page.locator('#paper-live').boundingBox())!, scale = r.width / 794, cdp = await context.newCDPSession(page);
   const send = (type: 'mousePressed' | 'mouseMoved' | 'mouseReleased', x: number) => cdp.send('Input.dispatchMouseEvent', { type, pointerType: 'pen', button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, force: type === 'mouseReleased' ? 0 : .65, x: r.x + x * scale, y: r.y + 200 * scale });
   await send('mousePressed', 100); for (let x = 104; x <= 360; x += 4) await send('mouseMoved', x); await send('mouseReleased', 360);
@@ -42,8 +43,8 @@ test('pencil keeps a continuous graphite curve with fine paper texture', async (
   await page.goto('./'); await page.getByRole('button', { name: '새 노트', exact: true }).click();
   await page.locator('[name=title]').fill('연필 질감'); await page.locator('.paper-options label').filter({ hasText: '무지' }).click();
   await page.getByRole('button', { name: '노트 만들기', exact: true }).click(); await expect(page.locator('#app .page-loading')).toBeHidden();
-  await page.getByRole('button', { name: '연필', exact: true }).click();
-  await page.getByRole('slider', { name: '펜 굵기', exact: true }).fill('6'); await page.locator('#ink-color').fill('#252525');
+  await selectPen(page, '연필');
+  await page.getByRole('slider', { name: '펜 굵기', exact: true }).fill('6'); await setInkColor(page, '#252525');
   const r = (await page.locator('#paper-live').boundingBox())!, scale = r.width / 794;
   const cdp = await context.newCDPSession(page);
   const curves = [[140, 220, 170, 165, 210, 155, 220, 160], [220, 160, 205, 185, 175, 245, 190, 250],
@@ -89,7 +90,8 @@ test('live ballpoint, marker, shape and thin pencil stay connected after lasso s
     return cdp.send('Input.dispatchMouseEvent', { type, pointerType: 'pen', button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, force: type === 'mouseReleased' ? 0 : .65, x: r.x + x * scale, y: r.y + y * scale });
   };
   for (const [tool, y, minimum] of [['볼펜', 100, 240], ['형광펜', 180, 70], ['도형', 260, 240], ['연필', 340, 25]] as const) {
-    await page.getByRole('button', { name: tool, exact: true }).click();
+    if (tool === '볼펜' || tool === '연필') await selectPen(page, tool);
+    else await page.getByRole('button', { name: tool, exact: true }).click();
     if (tool === '도형') {
       await page.getByRole('button', { name: '필기 옵션', exact: true }).click();
       await page.getByRole('combobox', { name: '도형 종류', exact: true }).selectOption('line');
@@ -131,9 +133,9 @@ test('ballpoint and pencil stay fixed while fountain responds to pressure and pe
     await send('mouseReleased', 320, 0, 0);
   };
   await stroke(100, .1); await stroke(150, .9);
-  await page.getByRole('button', { name: '만년필', exact: true }).click();
+  await selectPen(page, '만년필');
   await page.getByRole('slider', { name: '펜 굵기', exact: true }).fill('12'); await stroke(230, .1); await stroke(280, .9);
-  await page.getByRole('button', { name: '연필', exact: true }).click();
+  await selectPen(page, '연필');
   await page.getByRole('slider', { name: '펜 굵기', exact: true }).fill('12'); await stroke(360, .1);
   const pressurePixels = () => page.locator('#paper-ink').evaluate((canvas: HTMLCanvasElement) => {
     const scale = canvas.width / 794;
@@ -213,7 +215,7 @@ test('ballpoint and pencil stay fixed while fountain responds to pressure and pe
   await page.reload(); await page.getByRole('button', { name: '세 가지 필기 도구 열기', exact: true }).click();
   await expect(page.locator('#app .page-loading')).toBeHidden();
   await compareGraphite();
-  await page.getByRole('button', { name: '연필', exact: true }).click();
+  await selectPen(page, '연필');
   await page.getByRole('button', { name: /연필 조절 항목:/ }).click();
   await page.locator('[data-action="pencil-mode"][data-id="darkness"]').click();
   await expect(page.getByRole('slider', { name: '연필 진하기', exact: true })).toHaveValue('85');

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { selectPen } from './helpers';
 import { PDFDocument, PDFName, PDFRawStream } from 'pdf-lib';
 import { readFile } from 'node:fs/promises';
 
@@ -115,7 +116,7 @@ test('holding a pen straightens the live stroke before release and lets the endp
   await page.clock.install(); await create(page);
   const r = (await page.locator('#paper-live').boundingBox())!, cdp = await context.newCDPSession(page);
   for (const [tool, y] of [['볼펜', 240], ['연필', 330]] as const) {
-    await page.getByRole('button', { name: tool, exact: true }).click();
+    await selectPen(page, tool);
     await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', pointerType: 'pen', button: 'left', buttons: 1, force: .5, x: r.x + 90, y: r.y + y, clickCount: 1 });
     for (let i = 1; i <= 24; i++) await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', pointerType: 'pen', buttons: 1, force: .5, x: r.x + 90 + i * 7, y: r.y + y + Math.sin(i / 3) * 5 });
     await page.clock.runFor(650); await expect(page.locator('#toast')).toContainText('직선으로 정리');

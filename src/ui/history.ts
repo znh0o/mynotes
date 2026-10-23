@@ -87,10 +87,12 @@ export class AppHistory {
     let target: Entry = valid(state) ? state : { mynotes: 1, index: 0, route: homeRoute };
     const menu = document.querySelector('.context-menu');
     const eraser = document.querySelector<HTMLElement>('.eraser-picker:popover-open');
+    const pen = document.querySelector<HTMLElement>('.pen-picker:popover-open');
+    const color = document.querySelector<HTMLElement>('.color-picker-dialog:popover-open');
     const sidebar = document.querySelector('.library-sidebar.mobile-open');
     const profile = document.querySelector<HTMLElement>('.profile-popover:not([hidden])');
-    if ((menu || eraser || sidebar || profile) && !previous.overlay) {
-      menu?.remove(); eraser?.hidePopover(); sidebar?.classList.remove('mobile-open');
+    if ((menu || eraser || pen || color || sidebar || profile) && !previous.overlay) {
+      menu?.remove(); eraser?.hidePopover(); color?.hidePopover(); if (!color) pen?.hidePopover(); sidebar?.classList.remove('mobile-open');
       if (profile) { profile.hidden = true; document.querySelector('.avatar')?.setAttribute('aria-expanded', 'false'); }
       this.entry = { ...previous, index: target.index + 1 }; history.pushState(this.entry, ''); return;
     }

@@ -1,4 +1,5 @@
 import { test, expect, type Page, type CDPSession } from '@playwright/test';
+import { selectPen } from './helpers';
 test.use({ hasTouch: true });
 
 async function start(page: Page) {
@@ -54,12 +55,12 @@ test('eraser tap offers both modes, partial erases only the crossing and setting
 
 test('barrel button erases immediately and releasing it restores the selected pencil', async ({ page, context }) => {
   await start(page); const cdp = await context.newCDPSession(page); await line(page, cdp, 180);
-  await page.getByRole('button', { name: '연필', exact: true }).click();
+  await selectPen(page, '연필');
   await pen(page, cdp, 'mousePressed', 250, 150, 2, .5, 'right');
   await pen(page, cdp, 'mouseMoved', 250, 205, 2, .5, 'right');
   await pen(page, cdp, 'mouseReleased', 250, 205, 0, 0, 'right');
   await expect.poll(async () => (await saved(page)).length).toBe(0);
-  await expect(page.getByRole('button', { name: '연필', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.pen-tool')).toHaveAttribute('aria-pressed', 'true');
   await line(page, cdp, 280); await expect.poll(async () => (await saved(page)).length).toBe(1);
   expect((await saved(page))[0].tool).toBe('pencil');
   // Holding the barrel before touching the paper produces chorded moves.
@@ -120,7 +121,7 @@ test('Samsung primary-button hover log neither creates ink nor erases and light 
   await page.getByRole('button', { name: '지우개', exact: true }).tap();
   await page.getByRole('button', { name: '스트로크 지우개', exact: true }).tap();
   await hover();
-  await page.getByRole('button', { name: '볼펜', exact: true }).tap();
+  await selectPen(page, '볼펜', true);
   await pen(page, cdp, 'mousePressed', 100, 360, 1, .001);
   await pen(page, cdp, 'mouseMoved', 220, 360, 1, .001);
   await page.locator('#paper-live').evaluate((canvas: HTMLCanvasElement) => {
@@ -149,7 +150,7 @@ test('Samsung Internet compatibility toggles once, waits for contact, restores p
   await page.getByRole('button', { name: '지우개', exact: true }).tap();
   await expect(page.getByRole('checkbox', { name: '삼성인터넷 버튼 호환' })).toBeChecked();
   await page.getByRole('button', { name: '스트로크 지우개', exact: true }).tap();
-  await page.getByRole('button', { name: '연필', exact: true }).tap();
+  await selectPen(page, '연필', true);
   await line(page, cdp, 280); await expect.poll(async () => (await saved(page)).length).toBe(2);
   const before = await saved(page);
   const primaryMove = (button: number, buttons: number) => page.locator('#paper-live').evaluate((canvas: HTMLCanvasElement, input) => {
@@ -170,16 +171,16 @@ test('Samsung Internet compatibility toggles once, waits for contact, restores p
   await pen(page, cdp, 'mouseReleased', 250, 195, 0, 0);
   await expect.poll(async () => (await saved(page)).length).toBe(1);
   await primaryMove(0, 1); await primaryMove(-1, 0);
-  await expect(page.getByRole('button', { name: '연필', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.pen-tool')).toHaveAttribute('aria-pressed', 'true');
   await line(page, cdp, 360); await expect.poll(async () => (await saved(page)).length).toBe(2);
   expect((await saved(page)).every((s: any) => s.tool === 'pencil')).toBe(true);
   await page.getByRole('button', { name: '지우개', exact: true }).tap();
   await page.getByText('삼성인터넷 버튼 호환', { exact: true }).tap();
   await expect(page.getByRole('checkbox', { name: '삼성인터넷 버튼 호환' })).not.toBeChecked();
   await page.getByRole('button', { name: '스트로크 지우개', exact: true }).tap();
-  await page.getByRole('button', { name: '연필', exact: true }).tap();
+  await selectPen(page, '연필', true);
   await primaryMove(0, 1); await primaryMove(-1, 0);
-  await expect(page.getByRole('button', { name: '연필', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.pen-tool')).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).tap();
   await page.getByRole('button', { name: '지우개 검증 열기', exact: true }).tap();
   await expect(page.locator('.page-loading')).toBeHidden();
@@ -229,7 +230,7 @@ test('eraser circle follows its real size, zoom and temporary barrel mode withou
   await page.getByRole('button', { name: '축소', exact: true }).tap();
   await pen(page, cdp, 'mouseMoved', 240, 210, 0, 0); await expect(circle).toBeVisible(); await checkSize();
   await page.screenshot({ path: '../MyNotes-eraser-circle.png' });
-  await page.getByRole('button', { name: '볼펜', exact: true }).tap(); await expect(circle).toBeHidden();
+  await selectPen(page, '볼펜', true); await expect(circle).toBeHidden();
   // Establish an actual held barrel before moving. Forging buttons=2 on a
   // hover move alone lets Chromium correct it back to its real up state.
   await pen(page, cdp, 'mousePressed', 240, 210, 2, 0, 'right');

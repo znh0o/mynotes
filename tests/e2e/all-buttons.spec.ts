@@ -8,7 +8,7 @@ for (const pointer of ['pen', 'touch'] as const) test(`every button path respond
   await page.goto('./'); await expect(page.getByRole('button', { name: '새 노트', exact: true })).toBeVisible();
   const cdp = await context.newCDPSession(page);
   const tap = async (name: string, role: 'button' | 'menuitem' = 'button') => {
-    const target = page.getByRole(role, { name, exact: true }); await expect(target).toBeVisible();
+    const target = name === '연필 프리셋' ? page.locator('.pen-preset-row').filter({ hasText: '연필' }) : page.getByRole(role, { name, exact: true }); await expect(target).toBeVisible();
     const r = (await target.boundingBox())!, x = r.x + r.width / 2, y = r.y + r.height / 2;
     if (pointer === 'touch') await page.touchscreen.tap(x, y);
     else {
@@ -18,10 +18,11 @@ for (const pointer of ['pen', 'touch'] as const) test(`every button path respond
   };
   await tap('새 노트'); await expect(page.getByRole('dialog')).toBeVisible();
   await tap('취소'); await expect(page.getByRole('dialog')).toHaveCount(0);
-  await tap('새 노트'); await page.locator('[name=title]').fill(`짧은 ${pointer} 탭`);
+  await tap('새 노트'); await page.getByRole('dialog').getByRole('textbox', { name: '노트 이름' }).fill(`짧은 ${pointer} 탭`);
   await tap('노트 만들기'); await expect(page.locator('#paper-live')).toBeVisible(); await expect(page.locator('.page-loading')).toBeHidden();
   await expect(page.locator('.app-slide-layer')).toHaveCount(0);
-  await tap('연필'); await expect(page.getByRole('button', { name: '연필', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await tap('펜'); await tap('연필 프리셋');
+  await expect(page.locator('.pen-tool')).toHaveAttribute('aria-pressed', 'true');
   await tap('필기 옵션'); await expect(page.getByRole('dialog')).toBeVisible();
   await tap('필기 옵션 닫기'); await expect(page.getByRole('dialog')).toHaveCount(0);
   await tap('필기 옵션'); await tap('속지 설정'); await expect(page.getByRole('dialog')).toBeVisible();

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { selectPen } from './helpers';
 import { PDFDocument, PDFRawStream, PDFName, StandardFonts, rgb } from 'pdf-lib';
 import { readFile } from 'node:fs/promises';
 
@@ -141,7 +142,7 @@ test('shape, lasso move/resize/copy/delete, partial eraser and zoom coordinates'
   await expect.poll(async () => (await current()).items.length).toBe(2);
   await page.getByRole('button', { name: '선택 삭제', exact: true }).click();
   await expect.poll(async () => (await current()).items.length).toBe(1);
-  await page.getByRole('button', { name: '볼펜', exact: true }).click(); await pen(page, 120, 380);
+  await selectPen(page, '볼펜'); await pen(page, 120, 380);
   await page.getByRole('button', { name: '확대', exact: true }).click();
   const zoomRect = await page.locator('#paper-live').boundingBox();
   await page.getByRole('button', { name: '도형', exact: true }).click();

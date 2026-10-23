@@ -13,19 +13,25 @@ test('tools switch on the first stylus or touch tap even when compatibility clic
   });
   const cdp = await context.newCDPSession(page);
   const penTap = async (name: string) => {
-    const r = (await page.getByRole('button', { name, exact: true }).boundingBox())!, x = r.x + r.width / 2, y = r.y + r.height / 2;
+    if (['볼펜', '만년필', '연필'].includes(name)) await penTap('펜');
+    const target = ['볼펜', '만년필', '연필'].includes(name)
+      ? page.locator('.pen-preset-row').filter({ hasText: name }).first()
+      : page.getByRole('button', { name, exact: true });
+    const r = (await target.boundingBox())!, x = r.x + r.width / 2, y = r.y + r.height / 2;
     await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', pointerType: 'pen', buttons: 0, x, y });
     await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', pointerType: 'pen', button: 'left', buttons: 1, x, y, force: .2, clickCount: 1 });
     await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', pointerType: 'pen', button: 'left', buttons: 0, x, y, force: 0, clickCount: 1 });
   };
   for (const name of ['만년필', '볼펜', '만년필', '형광펜']) {
-    await penTap(name); await expect(page.getByRole('button', { name, exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await penTap(name); await expect(name === '형광펜' ? page.getByRole('button', { name, exact: true }) : page.locator('.pen-tool')).toHaveAttribute('aria-pressed', 'true');
     expect(await page.locator('.drawing-tools .active').count()).toBe(1);
   }
   for (const name of ['만년필', '지우개', '볼펜']) {
-    const r = (await page.getByRole('button', { name, exact: true }).boundingBox())!;
+    if (name !== '지우개') await page.getByRole('button', { name: '펜', exact: true }).tap();
+    const target = name === '지우개' ? page.getByRole('button', { name, exact: true }) : page.locator('.pen-preset-row').filter({ hasText: name }).first();
+    const r = (await target.boundingBox())!;
     await page.touchscreen.tap(r.x + r.width / 2, r.y + r.height / 2);
-    await expect(page.getByRole('button', { name, exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(name === '지우개' ? target : page.locator('.pen-tool')).toHaveAttribute('aria-pressed', 'true');
   }
   // A normal synthesized click must not undo twice after one pen tap.
   await page.evaluate(() => (window as any).clickBlocker.abort());

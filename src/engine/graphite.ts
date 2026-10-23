@@ -28,16 +28,16 @@ export function graphiteMaterial(wide = false): BrushLayer[] {
   const cached = materials.get(wide); if (cached) return cached;
   const base = .52;
   const layers = [.52, .62, .72, .82, .92, 1].map(opacity => ({ opacity: (opacity - base) / (1 - base), polygons: [] as XY[][] }));
-  const corner = (x: number, y: number) => ({ x: (x + (hash(x, y) - .5) * .36) / 2, y: (y + (hash(x + 19, y + 37) - .5) * .36) / 2 });
-  for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) {
-    // Broad, connected deposits follow the paper relief. A small fine-grain
-    // component breaks up their edges without isolated white/noisy pixels.
-    // Wide lead uses short, slanted graphite fibres rather than enlarging
-    // the thin lead's cloudy deposits into a broad, smooth band.
-    const fibre = hash(Math.floor((x + y) / 3), Math.floor((y - x + 64) / 2));
-    const value = wide ? paperHeight(x, y) * .28 + fibre * .54 + hash(x + 7, y + 23) * .18
-      : paperHeight(x, y) * .86 + hash(x + 7, y + 23) * .14;
-    const level = value < .22 ? 0 : value < .32 ? 1 : value < .43 ? 2 : value < .55 ? 3 : value < .67 ? 4 : 5;
+  const corner = (x: number, y: number) => ({ x: x + (hash(x, y) - .5) * .28, y: y + (hash(x + 19, y + 37) - .5) * .28 });
+  for (let y = 0; y < graphiteSize; y++) for (let x = 0; x < graphiteSize; x++) {
+    // A one-point grain survives tablet display scaling. The longer diagonal
+    // clusters resemble graphite dragged across paper, while the continuous
+    // base keeps a quick, narrow stroke from breaking into dots.
+    const fibre = hash(Math.floor((x + y) / 2), Math.floor((y - x + 32) / 5));
+    const fine = hash(x + 7, y + 23);
+    const value = wide ? paperHeight(x, y) * .25 + fibre * .48 + fine * .27
+      : paperHeight(x, y) * .55 + fine * .45;
+    const level = value < .18 ? 0 : value < .29 ? 1 : value < .41 ? 2 : value < .53 ? 3 : value < .65 ? 4 : 5;
     if (level) layers[level].polygons.push([corner(x, y), corner(x, y + 1), corner(x + 1, y + 1), corner(x + 1, y)]);
   }
   // A paper-wide graphite base prevents subpixel seams between neighboring

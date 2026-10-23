@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { selectPen } from './helpers';
 
 for (const viewport of [{ width: 1280, height: 800 }, { width: 800, height: 1280 }]) {
   test(`Android tablet touch typing controls and start position at ${viewport.width}x${viewport.height}`, async ({ browser }) => {
@@ -67,7 +68,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 800, height: 1280
       expect(await input.evaluate((el: HTMLTextAreaElement) => el.selectionStart)).toBe(0);
       expect(await page.locator('.paper-viewport').evaluate(el => el.scrollTop)).toBeLessThan(2);
       await checkOrigin();
-      await page.getByRole('button', { name: '볼펜', exact: true }).tap();
+      await selectPen(page, '볼펜', true);
       await expect(page.getByRole('slider', { name: '펜 굵기', exact: true })).toHaveValue('3');
       await page.screenshot({ path: `../MyNotes-tablet-typing-${viewport.width}.png` });
     } finally { await context.close(); }
