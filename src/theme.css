@@ -8,7 +8,22 @@
 .brand-wordmark{display:block;width:190px;max-width:100%;height:auto;flex:none}
 .library-content{padding-bottom:36px}
 .library-topbar{background:#ffffffd9}.breadcrumb{color:#7387a6}.breadcrumb strong{color:#3e587d}
-.avatar{background:#386be5;color:white;box-shadow:0 0 0 1px #cbd9f7}.status-dot{background:#22a77b}
+.avatar{width:36px;height:36px;border-width:2px;font-size:13px;background:#386be5;color:white;box-shadow:0 0 0 1px #cbd9f7}.status-dot{background:#22a77b}
+.profile-anchor{position:relative;z-index:45}
+.profile-popover{position:absolute;right:0;top:calc(100% + 12px);width:310px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 100px);overflow:auto;padding:20px;border:1px solid #d9e4f6;border-radius:15px;background:#fff;color:#2e476b;box-shadow:0 16px 44px #233d6a26;touch-action:pan-y}
+.profile-popover h2{font-size:15px;font-weight:700;margin:0 0 17px}
+.profile-summary{display:flex;align-items:center;gap:11px;padding-bottom:16px;border-bottom:1px solid #e7edf7}
+.profile-summary-avatar{display:grid;place-items:center;flex:none;width:42px;height:42px;border-radius:50%;background:#386be5;color:#fff;font-size:17px;font-weight:650}
+.profile-summary strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.profile-details{display:grid;gap:10px;margin:16px 0}
+.profile-details>div{display:grid;grid-template-columns:48px minmax(0,1fr);gap:12px;align-items:start;font-size:12px}
+.profile-details dt{color:#8293ad}.profile-details dd{margin:0;min-width:0;overflow-wrap:anywhere;font-weight:600}
+.profile-edit{width:100%;justify-content:center}
+.profile-form label{display:flex;flex-direction:column;gap:6px;margin-bottom:13px;color:#577094;font-size:11px;font-weight:600}
+.profile-form input{width:100%;min-height:38px;padding:9px 10px;border:1px solid #d6e1f4;border-radius:8px;background:#fff;color:#2e476b;font-size:13px}
+.profile-form input:focus{outline:2px solid #a9c3f6;outline-offset:1px}
+.profile-form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.profile-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}.profile-actions .button{height:36px}
 .nav-item{color:#536b8c}.nav-item>small{color:#7489a8}.nav-item:hover{background:#eef3ff}
 .nav-item.active{background:#3b6fe7;color:#fff;box-shadow:0 4px 10px #3b6fe71c}
 .nav-item.active small{background:#ffffff2e;color:white}.nav-item.active>span:first-child{color:white}

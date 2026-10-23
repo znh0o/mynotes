@@ -88,8 +88,10 @@ export class AppHistory {
     const menu = document.querySelector('.context-menu');
     const eraser = document.querySelector<HTMLElement>('.eraser-picker:popover-open');
     const sidebar = document.querySelector('.library-sidebar.mobile-open');
-    if ((menu || eraser || sidebar) && !previous.overlay) {
+    const profile = document.querySelector<HTMLElement>('.profile-popover:not([hidden])');
+    if ((menu || eraser || sidebar || profile) && !previous.overlay) {
       menu?.remove(); eraser?.hidePopover(); sidebar?.classList.remove('mobile-open');
+      if (profile) { profile.hidden = true; document.querySelector('.avatar')?.setAttribute('aria-expanded', 'false'); }
       this.entry = { ...previous, index: target.index + 1 }; history.pushState(this.entry, ''); return;
     }
     if (target.index === 0) {

@@ -3,6 +3,15 @@ import { covers, createNote, paperNames, uid, type Folder, type Note, type Paper
 import { importPDF, thumbnail } from '../data/pdf';
 import { icon, button, escape, safeColor, modal, toast, run, pickFile, contextMenu, confirmAction, formatDate } from './common';
 export interface LibraryState { filter: string; query: string; sort: string; list: boolean }
+interface Profile { name: string; school: string; grade: string; classroom: string }
+const emptyProfile = (): Profile => ({ name: '', school: '', grade: '', classroom: '' });
+function profileFrom(value: unknown): Profile {
+  const input = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  const field = (key: keyof Profile, max: number) => {
+    const raw = input[key]; return typeof raw === 'string' ? raw.trim().slice(0, max) : '';
+  };
+  return { name: field('name', 40), school: field('school', 80), grade: field('grade', 20), classroom: field('classroom', 20) };
+}
 
 export class LibraryView {
   private notes: Note[] = [];
@@ -16,6 +25,7 @@ export class LibraryView {
   private previewVersion = 0;
   private updateAvailable = false;
   private updateApplying = false;
+  private profile = emptyProfile();
   constructor(private root: HTMLElement, private openNote: (id: string) => Promise<void>, private settings: () => void,
     private navigateFilter: (filter: string) => Promise<void> = async filter => this.setFilter(filter), initial?: LibraryState,
     private applyUpdate: () => Promise<void> = async () => {}) {
@@ -34,11 +44,21 @@ export class LibraryView {
         run(async () => { await db.settings.put({ key: 'library-columns', value: this.columns }); });
       }
     }, { signal: this.abort.signal });
+    root.addEventListener('submit', e => this.submitProfile(e), { signal: this.abort.signal });
+    document.addEventListener('pointerdown', e => {
+      if (!(e.target instanceof Element) || !e.target.closest('.profile-anchor')) this.closeProfile();
+    }, { signal: this.abort.signal });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && this.root.querySelector<HTMLElement>('.profile-popover:not([hidden])')) {
+        e.preventDefault(); e.stopPropagation(); this.closeProfile(); this.root.querySelector<HTMLButtonElement>('.avatar')?.focus();
+      }
+    }, { signal: this.abort.signal });
   }
   async show() {
-    const [notes, folders, columns] = await Promise.all([db.notes.toArray(), db.folders.toArray(), db.settings.get('library-columns')]);
+    const [notes, folders, columns, profile] = await Promise.all([db.notes.toArray(), db.folders.toArray(), db.settings.get('library-columns'), db.settings.get('user-profile')]);
     this.notes = notes; this.folders = folders;
     this.columns = [4, 5, 6].includes(columns?.value as number) ? columns!.value as 4 | 5 | 6 : 'auto';
+    this.profile = profileFrom(profile?.value);
     this.render();
     void this.previews(++this.previewVersion);
   }
@@ -90,7 +110,7 @@ export class LibraryView {
         </div>
       </aside>
       <div class="library-main">
-        <header class="library-topbar"><div class="breadcrumb">${button('Menu', '메뉴 열기', 'mobile-menu')}<span>나의 공간</span>${icon('ChevronRight', 13)}<strong id="breadcrumb-title">나의 서재</strong></div><div class="topbar-right"><button class="avatar" data-action="settings" aria-label="설정">N</button></div></header>
+        <header class="library-topbar"><div class="breadcrumb">${button('Menu', '메뉴 열기', 'mobile-menu')}<span>나의 공간</span>${icon('ChevronRight', 13)}<strong id="breadcrumb-title">나의 서재</strong></div><div class="topbar-right"><div class="profile-anchor"><button class="avatar" type="button" data-action="profile" aria-label="프로필" aria-expanded="false" aria-controls="profile-popover">${escape(this.profileInitial())}</button><div class="profile-popover" id="profile-popover" role="dialog" aria-label="프로필" hidden></div></div></div></header>
         <main class="library-content">
           <div class="page-heading"><div><h1 id="library-title">나의 서재<span class="heading-dot">.</span></h1><p id="library-subtitle" hidden></p></div><div class="heading-actions"><button class="button secondary" data-action="import">${icon('Upload', 18)} PDF 가져오기</button><button class="button primary" data-action="new">${icon('Plus', 19)} 새 노트</button></div></div>
           <section class="welcome-banner ${this.updateAvailable ? 'update-banner' : ''}">${this.bannerContent()}</section>
@@ -104,6 +124,45 @@ export class LibraryView {
   }
   private nav(id: string, name: Parameters<typeof icon>[0], label: string, count?: number, color?: string) {
     return `<button class="nav-item ${this.filter === id ? 'active' : ''}" data-action="filter" data-id="${id}"><span ${color ? `style="color:${safeColor(color)}"` : ''}>${icon(name)}</span><span>${escape(label)}</span>${count !== undefined ? `<small>${count}</small>` : ''}</button>`;
+  }
+  private profileInitial() { return Array.from(this.profile.name)[0] || 'N'; }
+  private renderProfile(editing = false) {
+    const popover = this.root.querySelector<HTMLElement>('.profile-popover')!;
+    if (editing) {
+      popover.innerHTML = `<form class="profile-form"><h2>프로필 수정</h2><label>이름<input name="name" autocomplete="name" maxlength="40" value="${escape(this.profile.name)}" /></label><label>학교<input name="school" autocomplete="organization" maxlength="80" value="${escape(this.profile.school)}" /></label><div class="profile-form-row"><label>학년<input name="grade" maxlength="20" value="${escape(this.profile.grade)}" /></label><label>반<input name="classroom" maxlength="20" value="${escape(this.profile.classroom)}" /></label></div><div class="profile-actions"><button type="button" class="button secondary" data-action="profile-cancel">취소</button><button type="submit" class="button primary">저장</button></div></form>`;
+      popover.querySelector<HTMLInputElement>('[name=name]')?.focus();
+      return;
+    }
+    const value = (text: string) => escape(text || '—');
+    popover.innerHTML = `<h2>프로필</h2><div class="profile-summary"><span class="profile-summary-avatar">${escape(this.profileInitial())}</span><strong>${value(this.profile.name || '이름 없음')}</strong></div><dl class="profile-details"><div><dt>학교</dt><dd>${value(this.profile.school)}</dd></div><div><dt>학년</dt><dd>${value(this.profile.grade)}</dd></div><div><dt>반</dt><dd>${value(this.profile.classroom)}</dd></div></dl><button type="button" class="button secondary profile-edit" data-action="profile-edit">${icon('Pencil', 15)} 수정</button>`;
+  }
+  private closeProfile() {
+    const popover = this.root.querySelector<HTMLElement>('.profile-popover');
+    if (popover) popover.hidden = true;
+    this.root.querySelector<HTMLButtonElement>('.avatar')?.setAttribute('aria-expanded', 'false');
+  }
+  private toggleProfile() {
+    const popover = this.root.querySelector<HTMLElement>('.profile-popover')!;
+    if (!popover.hidden) { this.closeProfile(); return; }
+    this.renderProfile(); popover.hidden = false;
+    this.root.querySelector<HTMLButtonElement>('.avatar')!.setAttribute('aria-expanded', 'true');
+  }
+  private submitProfile(event: Event) {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || !form.classList.contains('profile-form')) return;
+    event.preventDefault();
+    const submit = form.querySelector<HTMLButtonElement>('[type=submit]')!;
+    const profile = profileFrom(Object.fromEntries(new FormData(form)));
+    run(async () => {
+      submit.disabled = true;
+      try {
+        await db.settings.put({ key: 'user-profile', value: profile });
+        this.profile = profile;
+        this.root.querySelector<HTMLButtonElement>('.avatar')!.textContent = this.profileInitial();
+        this.renderProfile();
+        this.root.querySelector<HTMLButtonElement>('[data-action=profile-edit]')?.focus();
+      } finally { submit.disabled = false; }
+    });
   }
   private card(note: Note) {
     const cover = safeColor(note.cover);
@@ -149,6 +208,9 @@ export class LibraryView {
     if (action === 'folder-menu') this.folderMenu(target, id!);
     if (action === 'note-menu') this.noteMenu(target, id!);
     if (action === 'grid' || action === 'list') { this.list = action === 'list'; this.renderResults(); }
+    if (action === 'profile') this.toggleProfile();
+    if (action === 'profile-edit') this.renderProfile(true);
+    if (action === 'profile-cancel') this.renderProfile();
     if (action === 'settings') this.settings();
     if (action === 'import') run(async () => {
       const file = await pickFile('.pdf,application/pdf'); if (!file) return;
