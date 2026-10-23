@@ -25,14 +25,25 @@ let installPrompt: (Event & { prompt: () => Promise<void>; userChoice: Promise<{
 let updateAvailable = false;
 let serviceWorkerRegistration: ServiceWorkerRegistration | undefined;
 let updateChecking = false;
+let updateApplying = false;
 let updateMessage = '버튼을 눌러 새 버전을 확인하세요.';
 function refreshUpdateControls() {
+  library?.setUpdateState(updateAvailable, updateApplying);
   const status = document.querySelector<HTMLElement>('#update-status');
   if (status) status.textContent = updateMessage;
   const check = document.querySelector<HTMLButtonElement>('[data-setting=check-update]');
   if (check) { check.disabled = updateChecking; check.textContent = updateChecking ? '확인 중…' : '업데이트 확인'; }
   const apply = document.querySelector<HTMLButtonElement>('[data-setting=apply-update]');
-  if (apply) apply.hidden = !updateAvailable;
+  if (apply) { apply.hidden = !updateAvailable; apply.disabled = updateApplying; }
+}
+async function applyUpdate() {
+  if (updateApplying) return;
+  updateApplying = true; refreshUpdateControls();
+  try {
+    await applyWaitingUpdate(serviceWorkerRegistration, async () => {
+      await editor?.flush(); updateMessage = '저장했어요. 새 버전을 적용하고 있어요…'; refreshUpdateControls();
+    });
+  } finally { updateApplying = false; refreshUpdateControls(); }
 }
 registerSW({
   immediate: true,
@@ -40,7 +51,7 @@ registerSW({
   onOfflineReady() { toast('오프라인 사용 준비가 완료됐어요.'); },
   onNeedRefresh() {
     updateAvailable = true; updateMessage = '새 버전이 준비됐어요. 필기를 저장한 뒤 적용할 수 있어요.';
-    refreshUpdateControls(); toast('새 버전이 있어요. 설정에서 업데이트할 수 있어요.');
+    refreshUpdateControls(); toast('새 버전이 준비됐어요. 서재의 업데이트 버튼을 눌러 적용하세요.');
   },
   onRegisteredSW(_url, registration) {
     serviceWorkerRegistration = registration;
@@ -52,6 +63,14 @@ registerSW({
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e as typeof installPrompt; });
 window.addEventListener('appinstalled', () => { installPrompt = undefined; toast('MyNotes가 설치됐어요.'); });
 window.addEventListener('offline', () => toast('오프라인이에요. 이 기기에서 계속 필기할 수 있어요.'));
+let lastUpdateCheck = 0;
+function probeUpdate() {
+  if (document.hidden || !navigator.onLine || !serviceWorkerRegistration || Date.now() - lastUpdateCheck < 60000) return;
+  lastUpdateCheck = Date.now(); void serviceWorkerRegistration.update().catch(() => {});
+}
+window.addEventListener('focus', probeUpdate); window.addEventListener('online', probeUpdate);
+document.addEventListener('visibilitychange', probeUpdate);
+setInterval(probeUpdate, 10 * 60 * 1000);
 
 async function home() {
   if (editor) await navigation.goHome();
@@ -72,8 +91,8 @@ async function renderRoute(route: AppRoute, direction: Direction) {
   if (route.screen === 'library') {
     const restoreScroll = libraryState.filter === route.filter ? libraryScroll : 0;
     libraryState = { ...libraryState, filter: route.filter };
-    library = new LibraryView(root, open, settings, filter => navigation.navigate({ screen: 'library', filter }), libraryState);
-    await library.show(); window.scrollTo(0, restoreScroll);
+    library = new LibraryView(root, open, settings, filter => navigation.navigate({ screen: 'library', filter }), libraryState, applyUpdate);
+    await library.show(); refreshUpdateControls(); window.scrollTo(0, restoreScroll);
   } else {
     const existing = tabs.find(t => t.id === note!.id);
     if (existing) existing.title = note!.title; else tabs.push({ id: note!.id, title: note!.title });
@@ -118,9 +137,7 @@ function settings() {
           } finally { updateChecking = false; refreshUpdateControls(); }
         }
         if (action === 'apply-update') {
-          await applyWaitingUpdate(serviceWorkerRegistration, async () => {
-            await editor?.flush(); updateMessage = '저장했어요. 새 버전을 적용하고 있어요…'; refreshUpdateControls();
-          });
+          await applyUpdate();
         }
       } finally { el.removeAttribute('disabled'); }
     })));

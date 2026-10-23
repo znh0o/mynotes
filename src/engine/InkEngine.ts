@@ -3,6 +3,7 @@ import { bounds, erase, inside, transform } from './geometry';
 import { drawItem, drawItems } from './render';
 import { LiveStroke } from './LiveStroke';
 import { canStraighten, straightPoints } from './straight-line';
+import { penContact, penEraser } from './pen-input';
 
 export interface InkOptions {
   tool: Tool; color: string; width: number; fingerDrawing: boolean;
@@ -21,6 +22,7 @@ export class InkEngine {
   private start: Point | null = null;
   private before: Item[] | null = null;
   private moving = false;
+  private gestureTool: Tool | null = null;
   private frame = 0;
   private ratio = 1;
   private dirtyInk = false;
@@ -154,33 +156,49 @@ export class InkEngine {
   }
   cancel() {
     clearTimeout(this.holdTimer); this.holdTimer = undefined; this.holdAnchor = undefined; this.straightSource = undefined;
-    if (this.before && this.page) { this.page.items = this.before; this.before = null; if (!this.stroke && !this.shape) this.render(); }
-    this.stroke = null; this.shape = null; this.lasso = []; this.activePointer = null; this.moving = false; this.inputRect = undefined;
+    if (this.before && this.page) { this.page.items = this.before; this.before = null; this.render(); }
+    this.stroke = null; this.shape = null; this.lasso = []; this.activePointer = null; this.moving = false; this.gestureTool = null; this.inputRect = undefined;
+    this.liveStroke.reset(); this.dirtyInk = false;
     if (this.page) this.preview();
   }
   private down(e: PointerEvent) {
-    if (!this.page || this.activePointer !== null || e.button > 0 && e.button !== 5) return;
+    if (!this.page || this.activePointer !== null) return;
+    if (e.pointerType === 'pen' ? !penContact(e) : e.button !== 0) return;
     if (e.pointerType === 'pen') this.lastPen = performance.now();
     if (e.pointerType === 'touch' && !['text', 'image'].includes(this.options.tool) && (!this.options.fingerDrawing || this.lastPen > 0 && performance.now() - this.lastPen < 800)) return;
-    if (this.options.tool === 'hand') return;
+    const tool = penEraser(e) ? 'eraser' : this.options.tool;
+    if (tool === 'hand') return;
     e.preventDefault();
     this.inputRect = this.live.getBoundingClientRect();
-    const p = this.point(e), tool = e.button === 5 || e.buttons === 32 ? 'eraser' : this.options.tool;
+    const p = this.point(e);
     if (tool === 'text' || tool === 'image') { this.inputRect = undefined; this.insert(p, tool); return; }
     this.activePointer = e.pointerId; this.live.setPointerCapture(e.pointerId); this.start = this.last = p;
     this.checkpoint();
+    this.beginSegment(tool, p); this.armStraightLine(p); this.schedule();
+  }
+  private beginSegment(tool: Tool, p: Point) {
+    this.gestureTool = tool;
     if (tool === 'lasso') {
       const b = bounds(this.page.items.filter(i => this.selected.has(i.id)));
       if (this.selected.size && p.x >= b.x - 12 && p.x <= b.x + b.w + 12 && p.y >= b.y - 12 && p.y <= b.y + b.h + 12) { this.mutableSelection(); this.moving = true; }
       else { this.clearSelection(); this.lasso = [p]; }
     } else if (tool === 'eraser') {
-      this.page.items = erase(this.page.items, p, p, this.options.eraserSize / 2, this.options.partialEraser); this.render();
+      this.page.items = erase(this.page.items, p, p, this.options.eraserSize / 2, this.options.partialEraser); this.dirtyInk = true;
     } else if (tool === 'shape') this.shape = { id: uid(), kind: 'shape', shape: this.options.shape, x: p.x, y: p.y, w: 0, h: 0, color: this.options.color, width: this.options.width };
-    else this.stroke = { id: uid(), kind: 'stroke', tool: tool as Stroke['tool'], color: this.options.color,
+    else if (['pen', 'fountain', 'pencil', 'highlighter'].includes(tool)) this.stroke = { id: uid(), kind: 'stroke', tool: tool as Stroke['tool'], color: this.options.color,
       width: tool === 'highlighter' ? Math.max(14, this.options.width * 5) : this.options.width,
       pressure: tool === 'fountain', brushVersion: 2,
       ...(tool === 'pencil' ? { textureSeed: Math.floor(Math.random() * 0x100000000), pencilDarkness: this.options.pencilDarkness } : {}), points: [p] };
-    this.armStraightLine(p); this.schedule();
+  }
+  private switchSegment(tool: Tool, p: Point) {
+    // Settle the ink before erasing it. Keep one undo snapshot for this contact,
+    // and begin a fresh stroke on release instead of bridging the erased path.
+    if (this.stroke) this.page.items.push(this.stroke);
+    if (this.shape && Math.abs(this.shape.w) + Math.abs(this.shape.h) > 2) this.page.items.push(this.shape);
+    clearTimeout(this.holdTimer); this.holdTimer = undefined; this.holdAnchor = undefined; this.straightSource = undefined;
+    this.stroke = null; this.shape = null; this.lasso = []; this.moving = false;
+    this.liveStroke.reset(); this.context(this.live); this.start = this.last = p;
+    this.beginSegment(tool, p); this.dirtyInk = true;
   }
   private armStraightLine(point: Point) {
     if (!this.stroke || !this.options.holdToLine || this.straightSource) return;
@@ -197,9 +215,20 @@ export class InkEngine {
   }
   private move(e: PointerEvent) {
     if (e.pointerType === 'pen') this.lastPen = performance.now();
+    // With a barrel held in the air, tip contact/lift arrives as pointermove,
+    // rather than another pointerdown/up (chorded Pointer Events).
+    if (e.pointerType === 'pen' && this.activePointer === null && penContact(e)) { this.down(e); return; }
     if (e.pointerId !== this.activePointer || !this.last) return;
     e.preventDefault();
-    const events = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : [];
+    let switched = false;
+    if (e.pointerType === 'pen') {
+      if (!penContact(e)) { this.up(e); return; }
+      const tool = penEraser(e) ? 'eraser' : this.options.tool;
+      if (tool !== this.gestureTool) { this.switchSegment(tool, this.point(e)); switched = true; }
+    }
+    // Coalesced positions precede a button transition; never replay them with
+    // the new tool, which would draw back across a freshly erased segment.
+    const events = !switched && typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : [];
     for (const event of events.length ? events : [e]) {
       const p = this.point(event);
       if (this.stroke) {
@@ -212,7 +241,7 @@ export class InkEngine {
       } else if (this.shape && this.start) { this.shape.w = p.x - this.start.x; this.shape.h = p.y - this.start.y; }
       else if (this.moving) { transform(this.page.items.filter(i => this.selected.has(i.id)), p.x - this.last.x, p.y - this.last.y); this.dirtyInk = true; }
       else if (this.lasso.length) this.lasso.push(p);
-      else { this.page.items = erase(this.page.items, this.last, p, this.options.eraserSize / 2, this.options.partialEraser); this.dirtyInk = true; }
+      else if (this.gestureTool === 'eraser') { this.page.items = erase(this.page.items, this.last, p, this.options.eraserSize / 2, this.options.partialEraser); this.dirtyInk = true; }
       this.last = p;
     }
     this.schedule();
@@ -222,6 +251,7 @@ export class InkEngine {
     clearTimeout(this.holdTimer); this.holdTimer = undefined; this.holdAnchor = undefined;
     if (e.pointerType === 'pen') this.lastPen = performance.now();
     cancelAnimationFrame(this.frame); this.frame = 0;
+    if (this.dirtyInk) { this.render(); this.dirtyInk = false; }
     if (this.stroke) {
       this.preview();
       const ctx = this.context(this.ink, false);
@@ -242,7 +272,7 @@ export class InkEngine {
       this.before = null; this.selection(this.selected.size);
     } else this.commit();
     this.stroke = null; this.shape = null; this.lasso = []; this.moving = false; this.straightSource = undefined;
-    this.activePointer = null; this.inputRect = undefined; this.dirtyInk = false; this.preview();
+    this.activePointer = null; this.gestureTool = null; this.inputRect = undefined; this.dirtyInk = false; this.preview();
     if (this.live.hasPointerCapture(e.pointerId)) this.live.releasePointerCapture(e.pointerId);
   }
   destroy() { this.cancel(); this.abort.abort(); cancelAnimationFrame(this.frame); }

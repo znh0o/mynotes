@@ -43,7 +43,7 @@ export class EditorView {
     });
   }
   async start() {
-    const [pencilSetting, lineSetting] = await db.settings.bulkGet(['pencil-darkness', 'hold-to-line']);
+    const [pencilSetting, lineSetting, eraserSetting] = await db.settings.bulkGet(['pencil-darkness', 'hold-to-line', 'eraser-settings']);
     document.title = `${this.note.title} · MyNotes`;
     this.root.innerHTML = `<div class="editor-shell">
       <header class="editor-header"><button class="editor-home" data-action="home" aria-label="서재로 돌아가기">${icon('ChevronLeft', 19)}<span class="brand-mark small">${icon('PenLine', 18)}</span><span>서재</span></button><div class="open-tabs">${this.tabs.map(t => `<div class="note-tab ${t.id === this.note.id ? 'active' : ''}"><button data-action="tab" data-id="${t.id}">${icon('BookOpen', 15)}<span>${escape(t.title)}</span></button><button data-action="close-tab" data-id="${t.id}" aria-label="${escape(t.title)} 탭 닫기">${icon('X', 13)}</button></div>`).join('')}</div><div class="editor-header-actions"><button class="save-indicator" id="save-status" data-action="save" title="지금 저장">${icon('Check', 13)} 모든 변경사항 저장됨</button>${button('Search', '노트 내 텍스트 검색', 'search')}${button('Download', 'PDF 내보내기', 'export')}${button('Maximize', '전체 화면', 'fullscreen')}${button('MoreHorizontal', '노트 설정', 'settings')}</div></header>
@@ -61,6 +61,11 @@ export class EditorView {
     this.textEditor = new InlineTextEditor(this.root.querySelector('.paper-surface')!, this.root.querySelector('.editor-shell')!, this.engine,
       (head, tail) => this.continueTyping(head, tail), () => this.syncInkControl());
     if (typeof lineSetting?.value === 'boolean') this.engine.options.holdToLine = lineSetting.value;
+    const eraser = eraserSetting?.value as { partial?: boolean; size?: number } | undefined;
+    if (typeof eraser?.partial === 'boolean') this.engine.options.partialEraser = eraser.partial;
+    if (typeof eraser?.size === 'number' && eraser.size >= 8 && eraser.size <= 100) this.engine.options.eraserSize = eraser.size;
+    const eraserButton = this.root.querySelector('[data-action=tool][data-id=eraser]')!;
+    eraserButton.setAttribute('aria-haspopup', 'dialog'); eraserButton.setAttribute('aria-expanded', 'false'); eraserButton.setAttribute('aria-controls', 'eraser-picker');
     this.previews = new PagePreviews(this.root.querySelector('#page-thumbnails')!, this.root.querySelector('.page-sidebar')!,
       () => this.engine.activePointer !== null || this.viewport.classList.contains('zoom-preview'),
       (id, preview, revision) => { if (this.page?.id === id && this.page.revision === revision) this.page.thumbnail = preview; });
@@ -236,7 +241,15 @@ export class EditorView {
     if (action === 'retry-page') run(() => this.showPage(this.index));
     if (action === 'tab' && id !== this.note.id) run(() => this.open(id!));
     if (action === 'close-tab') run(() => this.closeTab(id!));
-    if (action === 'tool') this.selectTool(id as Tool);
+    if (action === 'tool') {
+      this.selectTool(id as Tool);
+      if (id === 'eraser') this.showEraserPicker(target);
+    }
+    if (action === 'eraser-mode') {
+      this.setEraserMode(id === 'partial');
+      this.root.querySelector<HTMLElement>('#eraser-picker')?.hidePopover();
+    }
+    if (action === 'close-eraser') this.root.querySelector<HTMLElement>('#eraser-picker')?.hidePopover();
     if (action === 'color') this.setColor(id!);
     if (action === 'pen-thinner' || action === 'pen-thicker') {
       const slider = this.root.querySelector<HTMLInputElement>('#ink-width')!;
@@ -295,8 +308,11 @@ export class EditorView {
     if (el.id === 'ink-width') this.setInkValue(Number(el.value));
     if (el.id === 'ink-adjustment') { this.inkAdjustment = el.value as 'width' | 'darkness'; this.syncInkControl(); }
     if (el.id === 'finger-drawing') { this.engine.options.fingerDrawing = el.checked; toast(el.checked ? '손가락으로도 필기할 수 있어요.' : '손가락은 이동, S펜은 필기에 사용해요.'); }
-    if (el.id === 'eraser-size') this.engine.options.eraserSize = Number(el.value);
-    if (el.id === 'eraser-mode') this.engine.options.partialEraser = el.value === 'partial';
+    if (el.id === 'eraser-size') {
+      this.engine.options.eraserSize = Number(el.value); this.persistEraser();
+      const output = this.root.querySelector('#eraser-size-value'); if (output) output.textContent = el.value;
+    }
+    if (el.id === 'eraser-mode') this.setEraserMode(el.value === 'partial');
     if (el.id === 'shape-type') this.engine.options.shape = el.value as 'rect';
     if (el.id === 'hold-to-line') { this.engine.options.holdToLine = el.checked; void db.settings.put({ key: 'hold-to-line', value: el.checked }).catch(report); }
   }
@@ -325,6 +341,26 @@ export class EditorView {
     this.syncInkControl();
   }
   private persistPencilDarkness() { void db.settings.put({ key: 'pencil-darkness', value: this.engine.options.pencilDarkness }).catch(report); }
+  private persistEraser() { void db.settings.put({ key: 'eraser-settings', value: { partial: this.engine.options.partialEraser, size: this.engine.options.eraserSize } }).catch(report); }
+  private setEraserMode(partial: boolean) {
+    this.engine.options.partialEraser = partial; this.persistEraser();
+    this.root.querySelectorAll('[data-action=eraser-mode]').forEach(button => button.setAttribute('aria-pressed', String((button.getAttribute('data-id') === 'partial') === partial)));
+  }
+  private showEraserPicker(anchor: HTMLElement) {
+    this.root.querySelector('#eraser-picker')?.remove();
+    const panel = document.createElement('div'); panel.id = 'eraser-picker'; panel.className = 'eraser-picker'; panel.popover = 'auto';
+    panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', '지우개 설정');
+    panel.innerHTML = `<div class="writing-options-heading"><strong>지우개</strong>${button('X', '지우개 설정 닫기', 'close-eraser')}</div><div class="eraser-modes">${([['stroke', '스트로크 지우개', '닿은 획 전체를 지워요'], ['partial', '펜 지우개', '문지른 부분만 지워요']] as const).map(([id, name, description]) => `<button data-action="eraser-mode" data-id="${id}" aria-label="${name}" aria-pressed="${this.engine.options.partialEraser === (id === 'partial')}">${icon(id === 'stroke' ? 'PenLine' : 'Eraser', 20)}<span><strong>${name}</strong><small>${description}</small></span>${icon('Check', 16)}</button>`).join('')}</div><label class="eraser-size-label" for="eraser-size">지우개 크기 <output id="eraser-size-value">${this.engine.options.eraserSize}</output></label><input id="eraser-size" type="range" min="8" max="100" value="${this.engine.options.eraserSize}" aria-label="지우개 크기"/><p>S펜 버튼을 누른 채 문지르면 선택한 방식으로 지워요.</p>`;
+    this.root.querySelector('.editor-shell')!.append(panel);
+    const rect = anchor.getBoundingClientRect();
+    panel.style.left = `${Math.max(8, Math.min(rect.left, innerWidth - 296))}px`;
+    panel.style.top = `${this.root.querySelector('.ink-toolbar')!.getBoundingClientRect().bottom + 6}px`;
+    panel.addEventListener('toggle', () => {
+      const open = panel.matches(':popover-open'); anchor.setAttribute('aria-expanded', String(open));
+      if (!open) panel.remove();
+    });
+    panel.showPopover(); anchor.setAttribute('aria-expanded', 'true');
+  }
   private syncInkControl() {
     const pencil = this.engine.options.tool === 'pencil', darkness = this.adjustingDarkness, text = this.engine.options.tool === 'text';
     const width = this.engine.options.width, value = text ? this.textEditor.size : darkness ? Math.round(this.engine.options.pencilDarkness * 100) : width;
@@ -349,6 +385,7 @@ export class EditorView {
     }
   }
   private selectTool(tool: Tool) {
+    this.root.querySelector<HTMLElement>('.eraser-picker:popover-open')?.hidePopover();
     this.textEditor.finish();
     this.engine.cancel(); this.engine.clearSelection(); this.engine.options.tool = tool;
     this.root.querySelectorAll<HTMLElement>('[data-action=tool]').forEach(e => { const active = e.dataset.id === tool; e.classList.toggle('active', active); e.setAttribute('aria-pressed', String(active)); });
@@ -360,7 +397,7 @@ export class EditorView {
   }
   private contextOptions() {
     const tool = this.engine.options.tool;
-    return tool === 'eraser' ? `<select id="eraser-mode" aria-label="지우개 모드"><option value="stroke" ${!this.engine.options.partialEraser ? 'selected' : ''}>획 전체</option><option value="partial" ${this.engine.options.partialEraser ? 'selected' : ''}>부분 지우기</option></select><input id="eraser-size" type="range" min="8" max="100" value="${this.engine.options.eraserSize}" aria-label="지우개 크기"/>` : tool === 'shape' ? `<select id="shape-type" aria-label="도형 종류">${[['rect', '사각형'], ['ellipse', '원'], ['line', '직선'], ['triangle', '삼각형']].map(([v, t]) => `<option value="${v}" ${this.engine.options.shape === v ? 'selected' : ''}>${t}</option>`).join('')}</select>` : tool === 'pen' ? '<p>볼펜은 필압과 관계없이 설정한 굵기를 유지해요.</p>' : tool === 'lasso' ? `<button class="text-button" data-action="selection-paste">${icon('Copy', 14)} 붙여넣기</button>` : '';
+    return tool === 'eraser' ? `<select id="eraser-mode" aria-label="지우개 모드"><option value="stroke" ${!this.engine.options.partialEraser ? 'selected' : ''}>스트로크 지우개</option><option value="partial" ${this.engine.options.partialEraser ? 'selected' : ''}>펜 지우개</option></select><input id="eraser-size" type="range" min="8" max="100" value="${this.engine.options.eraserSize}" aria-label="지우개 크기"/>` : tool === 'shape' ? `<select id="shape-type" aria-label="도형 종류">${[['rect', '사각형'], ['ellipse', '원'], ['line', '직선'], ['triangle', '삼각형']].map(([v, t]) => `<option value="${v}" ${this.engine.options.shape === v ? 'selected' : ''}>${t}</option>`).join('')}</select>` : tool === 'pen' ? '<p>볼펜은 필압과 관계없이 설정한 굵기를 유지해요.</p>' : tool === 'lasso' ? `<button class="text-button" data-action="selection-paste">${icon('Copy', 14)} 붙여넣기</button>` : '';
   }
   private insert(point: Point, tool: Tool) {
     const page = this.page;
@@ -448,6 +485,7 @@ export class EditorView {
   private setupGestures() {
     const signal = this.abort.signal;
     this.viewport.addEventListener('pointerdown', e => {
+      if (e.defaultPrevented && this.engine.activePointer !== null) return;
       const inText = !!(e.target as Element).closest('.inline-text-box');
       if (inText && e.pointerType !== 'touch' || this.engine.options.tool === 'text' && e.defaultPrevented) return;
       if (e.pointerType === 'pen' && this.engine.options.tool !== 'hand') return;

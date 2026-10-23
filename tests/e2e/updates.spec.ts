@@ -28,6 +28,8 @@ test('settings can check, download and apply a real worker update without losing
   const address = server.address(); if (!address || typeof address === 'string') throw new Error('Test server unavailable');
   try {
     await page.goto(`http://127.0.0.1:${address.port}/mynotes/`); await expect(page.locator('h1')).toBeVisible();
+    await expect(page.locator('.welcome-banner h2')).toHaveText('오늘의 생각을 펼쳐보세요.');
+    await expect(page.getByRole('button', { name: '지금 업데이트', exact: true })).toHaveCount(0);
     await page.evaluate(() => navigator.serviceWorker.ready);
     await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
     expect(await workerRelease(page)).toBe(1);
@@ -57,5 +59,16 @@ test('settings can check, download and apply a real worker update without losing
       db.close(); return pages.filter(p => !p.items.some((i: any) => i.id === 'welcome-title')).flatMap(p => p.items);
     });
     expect(strokes).toHaveLength(1); expect(strokes[0].kind).toBe('stroke');
+    await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).click();
+    release = 3;
+    // A background worker update changes the existing home banner immediately.
+    await page.evaluate(async () => { const registration = await navigator.serviceWorker.ready; await registration.update(); });
+    await expect(page.locator('.welcome-banner h2')).toHaveText('새로운 업데이트가 준비됐어요.');
+    const bannerUpdate = page.getByRole('button', { name: '지금 업데이트', exact: true }); await expect(bannerUpdate).toBeVisible();
+    await page.screenshot({ path: '../MyNotes-update-banner.png' });
+    await Promise.all([page.waitForEvent('load'), bannerUpdate.click()]);
+    expect(await workerRelease(page)).toBe(3);
+    await expect(page.locator('.welcome-banner h2')).toHaveText('오늘의 생각을 펼쳐보세요.');
+    await expect(page.getByRole('button', { name: '지금 업데이트', exact: true })).toHaveCount(0);
   } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }
 });

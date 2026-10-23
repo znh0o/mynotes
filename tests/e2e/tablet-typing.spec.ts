@@ -37,6 +37,25 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 800, height: 1280
       await cdp.send('Input.imeSetComposition', { text: '태', selectionStart: 1, selectionEnd: 1 });
       await cdp.send('Input.insertText', { text: '태블릿 첫 줄\n다음 줄' });
       await expect(input).toHaveValue('태블릿 첫 줄\n다음 줄');
+      await exactSize.tap(); await page.keyboard.insertText('31');
+      await page.getByRole('button', { name: '타이핑 글자 크게', exact: true }).tap();
+      await expect(input).toHaveCSS('font-size', '32px'); await expect(exactSize).toHaveValue('32');
+      await exactSize.tap(); await page.keyboard.insertText('41');
+      await page.getByRole('button', { name: '글자 크기 늘리기', exact: true }).tap();
+      await expect(input).toHaveCSS('font-size', '42px'); await expect(exactSize).toHaveValue('42');
+      await exactSize.tap(); await page.keyboard.insertText('28'); await page.keyboard.press('Enter');
+      // Resize text that already exists, with the keyboard/IME session open.
+      const originalHeight = (await input.boundingBox())!.height;
+      await exactSize.tap(); await page.keyboard.insertText('48'); await page.keyboard.press('Enter');
+      await expect(input).toHaveValue('태블릿 첫 줄\n다음 줄'); await expect(input).toHaveCSS('font-size', '48px');
+      expect((await input.boundingBox())!.height).toBeGreaterThan(originalHeight * 1.6);
+      await page.getByRole('button', { name: '타이핑 글자 작게', exact: true }).tap();
+      await expect(input).toHaveCSS('font-size', '47px'); await expect(input).toBeFocused();
+      await page.getByRole('button', { name: '타이핑 글자 크게', exact: true }).tap();
+      await expect(input).toHaveCSS('font-size', '48px'); await expect(input).toBeFocused();
+      await page.keyboard.insertText(' 추가 입력');
+      await expect(input).toHaveValue('태블릿 첫 줄\n다음 줄 추가 입력');
+      await exactSize.tap(); await page.keyboard.insertText('28'); await page.keyboard.press('Enter');
       await page.setViewportSize({ width: viewport.width, height: viewport.height - 300 });
       await checkOrigin(); expect(await page.locator('.paper-viewport').evaluate(el => el.scrollTop)).toBeLessThan(2);
       await input.fill(Array.from({ length: 18 }, (_, i) => `${i + 1}번째 줄`).join('\n'));

@@ -39,9 +39,11 @@ describe('versioned brush geometry', () => {
     expect(darker[0].polygons).toEqual(light[0].polygons);
     expect(darker[0].opacity).toBe(.9);
   });
-  it('keeps paper texture fine and low in contrast without empty white cells', () => {
+  it('keeps a continuous base under visible, connected graphite deposits', () => {
     const [base, ...grains] = graphiteMaterial();
-    expect(base.opacity).toBeGreaterThanOrEqual(.65);
-    expect((1 - base.opacity) * Math.max(...grains.map(layer => layer.opacity))).toBeLessThan(.32);
+    expect(base.opacity).toBeGreaterThanOrEqual(.5);
+    const contrast = (1 - base.opacity) * Math.max(...grains.map(layer => layer.opacity));
+    expect(contrast).toBeGreaterThan(.4); expect(contrast).toBeLessThanOrEqual(.5);
+    expect(grains.flatMap(layer => layer.polygons).length).toBeLessThan(4096);
   });
 });

@@ -25,6 +25,14 @@ export class InlineTextEditor {
     this.toolbar.setAttribute('role', 'toolbar'); this.toolbar.setAttribute('aria-label', '글자 서식');
     this.toolbar.innerHTML = `<select id="text-entry-mode" aria-label="입력 방식"><option value="document">본문</option><option value="box">글상자</option></select><label>크기<input type="text" inputmode="numeric" pattern="[0-9]*" role="spinbutton" aria-valuemin="10" aria-valuemax="100" aria-valuenow="22" value="22" aria-label="글자 크기" title="글자 크기 10–100" /></label><button type="button" data-text="bold" aria-label="굵게" aria-pressed="false"><b>B</b></button><button type="button" data-text="italic" aria-label="기울임" aria-pressed="false"><i>I</i></button><select id="text-align" aria-label="글자 정렬"><option value="left">왼쪽</option><option value="center">가운데</option><option value="right">오른쪽</option></select><button type="button" data-text="delete" aria-label="글상자 삭제">${icon('Trash2', 18)}</button><button type="button" data-text="cancel" aria-label="입력 취소">${icon('X', 18)}</button><button type="button" data-text="done" class="text-done">${icon('Check', 18)}<span>입력 완료</span></button>`;
     shell.append(this.toolbar);
+    const sizeLabel = this.toolbar.querySelector('label')!;
+    sizeLabel.firstChild!.textContent = '글자 크기';
+    for (const [action, name, symbol] of [['smaller', '타이핑 글자 작게', '−'], ['larger', '타이핑 글자 크게', '+']] as const) {
+      const button = document.createElement('button'); button.type = 'button'; button.dataset.text = action;
+      button.className = 'text-size-step'; button.setAttribute('aria-label', name); button.title = name; button.textContent = symbol;
+      if (action === 'smaller') sizeLabel.insertBefore(button, sizeLabel.querySelector('input'));
+      else sizeLabel.append(button);
+    }
     const signal = this.abort.signal;
     // Keep the native keyboard/caret when a formatting button is tapped.
     this.toolbar.addEventListener('pointerdown', event => { if ((event.target as Element).closest('button')) event.preventDefault(); }, { signal });
@@ -33,6 +41,9 @@ export class InlineTextEditor {
       if (!action || !this.draft) return;
       if (action === 'done' || action === 'cancel') { this.finish(action === 'cancel'); return; }
       if (action === 'delete') { this.input!.value = ''; this.finish(); return; }
+      if (action === 'smaller' || action === 'larger') {
+        this.setSize(this.size + (action === 'smaller' ? -1 : 1)); this.focus(); return;
+      }
       if (action === 'bold' || action === 'italic') this.draft[action] = !this.draft[action];
       this.sync(); this.publish(); this.input?.focus({ preventScroll: true });
     }, { signal });
@@ -45,9 +56,8 @@ export class InlineTextEditor {
       if (!this.draft) return;
       const size = Number(this.toolbar.querySelector('input')!.value);
       if (!Number.isFinite(size) || size < 10 || size > 100) return;
-      this.draft.size = Math.round(size);
       this.draft.align = this.toolbar.querySelector<HTMLSelectElement>('#text-align')!.value as TextItem['align'];
-      this.sync(); this.publish(false);
+      this.setSize(size);
     }, { signal });
     const sizeInput = this.toolbar.querySelector('input')!;
     sizeInput.addEventListener('focus', () => sizeInput.select(), { signal });
@@ -79,7 +89,7 @@ export class InlineTextEditor {
     if (!Number.isFinite(value)) return;
     const size = Math.max(10, Math.min(100, Math.round(value)));
     this.defaults.size = size;
-    if (this.draft) { this.draft.size = size; this.sync(); this.publish(false); }
+    if (this.draft) { this.draft.size = size; this.sync(); this.publish(false); this.ensureCaretVisible(); }
     else this.styleChanged();
   }
   focus() { this.input?.focus({ preventScroll: true }); this.ensureCaretVisible(); }
@@ -136,15 +146,20 @@ export class InlineTextEditor {
     const item = this.draft; if (!item || !this.input || !this.box) return;
     this.defaults = { size: item.size, bold: !!item.bold, italic: !!item.italic, align: item.align ?? 'left' };
     Object.assign(this.box.style, { left: `${item.x}px`, top: `${item.y}px`, width: `${item.w}px` });
-    Object.assign(this.input.style, { font: textFont(item), lineHeight: '1.55', color: item.color, textAlign: item.align ?? 'left' });
+    Object.assign(this.input.style, { fontFamily: '"Segoe UI", "Malgun Gothic", sans-serif', fontSize: `${item.size}px`, fontWeight: item.bold ? '700' : '400', fontStyle: item.italic ? 'italic' : 'normal', lineHeight: '1.55', color: item.color, textAlign: item.align ?? 'left' });
     // Measure in a separate DOM element. Collapsing the focused textarea to
     // zero height makes Android's keyboard/caret scrolling jump the page.
     const layout = this.textLayout();
     item.h = Math.max(item.size * 1.55, layout.height);
     this.input.style.height = `${item.h}px`;
     for (const action of ['bold', 'italic'] as const) this.toolbar.querySelector(`[data-text=${action}]`)!.setAttribute('aria-pressed', String(!!item[action]));
-    const size = this.toolbar.querySelector('input')!; if (document.activeElement !== size) size.value = String(item.size);
+    // Update even while this field is focused. On Android, moving from an
+    // edited number to a size button fires change after the button's click;
+    // a stale field value would then undo the newly chosen font size.
+    const size = this.toolbar.querySelector('input')!; if (size.value !== String(item.size)) size.value = String(item.size);
     size.setAttribute('aria-valuenow', String(item.size));
+    this.toolbar.querySelector<HTMLButtonElement>('[data-text=smaller]')!.disabled = item.size <= 10;
+    this.toolbar.querySelector<HTMLButtonElement>('[data-text=larger]')!.disabled = item.size >= 100;
     this.toolbar.querySelector<HTMLSelectElement>('#text-align')!.value = item.align ?? 'left';
     this.toolbar.querySelector<HTMLSelectElement>('#text-entry-mode')!.value = this.mode;
     const body = item.textMode === 'document';

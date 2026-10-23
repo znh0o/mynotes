@@ -3,7 +3,7 @@ import type { Point, Stroke } from '../data/model';
 export type XY = { x: number; y: number };
 export interface BrushLayer { opacity: number; polygons: XY[][] }
 export const graphiteSize = 32;
-export const graphiteScale = .7;
+export const graphiteScale = 1.1;
 export const graphiteOpacities = [.2, .32, .44, .56, .68, .8, .91, 1];
 export const pencilOpacities = (stroke: Stroke) => stroke.pencilDarkness === undefined ? graphiteOpacities : [stroke.pencilDarkness];
 export const graphiteOffset = (seed = 0) => ({ x: seed & 31, y: seed >>> 8 & 31 });
@@ -12,18 +12,28 @@ const hash = (x: number, y: number) => {
   let v = Math.imul(x & 63, 374761393) ^ Math.imul(y & 63, 668265263) ^ 0x6d2b79f5;
   v = Math.imul(v ^ v >>> 13, 1274126177); return ((v ^ v >>> 16) >>> 0) / 0x100000000;
 };
+const paperHeight = (x: number, y: number) => {
+  const a = Math.floor(x / 4), b = Math.floor(y / 4);
+  const smooth = (n: number) => n * n * (3 - 2 * n);
+  const u = smooth(x / 4 - a), v = smooth(y / 4 - b);
+  const sample = (x: number, y: number) => hash(x & 15, y & 15);
+  return (sample(a, b) * (1 - u) + sample(a + 1, b) * u) * (1 - v)
+    + (sample(a, b + 1) * (1 - u) + sample(a + 1, b + 1) * u) * v;
+};
 
 // One reusable paper-height material, shared by Canvas and vector PDF patterns.
 // Adjacent cells share jittered corners: irregular graphite islands, no dot grid.
 let material: BrushLayer[] | undefined;
 export function graphiteMaterial(): BrushLayer[] {
   if (material) return material;
-  const base = .68;
-  const layers = [.68, .74, .8, .86, .92, .98].map(opacity => ({ opacity: (opacity - base) / (1 - base), polygons: [] as XY[][] }));
+  const base = .52;
+  const layers = [.52, .62, .72, .82, .92, 1].map(opacity => ({ opacity: (opacity - base) / (1 - base), polygons: [] as XY[][] }));
   const corner = (x: number, y: number) => ({ x: (x + (hash(x, y) - .5) * .36) / 2, y: (y + (hash(x + 19, y + 37) - .5) * .36) / 2 });
   for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) {
-    const value = hash(Math.floor(x / 2), Math.floor(y / 2)) * .65 + hash(x + 7, y + 23) * .35;
-    const level = hash(x + 31, y + 9) < .07 || value < .18 ? 0 : value < .27 ? 1 : value < .36 ? 2 : value < .48 ? 3 : value < .66 ? 4 : 5;
+    // Broad, connected deposits follow the paper relief. A small fine-grain
+    // component breaks up their edges without isolated white/noisy pixels.
+    const value = paperHeight(x, y) * .86 + hash(x + 7, y + 23) * .14;
+    const level = value < .22 ? 0 : value < .32 ? 1 : value < .43 ? 2 : value < .55 ? 3 : value < .67 ? 4 : 5;
     if (level) layers[level].polygons.push([corner(x, y), corner(x, y + 1), corner(x + 1, y + 1), corner(x + 1, y)]);
   }
   // A paper-wide graphite base prevents subpixel seams between neighboring

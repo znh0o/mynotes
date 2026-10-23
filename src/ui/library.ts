@@ -14,8 +14,11 @@ export class LibraryView {
   private columns: 'auto' | 4 | 5 | 6 = 'auto';
   private abort = new AbortController();
   private previewVersion = 0;
+  private updateAvailable = false;
+  private updateApplying = false;
   constructor(private root: HTMLElement, private openNote: (id: string) => Promise<void>, private settings: () => void,
-    private navigateFilter: (filter: string) => Promise<void> = async filter => this.setFilter(filter), initial?: LibraryState) {
+    private navigateFilter: (filter: string) => Promise<void> = async filter => this.setFilter(filter), initial?: LibraryState,
+    private applyUpdate: () => Promise<void> = async () => {}) {
     if (initial) { this.filter = initial.filter; this.query = initial.query; this.sort = initial.sort; this.list = initial.list; }
     root.addEventListener('click', e => this.click(e), { signal: this.abort.signal });
     root.addEventListener('input', e => {
@@ -38,6 +41,16 @@ export class LibraryView {
     this.columns = [4, 5, 6].includes(columns?.value as number) ? columns!.value as 4 | 5 | 6 : 'auto';
     this.render();
     void this.previews(++this.previewVersion);
+  }
+  setUpdateState(available: boolean, applying: boolean) {
+    if (this.updateAvailable === available && this.updateApplying === applying) return;
+    this.updateAvailable = available; this.updateApplying = applying;
+    const banner = this.root.querySelector('.welcome-banner');
+    if (banner) { banner.classList.toggle('update-banner', available); banner.innerHTML = this.bannerContent(); }
+  }
+  private bannerContent() {
+    if (this.updateAvailable) return `<div role="status" aria-live="polite"><span class="banner-label"><span></span> MYNOTES UPDATE</span><h2>새로운 업데이트가 준비됐어요.</h2><p>더 나아진 MyNotes를 만나보세요.<br>노트를 안전하게 저장한 뒤 새 버전을 적용해요.</p><button class="button primary banner-update-button" data-action="apply-update" ${this.updateApplying ? 'disabled' : ''}>${icon('RefreshCw', 17)} ${this.updateApplying ? '업데이트 적용 중…' : '지금 업데이트'}</button></div><div class="update-banner-art" aria-hidden="true">${icon('RefreshCw', 72)}<span>MYNOTES</span></div>`;
+    return `<div><span class="banner-label"><span></span> A LITTLE SPACE, ENDLESS POSSIBILITIES</span><h2>오늘의 생각을 펼쳐보세요.</h2><p>펜 끝에서 시작되는 새로운 배움.<br>나만의 속도로, 한 페이지씩 채워가요.</p><button class="banner-link" data-action="new">새로운 페이지 시작하기 ${icon('ArrowUpRight', 17)}</button></div><div class="banner-art" aria-hidden="true"><div class="art-shadow"></div><div class="art-notebook back"></div><div class="art-notebook front"><span>small thoughts,<br>big possibilities.</span><i></i><small>MYNOTES / DAILY NOTES</small></div><div class="art-pen"></div><div class="art-star star-one">✧</div><div class="art-star star-two">✧</div><div class="art-dot"></div></div>`;
   }
   private async previews(version: number) {
     for (const note of this.notes.filter(n => !n.thumbnail && !n.deleted).slice(0, 12)) {
@@ -82,7 +95,7 @@ export class LibraryView {
         <header class="library-topbar"><div class="breadcrumb">${button('Menu', '메뉴 열기', 'mobile-menu')}<span>나의 공간</span>${icon('ChevronRight', 13)}<strong id="breadcrumb-title">나의 서재</strong></div><div class="topbar-right"><span class="local-badge">${icon('ShieldCheck', 15)} 오프라인 우선</span><button class="avatar" data-action="settings" aria-label="내 기기 설정">M</button></div></header>
         <main class="library-content">
           <div class="page-heading"><div><span class="eyebrow">YOUR SPACE TO THINK</span><h1 id="library-title">나의 서재<span class="heading-dot">.</span></h1><p id="library-subtitle">작은 아이디어부터 깊은 배움까지, 모두 이곳에.</p></div><div class="heading-actions"><button class="button secondary" data-action="import">${icon('Upload', 18)} PDF 가져오기</button><button class="button primary" data-action="new">${icon('Plus', 19)} 새 노트</button></div></div>
-          <section class="welcome-banner"><div><span class="banner-label"><span></span> A LITTLE SPACE, ENDLESS POSSIBILITIES</span><h2>오늘의 생각을 펼쳐보세요.</h2><p>펜 끝에서 시작되는 새로운 배움.<br>나만의 속도로, 한 페이지씩 채워가요.</p><button class="banner-link" data-action="new">새로운 페이지 시작하기 ${icon('ArrowUpRight', 17)}</button></div><div class="banner-art" aria-hidden="true"><div class="art-shadow"></div><div class="art-notebook back"></div><div class="art-notebook front"><span>small thoughts,<br>big possibilities.</span><i></i><small>MYNOTES / DAILY NOTES</small></div><div class="art-pen"></div><div class="art-star star-one">✧</div><div class="art-star star-two">✧</div><div class="art-dot"></div></div></section>
+          <section class="welcome-banner ${this.updateAvailable ? 'update-banner' : ''}">${this.bannerContent()}</section>
           <section class="recent-section"><div class="section-heading"><h2>${icon('Clock', 18)} 최근 펼쳐본 노트</h2><button class="text-button" data-action="filter" data-id="recent">모두 보기 ${icon('ChevronRight', 15)}</button></div><div id="recent-notes" class="recent-grid"></div></section>
           <section class="notes-section"><div class="collection-toolbar"><div class="collection-tabs"><button class="collection-tab active" data-action="filter" data-id="all">모든 노트 <span>${active.length}</span></button><button class="collection-tab" data-action="filter" data-id="favorites">즐겨찾기 ${icon('Star', 14)}</button></div><div class="collection-controls"><label class="search-field">${icon('Search', 17)}<input id="library-search" type="search" placeholder="노트 검색" aria-label="노트 검색" value="${escape(this.query)}" /></label><label class="sort-field"><select id="sort" aria-label="노트 정렬"><option value="updated">최근 수정순</option><option value="name">이름순</option><option value="created">최근 생성순</option></select>${icon('ChevronDown', 13)}</label><label class="note-density">한 줄<select id="note-columns" aria-label="한 줄 노트 개수"><option value="auto">자동</option><option value="4">4개</option><option value="5">5개</option><option value="6">6개</option></select></label><div class="view-toggle">${button('Grid2X2', '그리드 보기', 'grid')}${button('List', '목록 보기', 'list')}</div></div></div><div id="note-results"></div></section>
           <section class="template-section"><div class="section-heading"><div><span class="eyebrow">START WITH A FRESH PAGE</span><h2>생각에 맞는 한 장</h2></div><span class="muted">어떤 이야기를 써볼까요?</span></div><div class="template-grid">${(['blank', 'lined', 'grid', 'cornell'] as Paper[]).map((p, i) => `<button class="template-card" data-action="template" data-id="${p}"><div class="paper-mini ${p}"><span>${['Aa', '오늘의 기록', 'x + y =', 'IDEA / NOTE'][i]}</span></div><div><strong>${paperNames[p]}</strong><span>${['자유롭게 펼치는 아이디어', '차곡차곡 쌓이는 기록', '정리할수록 선명한 생각', '배움을 나만의 언어로'][i]}</span></div>${icon('ArrowUpRight', 16)}</button>`).join('')}</div></section>
@@ -129,6 +142,7 @@ export class LibraryView {
   private click(event: Event) {
     const target = (event.target as Element).closest<HTMLElement>('[data-action]'); if (!target) return;
     const { action, id } = target.dataset;
+    if (action === 'apply-update') run(this.applyUpdate);
     if (action === 'filter') { this.root.querySelector('.library-sidebar')?.classList.remove('mobile-open'); run(() => this.navigateFilter(id!)); }
     if (action === 'new' || action === 'template') this.newNote(action === 'template' ? id as Paper : 'lined');
     if (action === 'open') run(() => this.openNote(id!));

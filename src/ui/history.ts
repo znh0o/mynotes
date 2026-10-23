@@ -86,9 +86,10 @@ export class AppHistory {
     const previous = this.entry;
     let target: Entry = valid(state) ? state : { mynotes: 1, index: 0, route: homeRoute };
     const menu = document.querySelector('.context-menu');
+    const eraser = document.querySelector<HTMLElement>('.eraser-picker:popover-open');
     const sidebar = document.querySelector('.library-sidebar.mobile-open');
-    if ((menu || sidebar) && !previous.overlay) {
-      menu?.remove(); sidebar?.classList.remove('mobile-open');
+    if ((menu || eraser || sidebar) && !previous.overlay) {
+      menu?.remove(); eraser?.hidePopover(); sidebar?.classList.remove('mobile-open');
       this.entry = { ...previous, index: target.index + 1 }; history.pushState(this.entry, ''); return;
     }
     if (target.index === 0) {

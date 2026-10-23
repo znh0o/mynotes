@@ -161,7 +161,9 @@ test('ballpoint and pencil stay fixed while fountain responds to pressure and pe
     const mean = alpha.reduce((sum, a) => sum + a, 0) / alpha.length;
     return { low: Math.min(...alpha), variation: Math.sqrt(alpha.reduce((sum, a) => sum + (a - mean) ** 2, 0) / alpha.length) };
   });
-  expect(graphite.low).toBeGreaterThan(90); expect(graphite.variation).toBeGreaterThan(3); expect(graphite.variation).toBeLessThan(25);
+  // Connected deposits need more variation than the previous flat material,
+  // while the continuous base still prevents white gaps in the stroke core.
+  expect(graphite.low).toBeGreaterThan(90); expect(graphite.variation).toBeGreaterThan(10); expect(graphite.variation).toBeLessThan(32);
   const readStrokes = () => page.evaluate(async () => {
     const noteId = document.querySelector<HTMLElement>('.note-tab.active [data-action=tab]')!.dataset.id;
     const db = await new Promise<IDBDatabase>(resolve => { const r = indexedDB.open('mynotes-v1'); r.onsuccess = () => resolve(r.result); });
