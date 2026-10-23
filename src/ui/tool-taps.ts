@@ -25,7 +25,8 @@ export function installFastTaps(root: Document = document) {
     current.button.click();
   }, { capture: true });
   root.addEventListener('click', event => {
-    if (event.detail === 0) return; // Programmatic, keyboard and assistive activation.
+    const pointerClick = event.clientX !== 0 || event.clientY !== 0 || event instanceof PointerEvent && !!event.pointerType;
+    if (event.detail === 0 && !pointerClick) return; // Keyboard, assistive and button.click().
     const now = performance.now(); consumed = consumed.filter(tap => now - tap.time < 700);
     const target = buttonAt(event);
     const index = consumed.findIndex(tap => {

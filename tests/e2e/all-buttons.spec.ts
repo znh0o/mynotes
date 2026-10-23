@@ -12,8 +12,8 @@ for (const pointer of ['pen', 'touch'] as const) test(`every button path respond
     const r = (await target.boundingBox())!, x = r.x + r.width / 2, y = r.y + r.height / 2;
     if (pointer === 'touch') await page.touchscreen.tap(x, y);
     else {
-      await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', pointerType: 'pen', button: 'left', buttons: 1, force: .3, x, y });
-      await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', pointerType: 'pen', button: 'left', buttons: 0, force: 0, x, y });
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', pointerType: 'pen', button: 'left', buttons: 1, force: .3, x, y, clickCount: 1 });
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', pointerType: 'pen', button: 'left', buttons: 0, force: 0, x, y, clickCount: 1 });
     }
   };
   await tap('새 노트'); await expect(page.getByRole('dialog')).toBeVisible();
@@ -58,4 +58,16 @@ test('a delayed click landing on a newly opened dialog does not close it', async
     return dialog.open;
   });
   expect(open).toBe(true); await expect(page.getByRole('dialog')).toBeVisible();
+});
+
+test('zero-detail pen clicks are suppressed while keyboard activation stays available', async ({ page }) => {
+  await page.goto('./'); await expect(page.locator('#library-title')).toBeVisible();
+  const pen = await page.evaluate(() => {
+    const button = document.createElement('button'); button.id = 'fast-tap-probe'; button.dataset.count = '0';
+    button.onclick = () => button.dataset.count = String(Number(button.dataset.count) + 1); document.body.append(button);
+    for (const type of ['pointerdown', 'pointerup']) button.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerType: 'pen', pointerId: 7, button: 0, clientX: 100, clientY: 100 }));
+    button.dispatchEvent(new PointerEvent('click', { bubbles: true, cancelable: true, detail: 0, pointerType: 'pen', pointerId: 7, clientX: 100, clientY: 100 }));
+    button.focus(); return Number(button.dataset.count);
+  });
+  expect(pen).toBe(1); await page.keyboard.press('Enter'); await expect(page.locator('#fast-tap-probe')).toHaveAttribute('data-count', '2');
 });
