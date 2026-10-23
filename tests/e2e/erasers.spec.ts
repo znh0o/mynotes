@@ -129,8 +129,11 @@ test('eraser circle follows its real size, zoom and temporary barrel mode withou
   await pen(page, cdp, 'mouseMoved', 240, 210, 0, 0); await expect(circle).toBeVisible(); await checkSize();
   await page.screenshot({ path: '../MyNotes-eraser-circle.png' });
   await page.getByRole('button', { name: '볼펜', exact: true }).click(); await expect(circle).toBeHidden();
-  await pen(page, cdp, 'mouseMoved', 240, 210, 2, 0, 'right'); await expect(circle).toBeVisible(); await checkSize();
-  await pen(page, cdp, 'mouseMoved', 245, 210, 0, 0); await expect(circle).toBeHidden();
+  // Establish an actual held barrel before moving. Forging buttons=2 on a
+  // hover move alone lets Chromium correct it back to its real up state.
+  await pen(page, cdp, 'mousePressed', 240, 210, 2, 0, 'right');
+  await pen(page, cdp, 'mouseMoved', 245, 210, 2, 0, 'right'); await expect(circle).toBeVisible(); await checkSize();
+  await pen(page, cdp, 'mouseReleased', 245, 210, 0, 0, 'right'); await expect(circle).toBeHidden();
   await page.getByRole('button', { name: '지우개', exact: true }).click();
   await page.getByRole('button', { name: '스트로크 지우개', exact: true }).click();
   const rect = (await page.locator('#paper-live').boundingBox())!;
