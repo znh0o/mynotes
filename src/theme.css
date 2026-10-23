@@ -4,8 +4,9 @@
 .muted,.page-heading p,.workspace-label,.sidebar-empty,.add-folder,.text-button,.local-badge{color:#677f9f}
 .eyebrow,.sidebar-section-title{color:#5575b3}
 .brand{color:#21395d}.brand-dot{color:#386be5}.brand-mark{background:#e1eaff;color:#3265dc}
-.brand.brand-logo{width:100%;height:54px;min-height:54px;gap:0;padding:0 3px;align-items:center;justify-content:flex-start;overflow:hidden}
+.brand.brand-logo{width:100%;height:54px;min-height:54px;gap:0;padding:0 3px;margin-bottom:28px;align-items:center;justify-content:flex-start;overflow:hidden}
 .brand-wordmark{display:block;width:190px;max-width:100%;height:auto;flex:none}
+.library-content{padding-bottom:36px}
 .library-topbar{background:#ffffffd9}.breadcrumb{color:#7387a6}.breadcrumb strong{color:#3e587d}
 .avatar{background:#386be5;color:white;box-shadow:0 0 0 1px #cbd9f7}.status-dot{background:#22a77b}
 .nav-item{color:#536b8c}.nav-item>small{color:#7489a8}.nav-item:hover{background:#eef3ff}
@@ -27,7 +28,8 @@
 #note-results .notes-grid[data-columns]:not(.list-view){grid-template-columns:repeat(var(--note-columns),minmax(0,1fr))}
 #note-results .notes-grid.list-view{grid-template-columns:minmax(0,1fr)}
 @media(max-width:760px){.collection-controls{gap:8px}.collection-controls .search-field{min-width:88px}#note-results .notes-grid[data-columns]:not(.list-view){gap:18px 10px}#note-results .notes-grid[data-columns]:not(.list-view) .notebook-cover{padding:10px 8px;border-right-width:1px;border-bottom-width:2px}#note-results .notes-grid[data-columns]:not(.list-view) .cover-brand,#note-results .notes-grid[data-columns]:not(.list-view) .cover-edition{display:none}#note-results .notes-grid[data-columns]:not(.list-view) .cover-title{font-size:10px;margin-top:2px;line-height:1.4}#note-results .notes-grid[data-columns]:not(.list-view) .cover-preview{width:100%;border-width:1px}#note-results .notes-grid[data-columns]:not(.list-view) .note-info{padding-top:8px}#note-results .notes-grid[data-columns]:not(.list-view) .note-info span{display:none}#note-results .notes-grid[data-columns]:not(.list-view) .new-note-tile{min-width:0;gap:6px}#note-results .notes-grid[data-columns]:not(.list-view) .new-note-tile>span{width:26px;height:26px}#note-results .notes-grid[data-columns]:not(.list-view) .new-note-tile>span svg{width:18px}#note-results .notes-grid[data-columns]:not(.list-view) .new-note-tile small{display:none}#note-results .notes-grid[data-columns]:not(.list-view) .new-note-tile strong{font-size:8px}}
-.notebook-cover{box-shadow:3px 5px 10px #365b8c25;border-bottom-color:#d6e0ef}.cover-title,.cover-brand,.cover-edition{color:var(--cover-ink,#fff)}
+.notebook-cover{box-shadow:3px 5px 10px #365b8c25;border-bottom-color:#d6e0ef}.cover-title,.cover-brand{color:var(--cover-ink,#fff)}
+.notebook-cover .cover-preview{margin-bottom:18px}
 .cover-title{font-weight:650}.note-title{color:#304d76}.note-info span{color:#748aaa}.note-menu{color:#6c87b0}
 .new-note-tile{background:#eff4ff;border-color:#b7cbef}.new-note-tile:hover{background:#e7efff;border-color:#729ce8}
 .new-note-tile>span{background:#dfebff;color:#4e7edd}.new-note-tile strong{color:#4b70aa}.new-note-tile small{color:#7e98bd}
@@ -46,7 +48,7 @@
 .add-page-button{border-color:#b9cdef;color:#537fc2}.paper-viewport{background:#e3eaf6}.editor-footer{background:#f5f8ff;color:#7189ac;border-top-color:#d7e2f5}
 .zoom-controls>button:not(.icon-button){color:#5b7fb5}.page-navigation{color:#4d73ab}.selection-toolbar{color:#4777bc;border-color:#c3d6f5}
 .form-label{color:#526f98}.form-label>input:not([type=color]),.form-label>select,.form-label>textarea{color:#35557e;border-color:#cfdef4}
-.dialog-description{color:#6b83a5}.modal header .eyebrow{color:#4773c3}.settings-intro p,.settings-section p{color:#7188a8}.settings-section h3{color:#456fae}
+.modal header h2{margin-top:0}.settings-version{margin-bottom:14px}.settings-section p{color:#7188a8}.settings-section h3{color:#456fae}
 .storage-row{color:#6a82a5}.storage-row strong{color:#3868bd}.paper-options label:has(:checked){border-color:#4b7de2;background:#eaf1ff}.paper-options label>span{color:#6280ac}
 .context-menu button{color:#45648d}.context-menu button:hover{background:#eaf1ff}.context-menu button.danger{color:#c45d75}
 .app-slide-layer{position:fixed;inset:0;z-index:60;overflow:hidden;pointer-events:none;background:#f4f7ff;box-shadow:0 0 35px #203e7020;will-change:transform,opacity}

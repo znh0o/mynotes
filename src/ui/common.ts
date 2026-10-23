@@ -15,7 +15,7 @@ export function report(error: unknown) { console.error(error); toast(error insta
 export function run(action: () => Promise<unknown>) { void action().catch(report); }
 export function modal(title: string, content: string, submitLabel: string, submit: (form: FormData, dialog: HTMLDialogElement) => Promise<void> | void) {
   const dialog = document.createElement('dialog'); dialog.className = 'modal';
-  dialog.innerHTML = `<form><header><div><span class="eyebrow">NOTELIN</span><h2>${escape(title)}</h2></div><button type="button" class="icon-button" data-close aria-label="닫기">${icon('X')}</button></header><div class="modal-body">${content}</div><footer><button type="button" class="button secondary" data-close>취소</button><button type="submit" class="button primary">${escape(submitLabel)}</button></footer></form>`;
+  dialog.innerHTML = `<form><header><div><h2>${escape(title)}</h2></div><button type="button" class="icon-button" data-close aria-label="닫기">${icon('X')}</button></header><div class="modal-body">${content}</div><footer><button type="button" class="button secondary" data-close>취소</button><button type="submit" class="button primary">${escape(submitLabel)}</button></footer></form>`;
   dialog.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', () => dialog.close()));
   dialog.addEventListener('close', () => dialog.remove());
   dialog.addEventListener('click', e => { if (e.target === dialog) { const r = dialog.getBoundingClientRect(); const m = e as MouseEvent; if (m.clientX < r.left || m.clientX > r.right || m.clientY < r.top || m.clientY > r.bottom) dialog.close(); } });
