@@ -90,7 +90,7 @@ export class LibraryView {
         </div>
       </aside>
       <div class="library-main">
-        <header class="library-topbar"><div class="breadcrumb">${button('Menu', '메뉴 열기', 'mobile-menu')}<strong id="breadcrumb-title">나의 서재</strong></div><div class="topbar-right"><button class="avatar" data-action="settings" aria-label="설정">N</button></div></header>
+        <header class="library-topbar"><div class="breadcrumb">${button('Menu', '메뉴 열기', 'mobile-menu')}<span>나의 공간</span>${icon('ChevronRight', 13)}<strong id="breadcrumb-title">나의 서재</strong></div><div class="topbar-right"><button class="avatar" data-action="settings" aria-label="설정">N</button></div></header>
         <main class="library-content">
           <div class="page-heading"><div><h1 id="library-title">나의 서재<span class="heading-dot">.</span></h1><p id="library-subtitle" hidden></p></div><div class="heading-actions"><button class="button secondary" data-action="import">${icon('Upload', 18)} PDF 가져오기</button><button class="button primary" data-action="new">${icon('Plus', 19)} 새 노트</button></div></div>
           <section class="welcome-banner ${this.updateAvailable ? 'update-banner' : ''}">${this.bannerContent()}</section>
