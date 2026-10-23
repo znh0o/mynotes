@@ -43,7 +43,8 @@ test('long pencil input leaves time for a toolbar tap', async ({ page, context }
 
 test('rapid stylus taps ignore delayed clicks from every earlier button', async ({ page }) => {
   await page.goto('./'); await page.getByRole('button', { name: '새 노트', exact: true }).click();
-  await page.getByRole('button', { name: '노트 만들기', exact: true }).click(); await expect(page.locator('.page-loading')).toBeHidden();
+  await page.getByRole('button', { name: '노트 만들기', exact: true }).click();
+  await expect(page.locator('#paper-live')).toBeVisible(); await expect(page.locator('.page-loading')).toBeHidden();
   const tool = await page.evaluate(() => {
     for (const id of ['fountain', 'highlighter']) {
       const button = document.querySelector<HTMLElement>(`[data-action=tool][data-id=${id}]`)!;
