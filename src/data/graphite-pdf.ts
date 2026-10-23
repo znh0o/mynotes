@@ -5,12 +5,12 @@ import { graphiteMaterial, graphiteOffset, graphiteSize, graphiteScale, pencilLa
 const patterns = new WeakMap<PDFPage, Map<string, PDFName>>();
 const number = (value: number) => String(Math.round(value * 1000) / 1000);
 export function graphitePDF(page: PDFPage, stroke: Stroke, height: number) {
-  const context = page.doc.context, offset = graphiteOffset(stroke.textureSeed), key = `${stroke.color}:${offset.x}:${offset.y}`;
+  const context = page.doc.context, offset = graphiteOffset(stroke.textureSeed), wide = stroke.width > 1.5, key = `${stroke.color}:${offset.x}:${offset.y}:${wide}`;
   let cache = patterns.get(page); if (!cache) patterns.set(page, cache = new Map());
   let name = cache.get(key);
   if (!name) {
     const ext = context.obj({}); let content = `${[1, 3, 5].map(i => number(parseInt(stroke.color.slice(i, i + 2), 16) / 255)).join(' ')} rg\n`;
-    graphiteMaterial().forEach((layer, i) => {
+    graphiteMaterial(wide).forEach((layer, i) => {
       ext.set(PDFName.of(`G${i}`), context.obj({ Type: 'ExtGState', ca: layer.opacity, CA: layer.opacity }));
       content += `/G${i} gs\n`;
       for (const polygon of layer.polygons) content += polygon.map((p, i) => `${number(p.x)} ${number(p.y)} ${i ? 'l' : 'm'}`).join('\n') + '\nh\n';

@@ -128,6 +128,7 @@ export class LibraryView {
     this.root.querySelector('#library-title')!.innerHTML = `${escape(title)}<span class="heading-dot">.</span>`;
     this.root.querySelector('#breadcrumb-title')!.textContent = title;
     this.root.querySelector('#library-subtitle')!.textContent = this.filter === 'trash' ? '삭제한 노트는 영구 삭제하기 전까지 복구할 수 있어요.' : '작은 아이디어부터 깊은 배움까지, 모두 이곳에.';
+    this.root.querySelector<HTMLElement>('.heading-actions')!.hidden = this.filter === 'trash';
     this.root.querySelectorAll<HTMLElement>('.welcome-banner,.recent-section,.template-section').forEach(e => e.hidden = this.filter !== 'all' || !!this.query);
     this.root.querySelectorAll('.nav-item[data-id],.collection-tab').forEach(e => e.classList.toggle('active', (e as HTMLElement).dataset.id === this.filter));
     const recent = [...active].sort((a, b) => b.opened - a.opened).slice(0, 3);
@@ -142,6 +143,7 @@ export class LibraryView {
   private click(event: Event) {
     const target = (event.target as Element).closest<HTMLElement>('[data-action]'); if (!target) return;
     const { action, id } = target.dataset;
+    if (this.filter === 'trash' && ['new', 'template', 'import'].includes(action || '')) return;
     if (action === 'apply-update') run(this.applyUpdate);
     if (action === 'filter') { this.root.querySelector('.library-sidebar')?.classList.remove('mobile-open'); run(() => this.navigateFilter(id!)); }
     if (action === 'new' || action === 'template') this.newNote(action === 'template' ? id as Paper : 'lined');

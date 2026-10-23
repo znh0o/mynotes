@@ -8,6 +8,7 @@ import { isAppReloadApproved } from '../pwa/navigation';
 import { PagePreviews } from './page-previews';
 import { trackDialog } from './history';
 import { InlineTextEditor } from './inline-text';
+import { showPenCheck } from './pen-check';
 
 export class EditorView {
   private engine!: InkEngine;
@@ -250,6 +251,13 @@ export class EditorView {
       this.root.querySelector<HTMLElement>('#eraser-picker')?.hidePopover();
     }
     if (action === 'close-eraser') this.root.querySelector<HTMLElement>('#eraser-picker')?.hidePopover();
+    if (action === 'pen-button-help') {
+      const guide = this.root.querySelector<HTMLElement>('#pen-button-guide')!;
+      guide.hidden = !guide.hidden; target.setAttribute('aria-expanded', String(!guide.hidden));
+    }
+    if (action === 'pen-button-check') {
+      this.root.querySelector<HTMLElement>('#eraser-picker')?.hidePopover(); this.engine.cancel(); showPenCheck();
+    }
     if (action === 'color') this.setColor(id!);
     if (action === 'pen-thinner' || action === 'pen-thicker') {
       const slider = this.root.querySelector<HTMLInputElement>('#ink-width')!;
@@ -310,6 +318,7 @@ export class EditorView {
     if (el.id === 'finger-drawing') { this.engine.options.fingerDrawing = el.checked; toast(el.checked ? '손가락으로도 필기할 수 있어요.' : '손가락은 이동, S펜은 필기에 사용해요.'); }
     if (el.id === 'eraser-size') {
       this.engine.options.eraserSize = Number(el.value); this.persistEraser();
+      this.engine.previewEraserSize();
       const output = this.root.querySelector('#eraser-size-value'); if (output) output.textContent = el.value;
     }
     if (el.id === 'eraser-mode') this.setEraserMode(el.value === 'partial');
@@ -353,6 +362,8 @@ export class EditorView {
     const panel = document.createElement('div'); panel.id = 'eraser-picker'; panel.className = 'eraser-picker'; panel.popover = 'manual';
     panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', '지우개 설정');
     panel.innerHTML = `<div class="writing-options-heading"><strong>지우개</strong>${button('X', '지우개 설정 닫기', 'close-eraser')}</div><div class="eraser-modes">${([['stroke', '스트로크 지우개', '닿은 획 전체를 지워요'], ['partial', '펜 지우개', '문지른 부분만 지워요']] as const).map(([id, name, description]) => `<button data-action="eraser-mode" data-id="${id}" aria-label="${name}" aria-pressed="${this.engine.options.partialEraser === (id === 'partial')}">${icon(id === 'stroke' ? 'PenLine' : 'Eraser', 20)}<span><strong>${name}</strong><small>${description}</small></span>${icon('Check', 16)}</button>`).join('')}</div><label class="eraser-size-label" for="eraser-size">지우개 크기 <output id="eraser-size-value">${this.engine.options.eraserSize}</output></label><input id="eraser-size" type="range" min="8" max="100" value="${this.engine.options.eraserSize}" aria-label="지우개 크기"/><p>S펜 버튼을 누른 채 문지르면 선택한 방식으로 지워요.</p>`;
+    panel.insertAdjacentHTML('beforeend', `<button class="pen-button-help" data-action="pen-button-help" aria-expanded="false" aria-controls="pen-button-guide">${icon('HelpCircle', 15)} 버튼을 누르면 에어 커맨드가 열리나요?</button><p class="pen-button-guide" id="pen-button-guide" hidden><strong>기기 설정 → 유용한 기능 → S펜 → 에어 커맨드</strong>에서 <strong>펜 버튼으로 에어 커맨드 열기</strong>를 꺼 주세요.<br>그다음 버튼을 누른 채 펜촉을 종이에 대고 문질러 주세요. 앱에서 기기의 에어 커맨드 설정을 바꿀 수는 없어요. 꺼도 반응이 없다면 화면의 지우개 버튼을 사용해 주세요. 기기·브라우저에 따라 펜 버튼 입력이 전달되지 않을 수 있어요.</p>`);
+    panel.insertAdjacentHTML('beforeend', `<button class="pen-button-help" data-action="pen-button-check">${icon('Move', 15)} S펜 버튼 입력 확인</button>`);
     this.root.querySelector('.editor-shell')!.append(panel);
     const rect = anchor.getBoundingClientRect();
     panel.style.left = `${Math.max(8, Math.min(rect.left, innerWidth - 296))}px`;
@@ -402,7 +413,7 @@ export class EditorView {
     this.root.querySelectorAll<HTMLElement>('[data-action=tool]').forEach(e => { const active = e.dataset.id === tool; e.classList.toggle('active', active); e.setAttribute('aria-pressed', String(active)); });
     this.viewport.classList.toggle('hand-mode', tool === 'hand');
     this.syncInkControl();
-    const hints: Record<Tool, string> = { pen: '볼펜 · 일정한 굵기 · 선 끝에서 0.6초 멈추면 직선으로', fountain: '만년필 · 필압과 펜촉 방향에 따라 달라지는 굵기', pencil: '연필 · 굵기와 진하기를 직접 조절 · 필압과 관계없이 고정', highlighter: '형광펜 · 중요한 부분을 선명하게', eraser: '지우개 · S펜 버튼도 지우개로 사용할 수 있어요', lasso: '올가미 · 둘러싸서 선택한 다음 드래그로 이동', shape: '도형 · 드래그로 반듯한 도형 그리기', text: '타이핑 · 손글씨와 관계없이 페이지 여백 안에서 이어 쓰기 · 본문과 별도 글상자 전환', image: '이미지 · 종이를 눌러 이미지 추가', hand: '이동 · 드래그로 종이 이동, 두 손가락으로 확대' };
+    const hints: Record<Tool, string> = { pen: '볼펜 · 일정한 굵기 · 선 끝에서 0.6초 멈추면 직선으로', fountain: '만년필 · 필압과 펜촉 방향에 따라 달라지는 굵기', pencil: '연필 · 굵기와 진하기를 직접 조절 · 필압과 관계없이 고정', highlighter: '형광펜 · 중요한 부분을 선명하게', eraser: '지우개 · 원으로 지우는 범위 표시 · S펜 버튼 안내는 지우개 설정에서', lasso: '올가미 · 둘러싸서 선택한 다음 드래그로 이동', shape: '도형 · 드래그로 반듯한 도형 그리기', text: '타이핑 · 손글씨와 관계없이 페이지 여백 안에서 이어 쓰기 · 본문과 별도 글상자 전환', image: '이미지 · 종이를 눌러 이미지 추가', hand: '이동 · 드래그로 종이 이동, 두 손가락으로 확대' };
     this.toolHint = hints[tool];
     if (tool === 'text' && this.page && !this.switching && this.textEditor.mode === 'document') this.textEditor.open();
   }

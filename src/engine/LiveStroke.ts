@@ -63,7 +63,7 @@ export class LiveStroke {
     const stroke = this.stroke!;
     ctx.save(); ctx.setLineDash([]); ctx.lineDashOffset = 0;
     if (stroke.tool === 'pencil') {
-      ctx.fillStyle = graphitePattern(ctx, stroke.color, stroke.textureSeed);
+      ctx.fillStyle = graphitePattern(ctx, stroke.color, stroke.textureSeed, stroke.width);
       this.paths.forEach((path, i) => { ctx.globalAlpha = pencilOpacities(stroke)[i]; ctx.fill(path); });
     } else {
       ctx.globalAlpha = stroke.tool === 'highlighter' ? .32 : 1;

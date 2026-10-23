@@ -31,7 +31,7 @@ function brushPaths(stroke: Stroke) {
 export function drawStroke(ctx: CanvasRenderingContext2D, stroke: Stroke) {
   if (!stroke.points.length) return;
   if (stroke.tool === 'pencil' || stroke.tool === 'fountain' && stroke.brushVersion === 2) {
-    ctx.save(); ctx.fillStyle = stroke.tool === 'pencil' ? graphitePattern(ctx, stroke.color, stroke.textureSeed) : stroke.color;
+    ctx.save(); ctx.fillStyle = stroke.tool === 'pencil' ? graphitePattern(ctx, stroke.color, stroke.textureSeed, stroke.width) : stroke.color;
     for (const layer of brushPaths(stroke)) { ctx.globalAlpha = layer.opacity; ctx.fill(layer.path); }
     ctx.restore(); return;
   }

@@ -23,22 +23,27 @@ const paperHeight = (x: number, y: number) => {
 
 // One reusable paper-height material, shared by Canvas and vector PDF patterns.
 // Adjacent cells share jittered corners: irregular graphite islands, no dot grid.
-let material: BrushLayer[] | undefined;
-export function graphiteMaterial(): BrushLayer[] {
-  if (material) return material;
+const materials = new Map<boolean, BrushLayer[]>();
+export function graphiteMaterial(wide = false): BrushLayer[] {
+  const cached = materials.get(wide); if (cached) return cached;
   const base = .52;
   const layers = [.52, .62, .72, .82, .92, 1].map(opacity => ({ opacity: (opacity - base) / (1 - base), polygons: [] as XY[][] }));
   const corner = (x: number, y: number) => ({ x: (x + (hash(x, y) - .5) * .36) / 2, y: (y + (hash(x + 19, y + 37) - .5) * .36) / 2 });
   for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) {
     // Broad, connected deposits follow the paper relief. A small fine-grain
     // component breaks up their edges without isolated white/noisy pixels.
-    const value = paperHeight(x, y) * .86 + hash(x + 7, y + 23) * .14;
+    // Wide lead uses short, slanted graphite fibres rather than enlarging
+    // the thin lead's cloudy deposits into a broad, smooth band.
+    const fibre = hash(Math.floor((x + y) / 3), Math.floor((y - x + 64) / 2));
+    const value = wide ? paperHeight(x, y) * .28 + fibre * .54 + hash(x + 7, y + 23) * .18
+      : paperHeight(x, y) * .86 + hash(x + 7, y + 23) * .14;
     const level = value < .22 ? 0 : value < .32 ? 1 : value < .43 ? 2 : value < .55 ? 3 : value < .67 ? 4 : 5;
     if (level) layers[level].polygons.push([corner(x, y), corner(x, y + 1), corner(x + 1, y + 1), corner(x + 1, y)]);
   }
   // A paper-wide graphite base prevents subpixel seams between neighboring
   // cells from becoming white specks, including in PDF vector rasterizers.
-  return material = [{ opacity: base, polygons: [[{ x: 0, y: 0 }, { x: 0, y: graphiteSize }, { x: graphiteSize, y: graphiteSize }, { x: graphiteSize, y: 0 }]] }, ...layers.filter(layer => layer.polygons.length)];
+  const material = [{ opacity: base, polygons: [[{ x: 0, y: 0 }, { x: 0, y: graphiteSize }, { x: graphiteSize, y: graphiteSize }, { x: graphiteSize, y: 0 }]] }, ...layers.filter(layer => layer.polygons.length)];
+  materials.set(wide, material); return material;
 }
 
 export function curvePiece(points: Point[], i: number): Point[] {
@@ -57,12 +62,14 @@ export function curvePiece(points: Point[], i: number): Point[] {
 export function graphiteBand(points: Point[], stroke?: Stroke) { return stroke?.pencilDarkness !== undefined ? 0 : Math.min(7, Math.floor(clamp(points.reduce((sum, p) => sum + p.p, 0) / points.length) * 8)); }
 export function ribbon(points: Point[], width: number, fixed = false): XY[][] {
   const left: XY[] = [], right: XY[] = [];
-  const radius = (p: Point) => width * (fixed ? 1 : .82 + .18 * clamp(p.p)) / 2;
+  const edge = fixed && width > 1.5 ? Math.min(.22, (width - 1.5) * .045) : 0;
+  const radius = (p: Point, side = 0) => width * (fixed ? 1 : .82 + .18 * clamp(p.p)) / 2
+    + (edge ? edge * (paperHeight(p.x * 2 + side * 17, p.y * 2 + side * 29) * 2 - 1) : 0);
   for (let i = 0; i < points.length; i++) {
     const p = points[i], a = points[Math.max(0, i - 1)], b = points[Math.min(points.length - 1, i + 1)];
-    const angle = Math.atan2(b.y - a.y, b.x - a.x) + Math.PI / 2, r = radius(p);
+    const angle = Math.atan2(b.y - a.y, b.x - a.x) + Math.PI / 2, r = radius(p), opposite = radius(p, 1);
     left.push({ x: p.x + Math.cos(angle) * r, y: p.y + Math.sin(angle) * r });
-    right.push({ x: p.x - Math.cos(angle) * r, y: p.y - Math.sin(angle) * r });
+    right.push({ x: p.x - Math.cos(angle) * opposite, y: p.y - Math.sin(angle) * opposite });
   }
   const cap = (p: Point) => Array.from({ length: 12 }, (_, i) => ({ x: p.x + Math.cos(-i * Math.PI / 6) * radius(p), y: p.y + Math.sin(-i * Math.PI / 6) * radius(p) }));
   return [[...left, ...right.reverse()], cap(points[0]), cap(points[points.length - 1])];

@@ -99,3 +99,58 @@ test('mid-contact button transitions do not connect across erased ink or erase o
   expect((await saved(page))).toHaveLength(1);
   await cdp.detach();
 });
+
+test('eraser circle follows its real size, zoom and temporary barrel mode without becoming ink', async ({ page, context }) => {
+  await start(page); const cdp = await context.newCDPSession(page);
+  const circle = page.locator('.eraser-cursor');
+  await page.getByRole('button', { name: '지우개', exact: true }).tap();
+  await page.getByRole('button', { name: '버튼을 누르면 에어 커맨드가 열리나요?', exact: true }).tap();
+  await expect(page.locator('#pen-button-guide')).toContainText('펜 버튼으로 에어 커맨드 열기');
+  await page.getByRole('slider', { name: '지우개 크기' }).fill('60');
+  await expect(circle).toBeVisible();
+  const checkSize = async () => {
+    const paper = (await page.locator('#paper-live').boundingBox())!, r = (await circle.boundingBox())!;
+    expect(r.width).toBeCloseTo(60 * paper.width / 794, 0); expect(r.height).toBeCloseTo(r.width, 1);
+  };
+  await checkSize();
+  await page.getByRole('button', { name: '펜 지우개', exact: true }).tap();
+  await pen(page, cdp, 'mouseMoved', 220, 210, 0, 0);
+  await expect(circle).toBeVisible(); await checkSize();
+  const center = (await circle.boundingBox())!, paper = (await page.locator('#paper-live').boundingBox())!;
+  expect(center.x + center.width / 2).toBeCloseTo(paper.x + 220 * paper.width / 794, 0);
+  expect(center.y + center.height / 2).toBeCloseTo(paper.y + 210 * paper.height / 1123, 0);
+  // A visible cursor must never be painted onto either saved or live ink.
+  const alpha = await page.locator('#paper-live,#paper-ink').evaluateAll(canvases => canvases.map(canvas => {
+    const c = canvas as HTMLCanvasElement, data = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
+    let sum = 0; for (let i = 3; i < data.length; i += 4) sum += data[i]; return sum;
+  }));
+  expect(alpha).toEqual([0, 0]);
+  await page.getByRole('button', { name: '축소', exact: true }).click();
+  await pen(page, cdp, 'mouseMoved', 240, 210, 0, 0); await expect(circle).toBeVisible(); await checkSize();
+  await page.screenshot({ path: '../MyNotes-eraser-circle.png' });
+  await page.getByRole('button', { name: '볼펜', exact: true }).click(); await expect(circle).toBeHidden();
+  await pen(page, cdp, 'mouseMoved', 240, 210, 2, 0, 'right'); await expect(circle).toBeVisible(); await checkSize();
+  await pen(page, cdp, 'mouseMoved', 245, 210, 0, 0); await expect(circle).toBeHidden();
+  await page.getByRole('button', { name: '지우개', exact: true }).click();
+  await page.getByRole('button', { name: '스트로크 지우개', exact: true }).click();
+  const rect = (await page.locator('#paper-live').boundingBox())!;
+  await page.touchscreen.tap(rect.x + 180 * rect.width / 794, rect.y + 190 * rect.height / 1123);
+  await expect(circle).toBeHidden();
+  await cdp.detach();
+});
+
+test('pen check distinguishes pen input from a real barrel signal without changing the note', async ({ page, context }) => {
+  await start(page); await page.getByRole('button', { name: '지우개', exact: true }).tap();
+  await page.getByRole('button', { name: 'S펜 버튼 입력 확인', exact: true }).tap();
+  const dialog = page.getByRole('dialog', { name: 'S펜 버튼 입력 확인', exact: true }), pad = dialog.locator('.pen-check-pad');
+  await expect(dialog).toBeVisible(); const r = (await pad.boundingBox())!, cdp = await context.newCDPSession(page);
+  const send = (type: 'mousePressed' | 'mouseReleased', button: 'left' | 'right', buttons: number, force: number) => cdp.send('Input.dispatchMouseEvent', { type, pointerType: 'pen', button, buttons, force, x: r.x + 50, y: r.y + 70 });
+  await send('mousePressed', 'left', 1, .5); await send('mouseReleased', 'left', 0, 0);
+  await dialog.getByRole('button', { name: '버튼을 누르고 테스트했어요', exact: true }).tap();
+  await expect(dialog.locator('[role=status]')).toContainText('펜 입력은 오지만 버튼 신호는 아직 확인되지');
+  await send('mousePressed', 'right', 2, .5); await send('mouseReleased', 'right', 0, 0);
+  await expect(dialog.locator('[role=status]')).toContainText('버튼 신호를 받았어요');
+  expect(await saved(page)).toHaveLength(0);
+  await dialog.getByRole('button', { name: '닫기', exact: true }).last().tap();
+  await expect(dialog).toHaveCount(0); await expect(page.locator('#paper-live')).toBeVisible(); await cdp.detach();
+});

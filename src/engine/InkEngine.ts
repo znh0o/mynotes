@@ -4,6 +4,7 @@ import { drawItem, drawItems } from './render';
 import { LiveStroke } from './LiveStroke';
 import { canStraighten, straightPoints } from './straight-line';
 import { penContact, penEraser } from './pen-input';
+import { EraserCursor } from './EraserCursor';
 
 export interface InkOptions {
   tool: Tool; color: string; width: number; fingerDrawing: boolean;
@@ -36,6 +37,7 @@ export class InkEngine {
   private holdAnchor?: Point;
   private straightSource?: Point[];
   private textSession?: { id: string; before: Item[] };
+  private eraserCursor: EraserCursor;
   constructor(private ink: HTMLCanvasElement, private live: HTMLCanvasElement,
     private changed: () => void, private selection: (count: number) => void,
     private insert: (point: Point, tool: Tool) => void, private straightened: () => void = () => {}) {
@@ -46,6 +48,9 @@ export class InkEngine {
     live.addEventListener('pointercancel', e => { if (e.pointerId === this.activePointer) this.cancel(); }, options);
     live.addEventListener('lostpointercapture', e => { if (e.pointerId === this.activePointer) this.cancel(); }, options);
     live.addEventListener('contextmenu', e => e.preventDefault(), options);
+    this.eraserCursor = new EraserCursor(live, () => ({ pageWidth: this.page?.width, tool: this.options.tool,
+      size: this.options.eraserSize, activePointer: this.activePointer, rect: this.inputRect }), this.abort.signal);
+    window.addEventListener('blur', () => { if (this.activePointer !== null) this.cancel(); }, options);
   }
   load(page: Page) {
     this.cancel(); this.page = page; this.selected.clear(); this.selection(0);
@@ -155,6 +160,7 @@ export class InkEngine {
     this.selection(this.selected.size);
   }
   cancel() {
+    this.eraserCursor.clear();
     clearTimeout(this.holdTimer); this.holdTimer = undefined; this.holdAnchor = undefined; this.straightSource = undefined;
     if (this.before && this.page) { this.page.items = this.before; this.before = null; this.render(); }
     this.stroke = null; this.shape = null; this.lasso = []; this.activePointer = null; this.moving = false; this.gestureTool = null; this.inputRect = undefined;
@@ -275,5 +281,6 @@ export class InkEngine {
     this.activePointer = null; this.gestureTool = null; this.inputRect = undefined; this.dirtyInk = false; this.preview();
     if (this.live.hasPointerCapture(e.pointerId)) this.live.releasePointerCapture(e.pointerId);
   }
-  destroy() { this.cancel(); this.abort.abort(); cancelAnimationFrame(this.frame); }
+  previewEraserSize() { this.eraserCursor.previewSize(); }
+  destroy() { this.cancel(); this.abort.abort(); this.eraserCursor.destroy(); cancelAnimationFrame(this.frame); }
 }

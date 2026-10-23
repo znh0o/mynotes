@@ -46,4 +46,11 @@ describe('versioned brush geometry', () => {
     expect(contrast).toBeGreaterThan(.4); expect(contrast).toBeLessThanOrEqual(.5);
     expect(grains.flatMap(layer => layer.polygons).length).toBeLessThan(4096);
   });
+  it('uses a separate reusable fibre material for broad lead while preserving thin lead', () => {
+    const thin = structuredClone(graphiteMaterial());
+    const broad = graphiteMaterial(true);
+    expect(broad).not.toEqual(thin);
+    expect(broad[0]).toEqual(thin[0]);
+    expect(graphiteMaterial()).toEqual(thin); expect(graphiteMaterial(true)).toBe(broad);
+  });
 });

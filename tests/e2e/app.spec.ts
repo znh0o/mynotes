@@ -53,6 +53,9 @@ test('notebook creation, pressure ink, undo, reload, page management, trash reco
   await card.getByRole('button', { name: 'S펜 학습 노트 메뉴' }).click(); await page.getByRole('menuitem', { name: '휴지통으로 이동' }).click();
   await page.locator('dialog').getByRole('button', { name: '이동', exact: true }).click();
   await page.locator('.library-sidebar').getByRole('button', { name: /휴지통/ }).click();
+  await expect(page.getByRole('button', { name: 'PDF 가져오기', exact: true })).toBeHidden();
+  await expect(page.getByRole('button', { name: '새 노트', exact: true })).toBeHidden();
+  await expect(page.locator('.new-note-tile')).toHaveCount(0);
   await page.getByRole('button', { name: 'S펜 학습 노트 메뉴' }).click(); await page.getByRole('menuitem', { name: '노트 복구' }).click();
   await expect.poll(async () => (await records(page, 'notes')).find(n => n.title === 'S펜 학습 노트').deleted).toBeNull();
   expect(errors).toEqual([]);
