@@ -1,5 +1,6 @@
 import { db, SaveQueue } from '../data/store';
-import { newPage, paperNames, uid, type Item, type Note, type Page, type Paper, type Point, type Tool } from '../data/model';
+import { newPage, paperNames, uid, type Item, type Note, type Page, type Paper, type Point, type TextItem, type Tool } from '../data/model';
+import { documentFrame, splitDocument, textFont } from '../engine/text';
 import { background, exportPDF, loadImages, thumbnail } from '../data/pdf';
 import { InkEngine } from '../engine/InkEngine';
 import { button, contextMenu, escape, icon, modal, pickFile, report, run, toast, confirmAction } from './common';
@@ -57,7 +58,8 @@ export class EditorView {
       this.root.querySelector<HTMLElement>('.selection-toolbar')!.hidden = !count;
       this.root.querySelector('#selection-count')!.textContent = `${count}개 선택 · 드래그로 이동`;
     }, (p, tool) => this.insert(p, tool), () => toast('직선으로 정리했어요. 펜을 댄 채 끝점을 움직일 수 있어요.'));
-    this.textEditor = new InlineTextEditor(this.root.querySelector('.paper-surface')!, this.root.querySelector('.editor-shell')!, this.engine);
+    this.textEditor = new InlineTextEditor(this.root.querySelector('.paper-surface')!, this.root.querySelector('.editor-shell')!, this.engine,
+      (head, tail) => this.continueTyping(head, tail));
     if (typeof lineSetting?.value === 'boolean') this.engine.options.holdToLine = lineSetting.value;
     this.previews = new PagePreviews(this.root.querySelector('#page-thumbnails')!, this.root.querySelector('.page-sidebar')!,
       () => this.engine.activePointer !== null || this.viewport.classList.contains('zoom-preview'),
@@ -113,11 +115,7 @@ export class EditorView {
     try {
       if (this.page) { this.engine.cancel(); await this.flush(); }
       const page = await db.pages.get(this.note.pageIds[index]); if (!page) throw new Error('페이지를 찾을 수 없어요.');
-      await loadImages(page); this.index = index; this.page = page;
-      this.engine.load(page); this.setScale(this.fit ? this.fitScale() : this.scale, this.fit);
-      this.viewport.scrollTo({ left: 0, top: 0 });
-      this.root.querySelector('.page-position')!.textContent = `${index + 1} / ${this.note.pageIds.length}`;
-      this.root.querySelector('#paper-description')!.textContent = page.pdfAssetId ? 'PDF · 원본 위에 필기' : `${Math.round(page.width)} × ${Math.round(page.height)} · ${paperNames[page.paper]}`;
+      await loadImages(page); this.displayPage(page, index);
       await this.renderBackground(); await this.renderThumbnails(); this.updateHistory();
       this.root.querySelector<HTMLButtonElement>('[data-action=prev-page]')!.disabled = index === 0;
       this.root.querySelector<HTMLButtonElement>('[data-action=next-page]')!.disabled = index === this.note.pageIds.length - 1;
@@ -127,6 +125,33 @@ export class EditorView {
       loading.innerHTML = `<div><h2>페이지를 표시하지 못했어요</h2><p>${escape(error instanceof Error ? error.message : '페이지를 다시 열어 주세요.')}</p><div><button class="button secondary" data-action="retry-page">다시 시도</button><button class="button primary" data-action="home">서재로 돌아가기</button></div></div>`;
       console.warn('Page rendering failed; notebook data is preserved.', error);
     } finally { this.switching = false; loading.hidden = !failed; }
+    if (!failed && this.engine.options.tool === 'text' && this.textEditor.mode === 'document') this.textEditor.open();
+  }
+  private displayPage(page: Page, index: number) {
+    this.index = index; this.page = page; this.engine.load(page);
+    this.setScale(this.fit ? this.fitScale() : this.scale, this.fit); this.viewport.scrollTo({ left: 0, top: 0 });
+    this.root.querySelector('.page-position')!.textContent = `${index + 1} / ${this.note.pageIds.length}`;
+    this.root.querySelector('#paper-description')!.textContent = page.pdfAssetId ? 'PDF · 원본 위에 필기' : `${Math.round(page.width)} × ${Math.round(page.height)} · ${paperNames[page.paper]}`;
+    this.root.querySelector<HTMLButtonElement>('[data-action=prev-page]')!.disabled = index === 0;
+    this.root.querySelector<HTMLButtonElement>('[data-action=next-page]')!.disabled = index === this.note.pageIds.length - 1;
+    this.updateHistory();
+  }
+  private continueTyping(head: TextItem, remaining: string) {
+    const source = this.page, pages: Page[] = [], ctx = document.createElement('canvas').getContext('2d')!;
+    ctx.font = textFont(head);
+    while (remaining) {
+      const page = newPage(this.note.id, { width: source.width, height: source.height, paper: source.paper, paperColor: source.paperColor, spacing: source.spacing });
+      const item: TextItem = { ...head, ...documentFrame(page), id: uid(), text: remaining };
+      const [text, tail] = splitDocument(item, page, text => ctx.measureText(text).width);
+      item.text = text; page.items = [item]; pages.push(page); remaining = tail;
+    }
+    const ids = this.note.pageIds.slice(); ids.splice(this.index + 1, 0, ...pages.map(page => page.id)); this.note.pageIds = ids;
+    // This is queued before any typing on the next page. Save the current head,
+    // continuation pages and their note order in one transaction.
+    const saved = this.queue.savePages(this.note, [source, ...pages]);
+    this.displayPage(pages[pages.length - 1], this.index + pages.length);
+    this.textEditor.open(); run(() => this.renderBackground());
+    run(async () => { await saved; await this.renderThumbnails(); });
   }
   private async renderBackground() {
     const generation = ++this.generation, p = this.page, temp = document.createElement('canvas');
@@ -323,8 +348,9 @@ export class EditorView {
     this.root.querySelectorAll<HTMLElement>('[data-action=tool]').forEach(e => { const active = e.dataset.id === tool; e.classList.toggle('active', active); e.setAttribute('aria-pressed', String(active)); });
     this.viewport.classList.toggle('hand-mode', tool === 'hand');
     this.syncInkControl();
-    const hints: Record<Tool, string> = { pen: '볼펜 · 일정한 굵기 · 선 끝에서 0.6초 멈추면 직선으로', fountain: '만년필 · 필압과 펜촉 방향에 따라 달라지는 굵기', pencil: '연필 · 굵기와 진하기를 직접 조절 · 필압과 관계없이 고정', highlighter: '형광펜 · 중요한 부분을 선명하게', eraser: '지우개 · S펜 버튼도 지우개로 사용할 수 있어요', lasso: '올가미 · 둘러싸서 선택한 다음 드래그로 이동', shape: '도형 · 드래그로 반듯한 도형 그리기', text: '텍스트 · 종이에 바로 입력 · 기존 글을 누르면 다시 편집 · 글상자 손잡이로 이동과 너비 조절', image: '이미지 · 종이를 눌러 이미지 추가', hand: '이동 · 드래그로 종이 이동, 두 손가락으로 확대' };
+    const hints: Record<Tool, string> = { pen: '볼펜 · 일정한 굵기 · 선 끝에서 0.6초 멈추면 직선으로', fountain: '만년필 · 필압과 펜촉 방향에 따라 달라지는 굵기', pencil: '연필 · 굵기와 진하기를 직접 조절 · 필압과 관계없이 고정', highlighter: '형광펜 · 중요한 부분을 선명하게', eraser: '지우개 · S펜 버튼도 지우개로 사용할 수 있어요', lasso: '올가미 · 둘러싸서 선택한 다음 드래그로 이동', shape: '도형 · 드래그로 반듯한 도형 그리기', text: '타이핑 · 손글씨와 관계없이 페이지 여백 안에서 이어 쓰기 · 본문과 별도 글상자 전환', image: '이미지 · 종이를 눌러 이미지 추가', hand: '이동 · 드래그로 종이 이동, 두 손가락으로 확대' };
     this.toolHint = hints[tool];
+    if (tool === 'text' && this.page && !this.switching && this.textEditor.mode === 'document') this.textEditor.open();
   }
   private contextOptions() {
     const tool = this.engine.options.tool;
@@ -416,7 +442,8 @@ export class EditorView {
   private setupGestures() {
     const signal = this.abort.signal;
     this.viewport.addEventListener('pointerdown', e => {
-      if ((e.target as Element).closest('.inline-text-box') || this.engine.options.tool === 'text' && e.defaultPrevented) return;
+      const inText = !!(e.target as Element).closest('.inline-text-box');
+      if (inText && e.pointerType !== 'touch' || this.engine.options.tool === 'text' && e.defaultPrevented) return;
       if (e.pointerType === 'pen' && this.engine.options.tool !== 'hand') return;
       if (e.pointerType === 'touch') {
         if (this.engine.activePointer !== null && !this.engine.options.fingerDrawing) return;
@@ -432,6 +459,7 @@ export class EditorView {
         // one-finger palm contacts during the brief pen hover window stay ignored.
         if (this.touches.size === 1 && this.engine.lastPen > 0 && performance.now() - this.engine.lastPen < 800) return;
       }
+      if (inText && this.touches.size < 2) return;
       if ((e.pointerType === 'touch' && !this.engine.options.fingerDrawing && this.touches.size === 1) || this.engine.options.tool === 'hand') {
         this.pan = { id: e.pointerId, x: e.clientX, y: e.clientY, left: this.viewport.scrollLeft, top: this.viewport.scrollTop };
         this.viewport.setPointerCapture(e.pointerId);

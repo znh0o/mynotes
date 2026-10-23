@@ -15,6 +15,7 @@ export interface TextItem {
   id: string; kind: 'text'; x: number; y: number; w: number; h: number;
   text: string; color: string; size: number;
   wrap?: boolean; bold?: boolean; italic?: boolean; align?: 'left' | 'center' | 'right';
+  textMode?: 'document';
 }
 export interface ImageItem {
   id: string; kind: 'image'; x: number; y: number; w: number; h: number; assetId: string;

@@ -32,18 +32,28 @@ export class SaveQueue {
   saveImmutable(page: Page, thumbnail?: string) {
     return this.enqueue({ ...page, items: page.items.slice() }, thumbnail);
   }
+  savePages(note: Note, pages: Page[]) {
+    const ids = note.pageIds.slice(), snapshots = pages.map(page => ({ ...page, items: page.items.slice() }));
+    return this.enqueueWrite(() => this.database.transaction('rw', this.database.pages, this.database.notes, async () => {
+      await this.database.pages.bulkPut(snapshots);
+      await this.database.notes.update(note.id, { pageIds: ids, updated: Date.now() });
+    }));
+  }
   private enqueue(snapshot: Page, thumbnail?: string) {
+    return this.enqueueWrite(() => this.database.transaction('rw', this.database.pages, this.database.notes, async () => {
+      await this.database.pages.put(snapshot);
+      const note = await this.database.notes.get(snapshot.noteId);
+      if (note) await this.database.notes.update(note.id, {
+        updated: Date.now(), ...(note.pageIds[0] === snapshot.id ? { thumbnail: thumbnail ?? snapshot.thumbnail } : {})
+      });
+    }));
+  }
+  private enqueueWrite(write: () => Promise<unknown>) {
     this.pending++;
     this.status('저장 중…');
     const task = this.tail.then(async () => {
       await new Promise(resolve => setTimeout(resolve, 0));
-      await this.database.transaction('rw', this.database.pages, this.database.notes, async () => {
-        await this.database.pages.put(snapshot);
-        const note = await this.database.notes.get(snapshot.noteId);
-        if (note) await this.database.notes.update(note.id, {
-          updated: Date.now(), ...(note.pageIds[0] === snapshot.id ? { thumbnail: thumbnail ?? snapshot.thumbnail } : {})
-        });
-      });
+      await write();
       this.failed = null;
     });
     this.tail = task.catch(error => { this.failed = error; }).finally(() => {
@@ -144,6 +154,7 @@ export async function restore(file: File) {
       if (i.kind !== 'stroke' && ![i.x, i.y, i.w, i.h].every(v => finite(v))) throw new Error('잘못된 오브젝트 좌표');
       if (i.kind === 'text' && (typeof i.text !== 'string' || !finite(i.size, 1000) || i.size <= 0)) throw new Error('잘못된 텍스트');
       if (i.kind === 'text' && (i.wrap !== undefined && typeof i.wrap !== 'boolean' || i.bold !== undefined && typeof i.bold !== 'boolean' || i.italic !== undefined && typeof i.italic !== 'boolean' || i.align !== undefined && !['left', 'center', 'right'].includes(i.align))) throw new Error('잘못된 글자 서식');
+      if (i.kind === 'text' && i.textMode !== undefined && i.textMode !== 'document') throw new Error('잘못된 본문 데이터');
       if (i.kind === 'shape' && (!['line', 'rect', 'ellipse', 'triangle'].includes(i.shape) || !finite(i.width, 1000) || i.width <= 0)) throw new Error('잘못된 도형');
     }
     return { ...p, id: remap(p.id), noteId: remap(p.noteId), thumbnail: preview(p.thumbnail), pdfAssetId: p.pdfAssetId ? remap(p.pdfAssetId) : undefined,

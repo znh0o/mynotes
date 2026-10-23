@@ -1,4 +1,15 @@
-import type { TextItem } from '../data/model';
+import type { Page, TextItem } from '../data/model';
+
+export const documentFrame = (page: Pick<Page, 'width' | 'height'>) => ({ x: 48, y: 64, w: page.width - 96, h: page.height - 128 });
+
+export function splitDocument(item: TextItem, page: Pick<Page, 'height'>, measure: (text: string) => number) {
+  const count = Math.max(1, Math.floor((page.height - item.y - 64) / (item.size * 1.55)));
+  const lines = textLines(item, measure);
+  if (lines.length <= count) return [item.text, ''] as const;
+  let offset = 0;
+  for (let i = 0; i < count; i++) { offset += lines[i].length; if (item.text[offset] === '\n') offset++; }
+  return [item.text.slice(0, offset), item.text.slice(offset)] as const;
+}
 
 export const textFont = (item: TextItem) => `${item.italic ? 'italic ' : ''}${item.bold ? 700 : 400} ${item.size}px "Segoe UI", "Malgun Gothic", sans-serif`;
 

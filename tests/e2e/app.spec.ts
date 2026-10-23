@@ -44,8 +44,7 @@ test('notebook creation, pressure ink, undo, reload, page management, trash reco
   await page.getByRole('button', { name: '페이지 추가', exact: true }).last().click();
   await expect(page.locator('.page-position')).toHaveText('2 / 2');
   await page.getByRole('button', { name: '텍스트', exact: true }).click();
-  const r = await page.locator('#paper-live').boundingBox();
-  await page.mouse.click(r!.x + 120, r!.y + 180); await page.locator('textarea').fill('오늘 배운 내용을 정리해요');
+  await page.locator('textarea').fill('오늘 배운 내용을 정리해요');
   await page.getByRole('button', { name: '입력 완료', exact: true }).click();
   await expect.poll(async () => (await records(page, 'pages')).some(p => p.items.some((i: any) => i.text === '오늘 배운 내용을 정리해요'))).toBe(true);
   await page.screenshot({ path: '../MyNotes-editor.png' });

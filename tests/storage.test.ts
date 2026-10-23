@@ -6,6 +6,15 @@ let db: NotesDB;
 beforeEach(async () => { db = new NotesDB(`test-${crypto.randomUUID()}`); await db.open(); });
 afterEach(async () => { await db.delete(); });
 describe('durable autosave', () => {
+  it('saves text continuation pages and order atomically before later typing', async () => {
+    const { note, page } = createNote('flow', '#5482da', null); await db.notes.add(note);
+    const next = { ...page, id: 'continued-page', items: [] }; note.pageIds.push(next.id);
+    const queue = new SaveQueue(db); const layout = queue.savePages(note, [page, next]);
+    const typed = { ...next, revision: 2, items: [{ id: 'body', kind: 'text' as const, x: 48, y: 64, w: 698, h: 50, size: 22, color: '#30445e', text: '한글 본문', textMode: 'document' as const }] };
+    const edit = queue.saveImmutable(typed); await Promise.all([layout, edit]); await queue.flush();
+    expect((await db.notes.get(note.id))!.pageIds).toEqual([page.id, next.id]);
+    expect((await db.pages.get(next.id))!.items).toEqual(typed.items);
+  });
   it('retains immutable ink snapshots across appended and replaced item arrays', async () => {
     const { note, page } = createNote('immutable', '#b9cee5', null); await db.notes.add(note);
     const queue = new SaveQueue(db);

@@ -108,21 +108,21 @@ export class InkEngine {
     this.cancel(); this.clearSelection();
     this.textSession = { id, before: this.page.items.slice() }; this.render();
   }
-  updateText(item: TextItem) {
+  updateText(item: TextItem, notify = true) {
     if (this.textSession?.id !== item.id) return;
     const index = this.page.items.findIndex(i => i.id === item.id);
     const items = this.page.items.filter(i => i.id !== item.id);
-    if (item.text.trim()) items.splice(index < 0 ? items.length : index, 0, { ...item });
-    this.page.items = items; this.page.revision++; this.changed();
+    if (item.textMode === 'document' ? item.text.length : item.text.trim()) items.splice(index < 0 ? items.length : index, 0, { ...item });
+    this.page.items = items; this.page.revision++; if (notify) this.changed();
   }
-  finishText(cancel = false) {
+  finishText(cancel = false, notify = true) {
     const session = this.textSession; if (!session) return;
     this.textSession = undefined;
     if (cancel) this.page.items = session.before;
     else if (JSON.stringify(session.before.find(i => i.id === session.id)) !== JSON.stringify(this.page.items.find(i => i.id === session.id))) {
       this.history.push(session.before); if (this.history.length > 40) this.history.shift(); this.future = [];
     }
-    this.page.revision++; this.render(); this.changed();
+    this.page.revision++; this.render(); if (notify) this.changed();
   }
   undo() {
     if (this.activePointer !== null) this.cancel();
@@ -235,6 +235,7 @@ export class InkEngine {
     if (this.lasso.length) {
       const polygon = this.lasso;
       for (const item of this.page.items) {
+        if (item.kind === 'text' && item.textMode === 'document') continue;
         const b = bounds([item]);
         if (item.kind === 'stroke' ? item.points.some(p => inside(p, polygon)) : inside({ x: b.x + b.w / 2, y: b.y + b.h / 2 }, polygon)) this.selected.add(item.id);
       }

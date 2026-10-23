@@ -18,6 +18,7 @@ async function items(page: Page) {
 
 test('type directly on paper, format, move, resize, re-edit, undo and reopen', async ({ page }) => {
   await create(page); await page.getByRole('button', { name: '텍스트', exact: true }).click();
+  await page.getByRole('combobox', { name: '입력 방식', exact: true }).selectOption('box');
   const canvas = page.locator('#paper-live'), rect = (await canvas.boundingBox())!;
   await canvas.click({ position: { x: 110, y: 170 } });
   await expect(page.locator('dialog')).toHaveCount(0);
@@ -48,6 +49,7 @@ test('type directly on paper, format, move, resize, re-edit, undo and reopen', a
   await expect(canvas).toBeVisible(); await expect(page.locator('.page-loading')).toBeHidden();
   await expect.poll(async () => (await items(page))[0]?.text).toContain('edited');
   await page.getByRole('button', { name: '텍스트', exact: true }).click();
+  await page.getByRole('combobox', { name: '입력 방식', exact: true }).selectOption('box');
   const current = (await items(page))[0], r = (await canvas.boundingBox())!;
   await canvas.click({ position: { x: (current.x + 10) * r.width / 794, y: (current.y + 10) * r.width / 794 } });
   await input.fill('수정 취소'); await page.getByRole('button', { name: '입력 취소', exact: true }).click();
@@ -67,6 +69,46 @@ test('type directly on paper, format, move, resize, re-edit, undo and reopen', a
   expect(saved.pages.flatMap((p: any) => p.items).find((i: any) => i.id === current.id)).toMatchObject({ text: current.text, bold: true, italic: true, wrap: true, align: 'center' });
   await page.getByRole('button', { name: '완료', exact: true }).click();
   await page.screenshot({ path: '../MyNotes-inline-typing.png' });
+});
+
+test('document typing fills the page margins and continues on new pages without moving handwriting', async ({ page }) => {
+  await create(page);
+  const canvas = page.locator('#paper-live'), r = (await canvas.boundingBox())!;
+  await page.mouse.move(r.x + 100, r.y + 180); await page.mouse.down(); await page.mouse.move(r.x + 380, r.y + 180, { steps: 20 }); await page.mouse.up();
+  await expect.poll(async () => (await items(page)).filter(i => i.kind === 'stroke').length).toBe(1);
+  const handwriting = (await items(page)).find(i => i.kind === 'stroke');
+  await page.getByRole('button', { name: '텍스트', exact: true }).click();
+  const input = page.getByRole('textbox', { name: '페이지에 글 입력' });
+  await expect(input).toBeFocused(); await expect(page.getByRole('combobox', { name: '입력 방식', exact: true })).toHaveValue('document');
+  await expect(page.locator('.document-text-box')).toBeVisible();
+  await expect(page.getByRole('button', { name: '글상자 이동' })).toHaveCount(0);
+  const frame = (await input.boundingBox())!;
+  expect(frame.x - r.x).toBeCloseTo(48 * r.width / 794, 0);
+  expect(frame.width).toBeCloseTo((794 - 96) * r.width / 794, 0);
+  const content = Array.from({ length: 65 }, (_, i) => `${i + 1}번째 줄 · 필기 위치와 관계없이 이어서 입력합니다.`).join('\n');
+  await input.fill(content);
+  await expect(page.locator('.page-position')).toHaveText('3 / 3'); await expect(input).toBeFocused();
+  await input.press('End'); await input.press('Enter'); await input.pressSequentially('continued');
+  await expect(input).toHaveValue(/continued$/);
+  await page.getByRole('button', { name: '서재로 돌아가기' }).click();
+  await expect(page.locator('#library-title')).toContainText('나의 서재');
+  const saved = await page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>(resolve => { const r = indexedDB.open('mynotes-v1'); r.onsuccess = () => resolve(r.result); });
+    try {
+      const read = <T>(table: string) => new Promise<T[]>(resolve => { const r = db.transaction(table).objectStore(table).getAll(); r.onsuccess = () => resolve(r.result); });
+      const note = (await read<any>('notes')).find(n => n.title === '타이핑과 직선'); const pages = await read<any>('pages');
+      return note.pageIds.map((id: string) => pages.find(p => p.id === id));
+    } finally { db.close(); }
+  });
+  expect(saved).toHaveLength(3);
+  expect(saved.map((p: any) => p.items.find((i: any) => i.textMode === 'document')?.text ?? '').join('')).toBe(content + '\ncontinued');
+  expect(saved[0].items.find((i: any) => i.kind === 'stroke')).toEqual(handwriting);
+  expect(saved.flatMap((p: any) => p.items).filter((i: any) => i.kind === 'stroke')).toHaveLength(1);
+  await page.getByRole('button', { name: '타이핑과 직선 열기', exact: true }).click();
+  await expect(canvas).toBeVisible(); await expect(page.locator('.page-loading')).toBeHidden();
+  await page.getByRole('button', { name: '텍스트', exact: true }).click();
+  await expect(input).toHaveValue(saved[0].items.find((i: any) => i.textMode === 'document').text);
+  await page.screenshot({ path: '../MyNotes-document-typing.png' });
 });
 
 test('holding a pen straightens the live stroke before release and lets the endpoint move', async ({ page, context }) => {
@@ -100,6 +142,19 @@ test('holding a pen straightens the live stroke before release and lets the endp
 test('mobile home stays at device scale while the paper keeps its own pinch zoom', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 800, height: 1000 }, isMobile: true, hasTouch: true });
   const page = await context.newPage(); await page.goto('./'); await expect(page.locator('h1')).toBeVisible();
+  // Exercise the event guard with viewport zoom allowed, like a browser that
+  // overrides the maximum-scale restriction. Single-finger scrolling survives.
+  const cancelled = await page.evaluate(() => {
+    document.querySelector('meta[name=viewport]')!.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes');
+    const target = document.querySelector('h1')!;
+    const a = new Touch({ identifier: 1, target, clientX: 300, clientY: 350 });
+    const b = new Touch({ identifier: 2, target, clientX: 500, clientY: 350 });
+    const single = !target.dispatchEvent(new TouchEvent('touchstart', { touches: [a], bubbles: true, cancelable: true }));
+    const multi = !target.dispatchEvent(new TouchEvent('touchmove', { touches: [a, b], bubbles: true, cancelable: true }));
+    target.dispatchEvent(new TouchEvent('touchend', { touches: [], bubbles: true, cancelable: true }));
+    return { single, multi };
+  });
+  expect(cancelled).toEqual({ single: false, multi: true });
   const cdp = await context.newCDPSession(page), start = await page.evaluate(() => visualViewport!.scale);
   await cdp.send('Input.synthesizePinchGesture', { x: 400, y: 350, scaleFactor: 2, gestureSourceType: 'touch' });
   expect(await page.evaluate(() => visualViewport!.scale)).toBe(start);

@@ -1,6 +1,6 @@
 import { uid, type Point, type TextItem } from '../data/model';
 import { InkEngine } from '../engine/InkEngine';
-import { textFont, textLines } from '../engine/text';
+import { documentFrame, splitDocument, textFont, textLines } from '../engine/text';
 import { icon } from './common';
 
 export class InlineTextEditor {
@@ -13,12 +13,14 @@ export class InlineTextEditor {
   private scale = 1;
   private composing = false;
   private measure = document.createElement('canvas').getContext('2d')!;
+  mode: 'document' | 'box' = 'document';
   private defaults = { size: 22, bold: false, italic: false, align: 'left' as TextItem['align'] };
-  constructor(private surface: HTMLElement, shell: HTMLElement, private engine: InkEngine) {
+  constructor(private surface: HTMLElement, shell: HTMLElement, private engine: InkEngine,
+    private overflow: (head: TextItem, tail: string) => void) {
     this.layer = document.createElement('div'); this.layer.className = 'page-text-layer'; surface.append(this.layer);
     this.toolbar = document.createElement('div'); this.toolbar.className = 'inline-text-toolbar'; this.toolbar.hidden = true;
     this.toolbar.setAttribute('role', 'toolbar'); this.toolbar.setAttribute('aria-label', '글자 서식');
-    this.toolbar.innerHTML = `<label>크기<input type="number" min="10" max="100" step="1" value="22" aria-label="글자 크기" /></label><button type="button" data-text="bold" aria-label="굵게" aria-pressed="false"><b>B</b></button><button type="button" data-text="italic" aria-label="기울임" aria-pressed="false"><i>I</i></button><select aria-label="글자 정렬"><option value="left">왼쪽</option><option value="center">가운데</option><option value="right">오른쪽</option></select><button type="button" data-text="delete" aria-label="글상자 삭제">${icon('Trash2', 18)}</button><button type="button" data-text="cancel" aria-label="입력 취소">${icon('X', 18)}</button><button type="button" data-text="done" class="text-done">${icon('Check', 18)}<span>입력 완료</span></button>`;
+    this.toolbar.innerHTML = `<select id="text-entry-mode" aria-label="입력 방식"><option value="document">본문</option><option value="box">글상자</option></select><label>크기<input type="number" min="10" max="100" step="1" value="22" aria-label="글자 크기" /></label><button type="button" data-text="bold" aria-label="굵게" aria-pressed="false"><b>B</b></button><button type="button" data-text="italic" aria-label="기울임" aria-pressed="false"><i>I</i></button><select id="text-align" aria-label="글자 정렬"><option value="left">왼쪽</option><option value="center">가운데</option><option value="right">오른쪽</option></select><button type="button" data-text="delete" aria-label="글상자 삭제">${icon('Trash2', 18)}</button><button type="button" data-text="cancel" aria-label="입력 취소">${icon('X', 18)}</button><button type="button" data-text="done" class="text-done">${icon('Check', 18)}<span>입력 완료</span></button>`;
     shell.append(this.toolbar);
     const signal = this.abort.signal;
     // Keep the native keyboard/caret when a formatting button is tapped.
@@ -31,11 +33,16 @@ export class InlineTextEditor {
       if (action === 'bold' || action === 'italic') this.draft[action] = !this.draft[action];
       this.sync(); this.publish(); this.input?.focus({ preventScroll: true });
     }, { signal });
-    this.toolbar.addEventListener('input', () => {
+    this.toolbar.addEventListener('input', event => {
+      if ((event.target as HTMLElement).id === 'text-entry-mode') {
+        this.mode = (event.target as HTMLSelectElement).value as typeof this.mode; this.finish();
+        if (this.mode === 'document') this.open();
+        return;
+      }
       if (!this.draft) return;
       const size = Number(this.toolbar.querySelector('input')!.value);
       if (Number.isFinite(size) && size >= 10 && size <= 100) this.draft.size = size;
-      this.draft.align = this.toolbar.querySelector('select')!.value as TextItem['align'];
+      this.draft.align = this.toolbar.querySelector<HTMLSelectElement>('#text-align')!.value as TextItem['align'];
       this.sync(); this.publish();
     }, { signal });
     document.addEventListener('pointerdown', event => {
@@ -58,28 +65,29 @@ export class InlineTextEditor {
     this.layer.style.width = `${this.engine.page.width}px`; this.layer.style.height = `${this.engine.page.height}px`;
     this.layer.style.transform = `scale(${scale})`;
   }
-  open(point: Point) {
+  open(point?: Point) {
     this.finish();
     const page = this.engine.page;
-    const item = [...page.items].reverse().find((i): i is TextItem => i.kind === 'text' && point.x >= i.x - 8 && point.x <= i.x + i.w + 8 && point.y >= i.y - 8 && point.y <= i.y + i.h + 8);
-    const x = item?.x ?? Math.max(16, Math.min(point.x, page.width - 136));
-    const y = item?.y ?? Math.max(16, Math.min(point.y, page.height - 60));
+    const body = this.mode === 'document', frame = documentFrame(page);
+    const item = [...page.items].reverse().find((i): i is TextItem => i.kind === 'text' && (body ? i.textMode === 'document' : i.textMode !== 'document' && !!point && point.x >= i.x - 8 && point.x <= i.x + i.w + 8 && point.y >= i.y - 8 && point.y <= i.y + i.h + 8));
+    const x = body ? frame.x : item?.x ?? Math.max(16, Math.min(point?.x ?? 64, page.width - 136));
+    const y = body ? frame.y : item?.y ?? Math.max(16, Math.min(point?.y ?? 80, page.height - 60));
     const surface = this.surface.getBoundingClientRect(), viewport = this.surface.closest('.paper-viewport')!.getBoundingClientRect();
     const visibleWidth = Math.max(100, (Math.min(surface.right, viewport.right) - surface.left - x * this.scale - 24) / this.scale);
     this.draft = item ? { ...item, wrap: true, w: Math.max(100, Math.min(item.w, page.width - x - 16)) } : { id: uid(), kind: 'text', x, y, w: Math.min(560, visibleWidth, page.width - x - 24), h: 40, text: '', color: this.engine.options.color, wrap: true, ...this.defaults };
+    if (body) Object.assign(this.draft, { ...frame, textMode: 'document' });
     this.engine.beginText(this.draft.id);
-    this.box = document.createElement('div'); this.box.className = 'inline-text-box';
-    this.box.innerHTML = `<button type="button" class="text-move-handle" aria-label="글상자 이동">${icon('Move', 14)}<span>드래그로 이동</span></button><textarea class="inline-text-input" aria-label="페이지에 글 입력" placeholder="여기에 입력하세요" spellcheck="false" enterkeyhint="enter"></textarea><button type="button" class="text-resize-handle" aria-label="글상자 너비 조절">${icon('ChevronRight', 16)}</button>`;
+    this.box = document.createElement('div'); this.box.className = `inline-text-box${body ? ' document-text-box' : ''}`;
+    this.box.innerHTML = `${body ? '' : `<button type="button" class="text-move-handle" aria-label="글상자 이동">${icon('Move', 14)}<span>드래그로 이동</span></button>`}<textarea class="inline-text-input" aria-label="페이지에 글 입력" placeholder="${body ? '여기서부터 입력하세요' : '여기에 입력하세요'}" spellcheck="false" enterkeyhint="enter"></textarea>${body ? '' : `<button type="button" class="text-resize-handle" aria-label="글상자 너비 조절">${icon('ChevronRight', 16)}</button>`}`;
     this.layer.append(this.box); this.input = this.box.querySelector('textarea')!; this.input.value = this.draft.text;
     this.input.addEventListener('input', () => { if (this.draft) { this.draft.text = this.input!.value; this.sync(); this.ensureCaretVisible(); if (!this.composing) this.publish(); } });
     this.input.addEventListener('compositionstart', () => this.composing = true);
     this.input.addEventListener('compositionend', () => { this.composing = false; if (this.draft) { this.draft.text = this.input!.value; this.sync(); this.publish(); } });
     this.input.addEventListener('keyup', () => this.ensureCaretVisible());
-    this.drag(this.box.querySelector('.text-move-handle')!, false);
-    this.drag(this.box.querySelector('.text-resize-handle')!, true);
+    if (!body) { this.drag(this.box.querySelector('.text-move-handle')!, false); this.drag(this.box.querySelector('.text-resize-handle')!, true); }
     this.toolbar.hidden = false; this.sync(); this.positionToolbar();
     this.input.focus({ preventScroll: true });
-    if (item) {
+    if (item && point) {
       const ctx = this.measure; ctx.font = textFont(this.draft);
       const lines = textLines(this.draft, text => ctx.measureText(text).width);
       const row = Math.max(0, Math.min(lines.length - 1, Math.floor((point.y - this.draft.y) / (this.draft.size * 1.55))));
@@ -94,7 +102,7 @@ export class InlineTextEditor {
         prefix += character;
       }
       offset += prefix.length; this.input.setSelectionRange(offset, offset);
-    }
+    } else this.input.setSelectionRange(this.input.value.length, this.input.value.length);
     this.ensureCaretVisible();
   }
   setColor(color: string) { if (this.draft) { this.draft.color = color; this.sync(); this.publish(); } }
@@ -109,9 +117,24 @@ export class InlineTextEditor {
     this.input.scrollTop = 0;
     for (const action of ['bold', 'italic'] as const) this.toolbar.querySelector(`[data-text=${action}]`)!.setAttribute('aria-pressed', String(!!item[action]));
     const size = this.toolbar.querySelector('input')!; if (document.activeElement !== size) size.value = String(item.size);
-    this.toolbar.querySelector('select')!.value = item.align ?? 'left';
+    this.toolbar.querySelector<HTMLSelectElement>('#text-align')!.value = item.align ?? 'left';
+    this.toolbar.querySelector<HTMLSelectElement>('#text-entry-mode')!.value = this.mode;
+    const body = item.textMode === 'document';
+    this.input.style.minHeight = body ? `${documentFrame(this.engine.page).h}px` : '';
+    this.toolbar.querySelector('[data-text=delete]')!.setAttribute('aria-label', body ? '본문 지우기' : '글상자 삭제');
   }
-  private publish() { if (this.draft) this.engine.updateText(this.draft); }
+  private publish() {
+    if (!this.draft) return;
+    this.engine.updateText(this.draft);
+    if (this.composing || this.draft.textMode !== 'document') return;
+    this.measure.font = textFont(this.draft);
+    const [text, tail] = splitDocument(this.draft, this.engine.page, text => this.measure.measureText(text).width);
+    if (!tail) return;
+    const head = { ...this.draft, text };
+    // The full draft was queued above. Replace it only in the atomic page
+    // transaction below, so a failed page insertion cannot lose the overflow.
+    this.engine.updateText(head, false); this.close(); this.engine.finishText(false, false); this.overflow(head, tail);
+  }
   private ensureCaretVisible() {
     if (!this.draft || !this.input) return;
     const viewport = this.surface.closest<HTMLElement>('.paper-viewport'); if (!viewport) return;
@@ -148,8 +171,9 @@ export class InlineTextEditor {
     if (!this.draft) return;
     // Flush IME text too when navigation/save happens during composition.
     this.draft.text = this.input!.value; this.sync(); if (!cancel) this.publish();
-    this.draft = undefined; this.composing = false; this.box?.remove(); this.box = undefined; this.input = undefined; this.toolbar.hidden = true;
+    this.close();
     this.engine.finishText(cancel);
   }
+  private close() { this.draft = undefined; this.composing = false; this.box?.remove(); this.box = undefined; this.input = undefined; this.toolbar.hidden = true; }
   destroy() { this.finish(); this.abort.abort(); this.layer.remove(); this.toolbar.remove(); }
 }
