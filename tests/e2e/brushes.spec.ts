@@ -131,8 +131,10 @@ test('ballpoint and pencil stay fixed while fountain responds to pressure and pe
     await send('mouseReleased', 320, 0, 0);
   };
   await stroke(100, .1); await stroke(150, .9);
-  await page.getByRole('button', { name: '만년필', exact: true }).click(); await stroke(230, .1); await stroke(280, .9);
-  await page.getByRole('button', { name: '연필', exact: true }).click(); await stroke(360, .1);
+  await page.getByRole('button', { name: '만년필', exact: true }).click();
+  await page.getByRole('slider', { name: '펜 굵기', exact: true }).fill('12'); await stroke(230, .1); await stroke(280, .9);
+  await page.getByRole('button', { name: '연필', exact: true }).click();
+  await page.getByRole('slider', { name: '펜 굵기', exact: true }).fill('12'); await stroke(360, .1);
   const pressurePixels = () => page.locator('#paper-ink').evaluate((canvas: HTMLCanvasElement) => {
     const scale = canvas.width / 794;
     const data = canvas.getContext('2d')!.getImageData(Math.floor(90 * scale), Math.floor(345 * scale), Math.ceil(240 * scale), Math.ceil(30 * scale)).data;
