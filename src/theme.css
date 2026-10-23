@@ -106,3 +106,21 @@ html,body,#app,.library-shell,.library-main,.library-content,.modal,.modal-body{
 .writing-options-panel [data-action=paper]{min-height:40px;width:100%;padding:8px 0;font-size:12px;color:#5277ae}
 @media(max-width:1200px){.ink-style-controls{gap:8px}.ink-toolbar .pen-width-control>label,.ink-toolbar .pen-width-control>#width-preview{display:none}.ink-toolbar .pen-width-control input[type=range]{width:76px}}
 @media(max-width:760px){.ink-toolbar{height:60px;min-height:60px;padding:4px 8px;gap:6px}.toolbar-tools{gap:8px}.toolbar-tools .drawing-tools{order:-1}.ink-style-controls{gap:6px}.ink-style-controls .color-palette{gap:3px}.ink-toolbar .pen-width-control input[type=range]{width:64px}.ink-toolbar .pen-width-control>button{width:26px}.ink-toolbar .tool-button{height:48px}.writing-options-panel .finger-switch{font-size:12px}}
+
+/* Compact editor chrome; tool names remain in titles and accessible labels. */
+.editor-header{height:40px;min-height:40px;align-items:center;padding:0 10px;gap:10px}
+.editor-header .editor-home{width:32px;height:36px;justify-content:center;padding:0;flex:none}
+.editor-header .editor-home>span{display:none}
+.editor-header .editor-home>svg{display:block;width:20px;height:20px}
+.editor-header .open-tabs{height:100%;padding-top:0;align-items:center;gap:4px}
+.editor-header .note-tab{height:32px;border-radius:6px;border-bottom:1px solid transparent}
+.editor-header .note-tab.active{border-bottom-color:#d5e1f6}
+.editor-header .note-tab>button:first-child{padding:4px 8px;gap:6px}
+.editor-header .note-tab>button:last-child{padding:4px 6px}
+.editor-header .editor-header-actions{gap:2px;align-items:center}
+.editor-header .editor-header-actions .icon-button{width:32px;height:32px}
+.editor-header .save-indicator{width:32px;height:32px;font-size:0;gap:0;justify-content:center;padding:0}
+.ink-toolbar{height:48px;min-height:48px;padding:1px 10px;gap:8px}
+.ink-toolbar .tool-button{width:40px;height:44px;gap:0;border-radius:7px}
+.ink-toolbar .tool-button>span,.ink-toolbar #width-label{display:none}
+@media(max-width:760px){.ink-toolbar{padding:1px 8px;gap:6px}}

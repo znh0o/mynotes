@@ -39,7 +39,7 @@ export class EditorView {
     private home: () => Promise<void>, private closeTab: (id: string) => Promise<void>, private settings: () => void) {
     this.queue = new SaveQueue(db, state => {
       const el = this.root.querySelector<HTMLElement>('#save-status');
-      if (el) { el.innerHTML = `${icon(state.startsWith('저장 실패') ? 'WifiOff' : 'Check', 13)} ${escape(state)}`; el.classList.toggle('save-error', state.startsWith('저장 실패')); }
+      if (el) { el.innerHTML = `${icon(state.startsWith('저장 실패') ? 'WifiOff' : 'Check', 13)} ${escape(state)}`; el.title = `${state} · 지금 저장`; el.classList.toggle('save-error', state.startsWith('저장 실패')); }
     });
   }
   async start() {
