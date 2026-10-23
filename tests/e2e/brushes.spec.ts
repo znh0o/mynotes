@@ -117,6 +117,7 @@ test('live ballpoint, marker, shape and thin pencil stay connected after lasso s
 });
 
 test('ballpoint and pencil stay fixed while fountain responds to pressure and pencil darkness is adjustable', async ({ page, context }) => {
+  await page.addInitScript(() => { Math.random = () => .12345; });
   await page.goto('./'); await page.getByRole('button', { name: '새 노트', exact: true }).click();
   await page.locator('[name=title]').fill('세 가지 필기 도구'); await page.locator('.paper-options label').filter({ hasText: '무지' }).click();
   await page.getByRole('button', { name: '노트 만들기', exact: true }).click(); await expect(page.locator('#app .page-loading')).toBeHidden();
@@ -131,7 +132,24 @@ test('ballpoint and pencil stay fixed while fountain responds to pressure and pe
   };
   await stroke(100, .1); await stroke(150, .9);
   await page.getByRole('button', { name: '만년필', exact: true }).click(); await stroke(230, .1); await stroke(280, .9);
-  await page.getByRole('button', { name: '연필', exact: true }).click(); await stroke(360, .1); await stroke(410, .9);
+  await page.getByRole('button', { name: '연필', exact: true }).click(); await stroke(360, .1);
+  const pressurePixels = () => page.locator('#paper-ink').evaluate((canvas: HTMLCanvasElement) => {
+    const scale = canvas.width / 794;
+    const data = canvas.getContext('2d')!.getImageData(Math.floor(90 * scale), Math.floor(345 * scale), Math.ceil(240 * scale), Math.ceil(30 * scale)).data;
+    return Array.from({ length: data.length / 4 }, (_, i) => data[i * 4 + 3]);
+  });
+  const lightPressure = await pressurePixels();
+  await page.getByRole('button', { name: '실행 취소 (Ctrl+Z)', exact: true }).click(); await stroke(360, .9);
+  const heavyPressure = await pressurePixels();
+  // Same paper position and texture seed isolate pressure from paper relief.
+  // Check actual width AND darkness, allowing only alpha quantization at
+  // incremental chunk edges when browser frame timing differs between runs.
+  expect(heavyPressure.length).toBe(lightPressure.length);
+  const pressureError = heavyPressure.map((value, i) => Math.abs(value - lightPressure[i]));
+  expect(Math.max(...pressureError)).toBeLessThanOrEqual(2);
+  expect(pressureError.reduce((sum, value) => sum + value, 0) / pressureError.length).toBeLessThan(.05);
+  await page.getByRole('button', { name: '실행 취소 (Ctrl+Z)', exact: true }).click();
+  await stroke(360, .1); await stroke(410, .9);
   await page.getByRole('combobox', { name: '연필 조절 항목', exact: true }).selectOption('darkness');
   await page.getByRole('slider', { name: '연필 진하기', exact: true }).fill('25'); await stroke(490, .9);
   await page.getByRole('slider', { name: '연필 진하기', exact: true }).fill('85'); await stroke(540, .1);
@@ -150,7 +168,6 @@ test('ballpoint and pencil stay fixed while fountain responds to pressure and pe
   // Integrated alpha avoids a one-pixel threshold difference from subpixel Y.
   expect(measured[1].mass / measured[0].mass).toBeCloseTo(1, 1);
   expect(measured[3].area).toBeGreaterThan(measured[2].area * 2.5);
-  expect(measured[5].mass / measured[4].mass).toBeCloseTo(1, 1);
   expect(measured[7].mass).toBeGreaterThan(measured[6].mass * 2.8);
   expect(measured[5].max).toBeLessThan(255); expect(measured[5].shades).toBeGreaterThan(12);
   // Texture remains visible, with a bounded contrast inside the line and no
