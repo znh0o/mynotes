@@ -75,7 +75,7 @@ export class LibraryView {
     const active = this.notes.filter(n => !n.deleted);
     this.root.innerHTML = `<div class="library-shell">
       <aside class="library-sidebar">
-        <button class="brand brand-logo" data-action="filter" data-id="all" aria-label="Notelin 홈"><img class="brand-wordmark" src="${import.meta.env.BASE_URL}notelin-wordmark.png" alt="" aria-hidden="true" /><span class="brand-dot" aria-hidden="true">.</span></button>
+        <button class="brand brand-logo" data-action="filter" data-id="all" aria-label="Notelin 홈"><img class="brand-wordmark" src="${import.meta.env.BASE_URL}notelin-wordmark-lockup.png" alt="" aria-hidden="true" /></button>
         <div class="workspace-label">나만의 작은 서재</div>
         <nav aria-label="서재 탐색">
           ${this.nav('all', 'Library', '모든 노트', active.length)}

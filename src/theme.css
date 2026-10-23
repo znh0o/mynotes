@@ -4,9 +4,8 @@
 .muted,.page-heading p,.workspace-label,.sidebar-empty,.add-folder,.text-button,.local-badge{color:#677f9f}
 .eyebrow,.sidebar-section-title{color:#5575b3}
 .brand{color:#21395d}.brand-dot{color:#386be5}.brand-mark{background:#e1eaff;color:#3265dc}
-.brand.brand-logo{width:100%;min-height:54px;gap:0;padding:0 3px;align-items:flex-end;justify-content:flex-start}
-.brand-wordmark{display:block;width:164px;max-width:calc(100% - 10px);height:auto;object-fit:contain;flex:0 1 auto}
-.brand-logo .brand-dot{margin:0 0 13px -1px;font-size:31px;font-weight:800;line-height:.7;flex:none}
+.brand.brand-logo{width:100%;height:54px;min-height:54px;gap:0;padding:0 3px;align-items:center;justify-content:flex-start;overflow:hidden}
+.brand-wordmark{display:block;width:190px;max-width:100%;height:auto;flex:none}
 .library-topbar{background:#ffffffd9}.breadcrumb{color:#7387a6}.breadcrumb strong{color:#3e587d}
 .avatar{background:#386be5;color:white;box-shadow:0 0 0 1px #cbd9f7}.status-dot{background:#22a77b}
 .nav-item{color:#536b8c}.nav-item>small{color:#7489a8}.nav-item:hover{background:#eef3ff}

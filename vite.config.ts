@@ -16,7 +16,7 @@ export default defineConfig({
   }, VitePWA({
     registerType: 'prompt',
     injectRegister: null,
-    includeAssets: ['icon-192.png', 'icon-512.png'],
+    includeAssets: ['notelin-icon-192.png', 'notelin-icon-512.png'],
     manifestFilename: 'manifest.webmanifest',
     manifest: {
       name: 'Notelin — 생각이 머무는 곳', short_name: 'Notelin', lang: 'ko',
@@ -24,9 +24,9 @@ export default defineConfig({
       start_url: '/mynotes/', scope: '/mynotes/', display: 'standalone',
       background_color: '#f7f9fc', theme_color: '#f7f9fc',
       icons: [
-        { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-        { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-        { src: 'icon-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+        { src: 'notelin-icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: 'notelin-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+        { src: 'notelin-icon-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
       ]
     },
     workbox: {
