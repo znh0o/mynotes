@@ -69,8 +69,8 @@ test('installable PWA, offline PDF annotation, export and backup restore', async
   const manifest = await page.evaluate(async () => (await fetch('manifest.webmanifest')).json());
   expect(manifest.name).toBe('Notelin — 생각이 머무는 곳'); expect(manifest.short_name).toBe('Notelin');
   expect(manifest.display).toBe('standalone'); expect(manifest.scope).toBe('/mynotes/');
-  expect(manifest.icons).toContainEqual({ src: 'notelin-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' });
-  expect(manifest.icons).toContainEqual({ src: 'notelin-icon-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' });
+  expect(manifest.icons).toContainEqual({ src: 'notelin-flat-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' });
+  expect(manifest.icons).toContainEqual({ src: 'notelin-flat-icon-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' });
   await context.setOffline(true); await page.reload(); await expect(page.locator('h1')).toContainText('나의 서재');
   const doc = await PDFDocument.create(), font = await doc.embedFont(StandardFonts.Helvetica);
   doc.addPage([600, 800]).drawText('Offline PDF study test', { x: 50, y: 700, font, size: 24, color: rgb(.2, .3, .5) });
