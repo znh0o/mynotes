@@ -35,7 +35,7 @@ export function showPenCheck() {
   pad.addEventListener('contextmenu', event => event.preventDefault());
   dialog.querySelector('[data-pen-check=finish]')!.addEventListener('click', () => { checked = true; update(); });
   dialog.querySelector('[data-pen-check=copy]')!.addEventListener('click', () => run(async () => {
-    await navigator.clipboard.writeText(JSON.stringify({ app: `MyNotes ${version}`, browser: navigator.userAgent, penSeen, buttonSeen, primaryHoverSeen, checked, events }, null, 2));
+    await navigator.clipboard.writeText(JSON.stringify({ app: `Notelin ${version}`, browser: navigator.userAgent, penSeen, buttonSeen, primaryHoverSeen, checked, events }, null, 2));
     toast('진단 결과를 복사했어요. 대화에 붙여넣어 주세요.');
   }));
 }

@@ -71,9 +71,9 @@ export async function initialize() {
   await db.open();
   await db.transaction('rw', db.notes, db.pages, db.settings, async () => {
     if (await db.settings.get('initialized')) return;
-    const { note, page } = createNote('MyNotes 시작 가이드', '#b9cee5', null, { paper: 'dots' });
+    const { note, page } = createNote('Notelin 시작 가이드', '#b9cee5', null, { paper: 'dots' });
     page.items = [
-      { id: 'welcome-title', kind: 'text', x: 72, y: 96, w: 650, h: 60, text: '생각이 머무는 곳, MyNotes', color: '#304f72', size: 34 },
+      { id: 'welcome-title', kind: 'text', x: 72, y: 96, w: 650, h: 60, text: '생각이 머무는 곳, Notelin', color: '#304f72', size: 34 },
       { id: 'welcome-sub', kind: 'text', x: 74, y: 176, w: 650, h: 72, text: '한 획의 생각이, 나만의 지식이 되도록.\n이 페이지에 자유롭게 필기해 보세요.', color: '#63758a', size: 20 },
       { id: 'welcome-body', kind: 'text', x: 74, y: 324, w: 650, h: 290, text: '01   펜을 고르고, 첫 문장을 써보세요.\n\n02   손가락으로 이동하고, 두 손가락으로 확대해요.\n\n03   페이지 옆 + 버튼으로 생각을 이어가세요.\n\n04   모든 필기는 이 기기에 자동 저장돼요.\n\n05   설정에서 주기적으로 백업 파일을 보관하세요.', color: '#44566c', size: 21 },
       { id: 'welcome-line', kind: 'stroke', tool: 'highlighter', color: '#c5d8f5', width: 18, pressure: false,
@@ -81,6 +81,28 @@ export async function initialize() {
     ];
     await db.notes.add(note); await db.pages.add(page);
     await db.settings.put({ key: 'initialized', value: true });
+  });
+  await migrateWelcomeBrand();
+}
+
+// Existing notes stay in the same IndexedDB database. Rename only the seeded
+// guide whose original title and heading are still present, retaining any ink
+// the owner added to that page.
+export async function migrateWelcomeBrand(database: NotesDB = db) {
+  await database.transaction('rw', database.notes, database.pages, database.settings, async () => {
+    if (await database.settings.get('notelin-brand')) return;
+    const guides = (await database.notes.toArray()).filter(note => note.title === 'MyNotes 시작 가이드');
+    for (const note of guides) {
+      const page = await database.pages.get(note.pageIds[0]);
+      if (!page?.items.some(item => item.id === 'welcome-title' && item.kind === 'text' && item.text === '생각이 머무는 곳, MyNotes')) continue;
+      await database.pages.update(page.id, {
+        items: page.items.map(item => item.id === 'welcome-title' && item.kind === 'text' && item.text === '생각이 머무는 곳, MyNotes'
+          ? { ...item, text: '생각이 머무는 곳, Notelin' } : item),
+        thumbnail: undefined, revision: page.revision + 1
+      });
+      await database.notes.update(note.id, { title: 'Notelin 시작 가이드', thumbnail: undefined });
+    }
+    await database.settings.put({ key: 'notelin-brand', value: true });
   });
 }
 
@@ -111,12 +133,12 @@ export async function backup() {
     folders: await db.folders.toArray(), assets: await db.assets.toArray()
   }));
   const assets = await Promise.all(data.assets.map(async a => ({ ...a, blob: await blobData(a.blob) })));
-  download(new Blob([JSON.stringify({ ...data, assets })], { type: 'application/json' }), `MyNotes-backup-${new Date().toISOString().slice(0, 10)}.json`);
+  download(new Blob([JSON.stringify({ ...data, assets })], { type: 'application/json' }), `Notelin-backup-${new Date().toISOString().slice(0, 10)}.json`);
 }
 export async function restore(file: File) {
   if (file.size > 400 * 1024 * 1024) throw new Error('백업 파일은 400MB 이하로 복원할 수 있어요.');
   const input = JSON.parse(await file.text());
-  if (input.format !== 'mynotes' || input.version !== 1 || !Array.isArray(input.notes) || !Array.isArray(input.pages) || !Array.isArray(input.assets) || !Array.isArray(input.folders)) throw new Error('MyNotes 백업 파일이 아니에요.');
+  if (input.format !== 'mynotes' || input.version !== 1 || !Array.isArray(input.notes) || !Array.isArray(input.pages) || !Array.isArray(input.assets) || !Array.isArray(input.folders)) throw new Error('Notelin 백업 파일이 아니에요.');
   const ids = new Map<string, string>();
   const remap = (old: string) => { if (typeof old !== 'string') throw new Error('올바르지 않은 ID'); if (!ids.has(old)) ids.set(old, crypto.randomUUID()); return ids.get(old)!; };
   const assets: Asset[] = [];

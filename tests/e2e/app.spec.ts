@@ -67,6 +67,7 @@ test('installable PWA, offline PDF annotation, export and backup restore', async
   await page.evaluate(() => navigator.serviceWorker.ready);
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
   const manifest = await page.evaluate(async () => (await fetch('manifest.webmanifest')).json());
+  expect(manifest.name).toBe('Notelin — 생각이 머무는 곳'); expect(manifest.short_name).toBe('Notelin');
   expect(manifest.display).toBe('standalone'); expect(manifest.scope).toBe('/mynotes/');
   expect(manifest.icons.some((i: any) => i.sizes === '512x512')).toBe(true);
   await context.setOffline(true); await page.reload(); await expect(page.locator('h1')).toContainText('나의 서재');

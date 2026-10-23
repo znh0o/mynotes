@@ -9,7 +9,7 @@ export default defineConfig({
     includeAssets: ['icon-192.png', 'icon-512.png'],
     manifestFilename: 'manifest.webmanifest',
     manifest: {
-      name: 'MyNotes — 생각이 머무는 곳', short_name: 'MyNotes', lang: 'ko',
+      name: 'Notelin — 생각이 머무는 곳', short_name: 'Notelin', lang: 'ko',
       description: 'S펜과 함께하는 나만의 오프라인 학습 노트',
       start_url: '/mynotes/', scope: '/mynotes/', display: 'standalone',
       background_color: '#f7f9fc', theme_color: '#f7f9fc',

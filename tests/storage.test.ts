@@ -1,11 +1,31 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, afterEach, describe, expect, it } from 'vitest';
 import { createNote } from '../src/data/model';
-import { NotesDB, SaveQueue } from '../src/data/store';
+import { NotesDB, SaveQueue, migrateWelcomeBrand } from '../src/data/store';
 let db: NotesDB;
 beforeEach(async () => { db = new NotesDB(`test-${crypto.randomUUID()}`); await db.open(); });
 afterEach(async () => { await db.delete(); });
 describe('durable autosave', () => {
+  it('renames only the original starter guide and preserves added ink', async () => {
+    const original = createNote('MyNotes 시작 가이드', '#b9cee5', null);
+    const customized = createNote('MyNotes 시작 가이드', '#b9cee5', null);
+    original.note.thumbnail = 'old-preview'; original.page.thumbnail = 'old-preview';
+    original.page.items = [
+      { id: 'welcome-title', kind: 'text', x: 72, y: 96, w: 650, h: 60, text: '생각이 머무는 곳, MyNotes', color: '#304f72', size: 34 },
+      { id: 'user-ink', kind: 'stroke', tool: 'pen', color: '#30445e', width: 3, pressure: false, points: [{ x: 10, y: 10, p: .5, t: 0 }] }
+    ];
+    customized.page.items = [{ id: 'welcome-title', kind: 'text', x: 72, y: 96, w: 650, h: 60, text: '내가 고친 제목', color: '#304f72', size: 34 }];
+    await db.notes.bulkAdd([original.note, customized.note]); await db.pages.bulkAdd([original.page, customized.page]);
+    await migrateWelcomeBrand(db); await migrateWelcomeBrand(db);
+    expect((await db.notes.get(original.note.id))?.title).toBe('Notelin 시작 가이드');
+    expect((await db.notes.get(original.note.id))?.thumbnail).toBeUndefined();
+    const renamedPage = (await db.pages.get(original.page.id))!;
+    expect(renamedPage.items[0]).toMatchObject({ text: '생각이 머무는 곳, Notelin' });
+    expect(renamedPage.items[1]).toEqual(original.page.items[1]);
+    expect(renamedPage.thumbnail).toBeUndefined(); expect(renamedPage.revision).toBe(1);
+    expect((await db.notes.get(customized.note.id))?.title).toBe('MyNotes 시작 가이드');
+    expect((await db.pages.get(customized.page.id))?.items).toEqual(customized.page.items);
+  });
   it('saves text continuation pages and order atomically before later typing', async () => {
     const { note, page } = createNote('flow', '#5482da', null); await db.notes.add(note);
     const next = { ...page, id: 'continued-page', items: [] }; note.pageIds.push(next.id);

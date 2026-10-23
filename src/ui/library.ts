@@ -49,8 +49,8 @@ export class LibraryView {
     if (banner) { banner.classList.toggle('update-banner', available); banner.innerHTML = this.bannerContent(); }
   }
   private bannerContent() {
-    if (this.updateAvailable) return `<div role="status" aria-live="polite"><span class="banner-label"><span></span> MYNOTES UPDATE</span><h2>새로운 업데이트가 준비됐어요.</h2><p>더 나아진 MyNotes를 만나보세요.<br>노트를 안전하게 저장한 뒤 새 버전을 적용해요.</p><button class="button primary banner-update-button" data-action="apply-update" ${this.updateApplying ? 'disabled' : ''}>${icon('RefreshCw', 17)} ${this.updateApplying ? '업데이트 적용 중…' : '지금 업데이트'}</button></div><div class="update-banner-art" aria-hidden="true">${icon('RefreshCw', 72)}<span>MYNOTES</span></div>`;
-    return `<div><span class="banner-label"><span></span> A LITTLE SPACE, ENDLESS POSSIBILITIES</span><h2>오늘의 생각을 펼쳐보세요.</h2><p>펜 끝에서 시작되는 새로운 배움.<br>나만의 속도로, 한 페이지씩 채워가요.</p><button class="banner-link" data-action="new">새로운 페이지 시작하기 ${icon('ArrowUpRight', 17)}</button></div><div class="banner-art" aria-hidden="true"><div class="art-shadow"></div><div class="art-notebook back"></div><div class="art-notebook front"><span>small thoughts,<br>big possibilities.</span><i></i><small>MYNOTES / DAILY NOTES</small></div><div class="art-pen"></div><div class="art-star star-one">✧</div><div class="art-star star-two">✧</div><div class="art-dot"></div></div>`;
+    if (this.updateAvailable) return `<div role="status" aria-live="polite"><span class="banner-label"><span></span> NOTELIN UPDATE</span><h2>새로운 업데이트가 준비됐어요.</h2><p>더 나아진 Notelin을 만나보세요.<br>노트를 안전하게 저장한 뒤 새 버전을 적용해요.</p><button class="button primary banner-update-button" data-action="apply-update" ${this.updateApplying ? 'disabled' : ''}>${icon('RefreshCw', 17)} ${this.updateApplying ? '업데이트 적용 중…' : '지금 업데이트'}</button></div><div class="update-banner-art" aria-hidden="true">${icon('RefreshCw', 72)}<span>NOTELIN</span></div>`;
+    return `<div><span class="banner-label"><span></span> A LITTLE SPACE, ENDLESS POSSIBILITIES</span><h2>오늘의 생각을 펼쳐보세요.</h2><p>펜 끝에서 시작되는 새로운 배움.<br>나만의 속도로, 한 페이지씩 채워가요.</p><button class="banner-link" data-action="new">새로운 페이지 시작하기 ${icon('ArrowUpRight', 17)}</button></div><div class="banner-art" aria-hidden="true"><div class="art-shadow"></div><div class="art-notebook back"></div><div class="art-notebook front"><span>small thoughts,<br>big possibilities.</span><i></i><small>NOTELIN / DAILY NOTES</small></div><div class="art-pen"></div><div class="art-star star-one">✧</div><div class="art-star star-two">✧</div><div class="art-dot"></div></div>`;
   }
   private async previews(version: number) {
     for (const note of this.notes.filter(n => !n.thumbnail && !n.deleted).slice(0, 12)) {
@@ -71,11 +71,11 @@ export class LibraryView {
   snapshot(): LibraryState { return { filter: this.filter, query: this.query, sort: this.sort, list: this.list }; }
   setFilter(filter: string) { this.filter = filter; this.renderResults(); }
   private render() {
-    document.title = 'MyNotes · 나의 서재';
+    document.title = 'Notelin · 나의 서재';
     const active = this.notes.filter(n => !n.deleted);
     this.root.innerHTML = `<div class="library-shell">
       <aside class="library-sidebar">
-        <button class="brand" data-action="filter" data-id="all" aria-label="MyNotes 홈"><span class="brand-mark">${icon('PenLine', 24)}</span>MyNotes<span class="brand-dot">.</span></button>
+        <button class="brand" data-action="filter" data-id="all" aria-label="Notelin 홈"><span class="brand-mark">${icon('PenLine', 24)}</span>Notelin<span class="brand-dot">.</span></button>
         <div class="workspace-label">나만의 작은 서재</div>
         <nav aria-label="서재 탐색">
           ${this.nav('all', 'Library', '모든 노트', active.length)}
@@ -92,7 +92,7 @@ export class LibraryView {
         </div>
       </aside>
       <div class="library-main">
-        <header class="library-topbar"><div class="breadcrumb">${button('Menu', '메뉴 열기', 'mobile-menu')}<span>나의 공간</span>${icon('ChevronRight', 13)}<strong id="breadcrumb-title">나의 서재</strong></div><div class="topbar-right"><span class="local-badge">${icon('ShieldCheck', 15)} 오프라인 우선</span><button class="avatar" data-action="settings" aria-label="내 기기 설정">M</button></div></header>
+        <header class="library-topbar"><div class="breadcrumb">${button('Menu', '메뉴 열기', 'mobile-menu')}<span>나의 공간</span>${icon('ChevronRight', 13)}<strong id="breadcrumb-title">나의 서재</strong></div><div class="topbar-right"><span class="local-badge">${icon('ShieldCheck', 15)} 오프라인 우선</span><button class="avatar" data-action="settings" aria-label="내 기기 설정">N</button></div></header>
         <main class="library-content">
           <div class="page-heading"><div><span class="eyebrow">YOUR SPACE TO THINK</span><h1 id="library-title">나의 서재<span class="heading-dot">.</span></h1><p id="library-subtitle">작은 아이디어부터 깊은 배움까지, 모두 이곳에.</p></div><div class="heading-actions"><button class="button secondary" data-action="import">${icon('Upload', 18)} PDF 가져오기</button><button class="button primary" data-action="new">${icon('Plus', 19)} 새 노트</button></div></div>
           <section class="welcome-banner ${this.updateAvailable ? 'update-banner' : ''}">${this.bannerContent()}</section>
@@ -113,7 +113,7 @@ export class LibraryView {
     const channels = [1, 3, 5].map(i => parseInt(cover.slice(i, i + 2), 16) / 255);
     const light = channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722;
     const coverInk = light > .67 ? '#25416b' : '#ffffff';
-    return `<article class="note-card"><button class="note-open" data-action="open" data-id="${note.id}" aria-label="${escape(note.title)} 열기"><div class="notebook-cover" style="--cover:${cover};--cover-ink:${coverInk}"><div class="cover-spine"></div><span class="cover-brand">MYNOTES</span><div class="cover-title">${escape(note.title)}</div><div class="cover-preview">${note.thumbnail ? `<img src="${note.thumbnail}" alt="첫 페이지 미리보기" loading="lazy" />` : `<div class="preview-lines"></div>`}</div><span class="cover-edition">PERSONAL COLLECTION <i>01</i></span></div></button><div class="note-info"><div><button class="note-title" data-action="open" data-id="${note.id}">${escape(note.title)}</button><span>${note.pageIds.length}페이지 <i>·</i> ${note.deleted ? '휴지통' : formatDate(note.updated)}</span></div><button class="note-menu icon-button" data-action="note-menu" data-id="${note.id}" aria-label="${escape(note.title)} 메뉴">${icon('MoreHorizontal', 19)}</button></div>${note.favorite ? `<span class="note-star">${icon('Star', 13)}</span>` : ''}</article>`;
+    return `<article class="note-card"><button class="note-open" data-action="open" data-id="${note.id}" aria-label="${escape(note.title)} 열기"><div class="notebook-cover" style="--cover:${cover};--cover-ink:${coverInk}"><div class="cover-spine"></div><span class="cover-brand">NOTELIN</span><div class="cover-title">${escape(note.title)}</div><div class="cover-preview">${note.thumbnail ? `<img src="${note.thumbnail}" alt="첫 페이지 미리보기" loading="lazy" />` : `<div class="preview-lines"></div>`}</div><span class="cover-edition">PERSONAL COLLECTION <i>01</i></span></div></button><div class="note-info"><div><button class="note-title" data-action="open" data-id="${note.id}">${escape(note.title)}</button><span>${note.pageIds.length}페이지 <i>·</i> ${note.deleted ? '휴지통' : formatDate(note.updated)}</span></div><button class="note-menu icon-button" data-action="note-menu" data-id="${note.id}" aria-label="${escape(note.title)} 메뉴">${icon('MoreHorizontal', 19)}</button></div>${note.favorite ? `<span class="note-star">${icon('Star', 13)}</span>` : ''}</article>`;
   }
   private renderResults() {
     if (this.abort.signal.aborted) return;

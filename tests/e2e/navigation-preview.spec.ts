@@ -28,7 +28,7 @@ test('back stays inside the app from settings, filters, folders and the home scr
   await page.getByRole('button', { name: '설정 및 백업', exact: true }).click();
   await expect(page.locator('dialog')).toBeVisible(); await page.keyboard.press('Escape');
   await expect(page.locator('dialog')).toHaveCount(0); await back(page); await expect(page.locator('#library-title')).toContainText('나의 서재');
-  await page.getByRole('button', { name: 'MyNotes 시작 가이드 메뉴', exact: true }).click();
+  await page.getByRole('button', { name: 'Notelin 시작 가이드 메뉴', exact: true }).click();
   await expect(page.locator('.context-menu')).toBeVisible(); await back(page);
   await expect(page.locator('.context-menu')).toHaveCount(0); await expect(page.locator('#library-title')).toContainText('나의 서재');
 });
@@ -51,7 +51,7 @@ test('editor returns to the library with a slide and Back works after switching 
   const slide = page.waitForSelector('.app-slide-layer[data-direction=back]', { state: 'attached' });
   await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).click();
   await slide; await expect(page.locator('#library-title')).toContainText('나의 서재'); await expect(page.locator('.app-slide-layer')).toHaveCount(0);
-  await page.getByRole('button', { name: 'MyNotes 시작 가이드 열기', exact: true }).click(); await expect(page.locator('#app .page-loading')).toBeHidden();
+  await page.getByRole('button', { name: 'Notelin 시작 가이드 열기', exact: true }).click(); await expect(page.locator('#app .page-loading')).toBeHidden();
   await page.locator('.open-tabs').getByRole('button', { name: '뒤로가기 필기', exact: true }).click();
   await expect(page.locator('#app .page-loading')).toBeHidden();
   await back(page); await expect(page.locator('#library-title')).toContainText('나의 서재');
