@@ -2,6 +2,7 @@ import './style.css';
 import './theme.css';
 import { registerSW } from 'virtual:pwa-register';
 import { backup, db, initialize, restore } from './data/store';
+import { importPDF } from './data/pdf';
 import { EditorView } from './ui/editor';
 import { LibraryView, type LibraryState } from './ui/library';
 import { AppHistory, type AppRoute, type Direction } from './ui/history';
@@ -175,7 +176,43 @@ function settings() {
 }
 async function boot() {
   await initialize(); await navigation.start();
+  await receiveSharedPdf();
   const estimate = await navigator.storage?.estimate?.();
   if (estimate?.usage && estimate.quota && estimate.usage / estimate.quota > .8) toast('저장 공간이 거의 찼어요. 설정에서 백업해 주세요.', true);
+}
+async function receiveSharedPdf() {
+  const url = new URL(location.href);
+  const token = url.searchParams.get('shared-pdf');
+  const shareError = url.searchParams.get('share-error');
+  if (!token && !shareError) return;
+  const clearShareUrl = () => {
+    url.searchParams.delete('shared-pdf'); url.searchParams.delete('share-error');
+    history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+  };
+  if (shareError) {
+    clearShareUrl();
+    toast(shareError === 'size' ? 'PDF는 150MB 이하로 가져올 수 있어요.' :
+      shareError === 'type' ? 'PDF 파일을 공유해 주세요.' : '공유한 PDF를 받지 못했어요. 다시 공유해 주세요.', true);
+    return;
+  }
+  if (!token || !/^[0-9a-f-]{36}$/i.test(token)) { clearShareUrl(); return; }
+  const key = new URL(`shared-pdf/${token}`, new URL(import.meta.env.BASE_URL, location.origin));
+  let cache: Cache | undefined;
+  try {
+    cache = await caches.open('notelin-shared-pdfs-v1');
+    const response = await cache.match(key.href);
+    if (!response) throw new Error('공유한 PDF를 찾지 못했어요. 다시 공유해 주세요.');
+    const encodedName = response.headers.get('X-Notelin-Filename');
+    const name = encodedName ? decodeURIComponent(encodedName) : '공유한 PDF.pdf';
+    const file = new File([await response.blob()], name, { type: 'application/pdf' });
+    toast('PDF를 가져오는 중이에요…');
+    const note = await importPDF(file, null);
+    clearShareUrl();
+    await open(note.id);
+  } catch (error) { report(error); }
+  finally {
+    if (cache) await cache.delete(key.href).catch(() => {});
+    clearShareUrl();
+  }
 }
 boot().catch(error => { report(error); root.innerHTML = `<div class="boot-error"><h1>저장 공간을 열 수 없어요.</h1><p>${escape(error instanceof Error ? error.message : error)}</p><p>브라우저의 사이트 데이터 권한과 비공개 모드 설정을 확인해 주세요.</p><button class="button primary" onclick="location.reload()">다시 시도</button></div>`; });

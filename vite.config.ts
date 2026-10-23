@@ -27,9 +27,14 @@ export default defineConfig({
         { src: 'notelin-flat-icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
         { src: 'notelin-flat-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
         { src: 'notelin-flat-icon-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
-      ]
+      ],
+      share_target: {
+        action: '/mynotes/share-target', method: 'POST', enctype: 'multipart/form-data',
+        params: { files: [{ name: 'pdf', accept: ['application/pdf', '.pdf'] }] }
+      }
     },
     workbox: {
+      importScripts: ['share-target-sw.js'],
       globPatterns: ['**/*.{js,mjs,css,html,png,svg,woff2,wasm,bcmap,pfb,ttf}'],
       maximumFileSizeToCacheInBytes: 12000000,
       cleanupOutdatedCaches: true,
