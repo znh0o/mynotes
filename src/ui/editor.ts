@@ -139,21 +139,24 @@ export class EditorView {
     this.updateHistory();
     const page = this.page;
     page.thumbnail = undefined;
-    void this.queue.save(page).catch(report);
+    void this.queue.saveImmutable(page).catch(report);
     clearTimeout(this.thumbTimer);
     this.thumbTimer = setTimeout(() => run(() => this.saveThumbnail(page)), 1400);
   }
   private async saveThumbnail(page: Page) {
-    const revision = page.revision, snapshot = structuredClone(page), thumb = await thumbnail(snapshot);
+    if (this.engine.activePointer !== null || this.viewport.classList.contains('zoom-preview')) {
+      this.thumbTimer = setTimeout(() => run(() => this.saveThumbnail(page)), 500); return;
+    }
+    const revision = page.revision, snapshot = { ...page, items: page.items.slice() }, thumb = await thumbnail(snapshot);
     if (page.revision !== revision) return;
-    page.thumbnail = thumb; await this.queue.save(page, thumb);
+    page.thumbnail = thumb; await this.queue.saveImmutable(page, thumb);
     if (page.id === this.page.id && !this.abort.signal.aborted) await this.renderThumbnails();
   }
   async flush() {
     clearTimeout(this.thumbTimer);
     // Navigation and PWA updates depend only on durable data. PDF rendering is
     // optional presentation work and must never prevent leaving the editor.
-    if (this.page) { await this.queue.save(this.page); await this.queue.flush(); }
+    if (this.page) { await this.queue.saveImmutable(this.page); await this.queue.flush(); }
   }
   private updateHistory() {
     this.root.querySelector<HTMLButtonElement>('[data-action=undo]')!.disabled = !this.engine.canUndo;

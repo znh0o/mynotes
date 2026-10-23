@@ -117,12 +117,22 @@ test('shape, lasso move/resize/copy/delete, partial eraser and zoom coordinates'
   await page.getByRole('button', { name: '도형', exact: true }).click(); await draw(180, 170, 340, 280);
   await expect.poll(async () => (await current())?.items.length).toBe(1);
   expect((await current()).items[0].kind).toBe('shape');
+  const original = (await current()).items[0];
   await page.getByRole('button', { name: '올가미', exact: true }).click();
-  await page.mouse.move(rect!.x + 150, rect!.y + 140); await page.mouse.down();
-  for (const [x, y] of [[370, 140], [370, 310], [150, 310], [150, 140]]) await page.mouse.move(rect!.x + x, rect!.y + y, { steps: 6 });
-  await page.mouse.up(); await expect(page.locator('.selection-toolbar')).toBeVisible();
+  const select = async () => {
+    await page.mouse.move(rect!.x + 150, rect!.y + 140); await page.mouse.down();
+    for (const [x, y] of [[370, 140], [370, 310], [150, 310], [150, 140]]) await page.mouse.move(rect!.x + x, rect!.y + y, { steps: 6 });
+    await page.mouse.up(); await expect(page.locator('.selection-toolbar')).toBeVisible();
+  };
+  await select();
   await page.getByRole('button', { name: '선택 확대', exact: true }).click();
-  const enlarged = (await current()).items[0]; expect(enlarged.w).toBeGreaterThan(100);
+  await expect.poll(async () => (await current()).items[0].w).toBeGreaterThan(original.w);
+  const enlarged = (await current()).items[0];
+  await page.getByRole('button', { name: '실행 취소 (Ctrl+Z)', exact: true }).click();
+  await expect.poll(async () => (await current()).items[0]).toEqual(original);
+  await page.getByRole('button', { name: '다시 실행 (Ctrl+Shift+Z)', exact: true }).click();
+  await expect.poll(async () => (await current()).items[0]).toEqual(enlarged);
+  await select();
   await page.getByRole('button', { name: '선택 복사', exact: true }).click(); await page.keyboard.press('Control+v');
   await expect.poll(async () => (await current()).items.length).toBe(2);
   await page.getByRole('button', { name: '선택 삭제', exact: true }).click();

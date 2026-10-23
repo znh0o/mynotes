@@ -1,6 +1,7 @@
 import { uid, type Item, type Page, type Point, type Shape, type ShapeItem, type Stroke, type Tool } from '../data/model';
 import { bounds, erase, inside, transform } from './geometry';
 import { drawItem, drawItems } from './render';
+import { LiveStroke } from './LiveStroke';
 
 export interface InkOptions {
   tool: Tool; color: string; width: number; fingerDrawing: boolean;
@@ -26,6 +27,8 @@ export class InkEngine {
   private future: Item[][] = [];
   private clipboard: Item[] = [];
   private abort = new AbortController();
+  private liveStroke = new LiveStroke();
+  private inputRect?: DOMRect;
   constructor(private ink: HTMLCanvasElement, private live: HTMLCanvasElement,
     private changed: () => void, private selection: (count: number) => void,
     private insert: (point: Point, tool: Tool) => void) {
@@ -43,6 +46,7 @@ export class InkEngine {
   }
   resize(force = false) {
     if (!this.page) return;
+    this.inputRect = undefined;
     const rect = this.live.getBoundingClientRect();
     const target = Math.max(1, (rect.width / this.page.width) * devicePixelRatio);
     const ratio = Math.min(target, Math.sqrt(14000000 / (this.page.width * this.page.height)));
@@ -53,20 +57,22 @@ export class InkEngine {
       if (canvas.width !== width) canvas.width = width;
       if (canvas.height !== height) canvas.height = height;
     }
-    this.render(); this.preview();
+    this.liveStroke.reset(); this.render(); this.preview();
   }
   point(e: PointerEvent): Point {
-    const r = this.live.getBoundingClientRect();
+    const r = this.inputRect ?? this.live.getBoundingClientRect();
     return { x: (e.clientX - r.left) * this.page.width / r.width,
       y: (e.clientY - r.top) * this.page.height / r.height,
       p: e.pointerType === 'pen' ? Math.max(.05, e.pressure || .05) : .65, t: e.timeStamp };
   }
-  private context(canvas: HTMLCanvasElement) {
-    const ctx = canvas.getContext('2d')!; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height);
+  private context(canvas: HTMLCanvasElement, clear = true) {
+    const ctx = canvas.getContext('2d')!; ctx.setTransform(1, 0, 0, 1, 0, 0); if (clear) ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.setTransform(this.ratio, 0, 0, this.ratio, 0, 0); return ctx;
   }
   render() { if (this.page) drawItems(this.context(this.ink), this.page.items); }
   private preview() {
+    if (this.stroke && this.liveStroke.draw(this.context(this.live, false), this.stroke, this.ratio)) return;
+    this.liveStroke.reset();
     const ctx = this.context(this.live);
     if (this.stroke) drawItem(ctx, this.stroke);
     if (this.shape) drawItem(ctx, this.shape);
@@ -82,7 +88,11 @@ export class InkEngine {
     ctx.restore();
   }
   private schedule() { if (!this.frame) this.frame = requestAnimationFrame(() => { this.frame = 0; if (this.dirtyInk) { this.dirtyInk = false; this.render(); } this.preview(); }); }
-  private checkpoint() { this.before = structuredClone(this.page.items); }
+  private checkpoint() { this.before = this.page.items.slice(); }
+  private mutableSelection() {
+    this.page.items = this.page.items.map(item => this.selected.has(item.id) ? structuredClone(item) : item);
+    return this.page.items.filter(item => this.selected.has(item.id));
+  }
   private commit() {
     if (!this.before) return;
     this.history.push(this.before); if (this.history.length > 40) this.history.shift();
@@ -92,12 +102,12 @@ export class InkEngine {
   undo() {
     if (this.activePointer !== null) this.cancel();
     const previous = this.history.pop(); if (!previous) return;
-    this.future.push(structuredClone(this.page.items)); this.page.items = previous; this.clearSelection();
+    this.future.push(this.page.items); this.page.items = previous; this.clearSelection();
     this.page.revision++; this.render(); this.changed();
   }
   redo() {
     const next = this.future.pop(); if (!next) return;
-    this.history.push(structuredClone(this.page.items)); this.page.items = next; this.clearSelection();
+    this.history.push(this.page.items); this.page.items = next; this.clearSelection();
     this.page.revision++; this.render(); this.changed();
   }
   get canUndo() { return !!this.history.length; }
@@ -112,14 +122,14 @@ export class InkEngine {
     } else if (items.length) {
       this.mutate(() => {
         if (action === 'delete') { this.page.items = this.page.items.filter(i => !this.selected.has(i.id)); this.selected.clear(); }
-        else transform(items, 0, 0, action === 'grow' ? 1.15 : 1 / 1.15);
+        else transform(this.mutableSelection(), 0, 0, action === 'grow' ? 1.15 : 1 / 1.15);
       });
     }
     this.selection(this.selected.size);
   }
   cancel() {
-    if (this.before && this.page) { this.page.items = this.before; this.before = null; this.render(); }
-    this.stroke = null; this.shape = null; this.lasso = []; this.activePointer = null; this.moving = false;
+    if (this.before && this.page) { this.page.items = this.before; this.before = null; if (!this.stroke && !this.shape) this.render(); }
+    this.stroke = null; this.shape = null; this.lasso = []; this.activePointer = null; this.moving = false; this.inputRect = undefined;
     if (this.page) this.preview();
   }
   private down(e: PointerEvent) {
@@ -128,13 +138,14 @@ export class InkEngine {
     if (e.pointerType === 'touch' && (!this.options.fingerDrawing || this.lastPen > 0 && performance.now() - this.lastPen < 800)) return;
     if (this.options.tool === 'hand') return;
     e.preventDefault();
+    this.inputRect = this.live.getBoundingClientRect();
     const p = this.point(e), tool = e.button === 5 || e.buttons === 32 ? 'eraser' : this.options.tool;
     if (tool === 'text' || tool === 'image') { this.insert(p, tool); return; }
     this.activePointer = e.pointerId; this.live.setPointerCapture(e.pointerId); this.start = this.last = p;
     this.checkpoint();
     if (tool === 'lasso') {
       const b = bounds(this.page.items.filter(i => this.selected.has(i.id)));
-      if (this.selected.size && p.x >= b.x - 12 && p.x <= b.x + b.w + 12 && p.y >= b.y - 12 && p.y <= b.y + b.h + 12) this.moving = true;
+      if (this.selected.size && p.x >= b.x - 12 && p.x <= b.x + b.w + 12 && p.y >= b.y - 12 && p.y <= b.y + b.h + 12) { this.mutableSelection(); this.moving = true; }
       else { this.clearSelection(); this.lasso = [p]; }
     } else if (tool === 'eraser') {
       this.page.items = erase(this.page.items, p, p, this.options.eraserSize / 2, this.options.partialEraser); this.render();
@@ -166,6 +177,15 @@ export class InkEngine {
   private up(e: PointerEvent) {
     if (e.pointerId !== this.activePointer) return;
     if (e.pointerType === 'pen') this.lastPen = performance.now();
+    cancelAnimationFrame(this.frame); this.frame = 0;
+    if (this.stroke) {
+      this.preview();
+      const ctx = this.context(this.ink, false);
+      if (this.liveStroke.commit(this.stroke)) {
+        ctx.save(); ctx.resetTransform(); ctx.drawImage(this.live, 0, 0); ctx.restore();
+      } else drawItem(ctx, this.stroke);
+    } else if (this.shape && Math.abs(this.shape.w) + Math.abs(this.shape.h) > 2) drawItem(this.context(this.ink, false), this.shape);
+    else this.render();
     if (this.stroke) this.page.items.push(this.stroke);
     if (this.shape && Math.abs(this.shape.w) + Math.abs(this.shape.h) > 2) this.page.items.push(this.shape);
     if (this.lasso.length) {
@@ -177,7 +197,7 @@ export class InkEngine {
       this.before = null; this.selection(this.selected.size);
     } else this.commit();
     this.stroke = null; this.shape = null; this.lasso = []; this.moving = false;
-    this.activePointer = null; this.render(); this.preview();
+    this.activePointer = null; this.inputRect = undefined; this.dirtyInk = false; this.preview();
     if (this.live.hasPointerCapture(e.pointerId)) this.live.releasePointerCapture(e.pointerId);
   }
   destroy() { this.cancel(); this.abort.abort(); cancelAnimationFrame(this.frame); }

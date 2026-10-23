@@ -15,6 +15,7 @@ describe('vector PDF export', () => {
     ];
     const bytes = await renderPDF(note, async () => page, async () => undefined, () => {}), document = await PDFDocument.load(bytes);
     expect(images(document)).toHaveLength(0);
+    expect(document.context.enumerateIndirectObjects().some(([, value]) => value instanceof PDFRawStream && value.dict.get(PDFName.of('PatternType'))?.toString() === '1')).toBe(true);
     const streams = document.context.enumerateIndirectObjects().flatMap(([, value]) => value instanceof PDFRawStream && !value.dict.has(PDFName.of('Subtype')) ? [new TextDecoder().decode(decodePDFRawStream(value).decode())] : []);
     expect(streams.some(s => s.includes(' m\n') && s.includes(' l\n') && s.includes('f\n'))).toBe(true);
   });

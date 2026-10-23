@@ -1,6 +1,7 @@
 import { PDFDocument, type PDFPage, type PDFFont, rgb, degrees, LineCapStyle, pushGraphicsState, popGraphicsState, rectangle, clip, endPath, StandardFonts } from 'pdf-lib';
 import { smooth, drawItem } from '../engine/render';
 import { brushLayers } from '../engine/brush';
+import { graphitePDF } from './graphite-pdf';
 import type { Asset, Item, Note, Page, Point, Stroke } from './model';
 
 const color = (hex: string) => rgb(parseInt(hex.slice(1, 3), 16) / 255, parseInt(hex.slice(3, 5), 16) / 255, parseInt(hex.slice(5, 7), 16) / 255);
@@ -11,7 +12,8 @@ const radius = (stroke: Stroke, point: Point) => stroke.width * (.22 + .78 * Mat
 function ink(out: PDFPage, stroke: Stroke, height: number) {
   const points = smooth(stroke.points); if (!points.length) return;
   const c = color(stroke.color), first = points[0], last = points[points.length - 1];
-  if (stroke.tool === 'pencil' || stroke.tool === 'fountain' && stroke.brushVersion === 2) {
+  if (stroke.tool === 'pencil') { graphitePDF(out, stroke, height); return; }
+  if (stroke.tool === 'fountain' && stroke.brushVersion === 2) {
     for (const layer of brushLayers(stroke, points)) out.drawSvgPath(layer.polygons.map(polygon => path(polygon, true)).join(' '), { x: 0, y: height, color: c, opacity: layer.opacity });
     return;
   }

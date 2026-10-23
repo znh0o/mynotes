@@ -44,6 +44,8 @@
 .context-menu button{color:#45648d}.context-menu button:hover{background:#eaf1ff}.context-menu button.danger{color:#c45d75}
 .app-slide-layer{position:fixed;inset:0;z-index:60;overflow:hidden;pointer-events:none;background:#f4f7ff;box-shadow:0 0 35px #203e7020;will-change:transform,opacity}
 .app-slide-layer>div{position:relative;min-height:100dvh;width:100%}
+button,a,label,input,select,textarea{touch-action:manipulation}
+.tool-button{transition:none}
 @media(hover:none){.tool-button:hover:not(.active){background:transparent}}
 
 /* One toolbar row: keep color and width together while the tools can scroll. */

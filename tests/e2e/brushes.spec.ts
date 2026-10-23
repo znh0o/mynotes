@@ -1,5 +1,41 @@
 import { test, expect } from '@playwright/test';
 
+test('pencil PDF preserves the paper grain and its position', async ({ page, context }) => {
+  await page.addInitScript(() => { Math.random = () => .12345; });
+  await page.goto('./'); await page.getByRole('button', { name: '새 노트', exact: true }).click();
+  await page.locator('[name=title]').fill('흑연 PDF'); await page.locator('.paper-options label').filter({ hasText: '무지' }).click();
+  await page.getByRole('button', { name: '노트 만들기', exact: true }).click(); await expect(page.locator('.page-loading')).toBeHidden();
+  await page.getByRole('button', { name: '연필', exact: true }).click();
+  await page.getByRole('slider', { name: '펜 굵기', exact: true }).fill('8'); await page.locator('#ink-color').fill('#252525');
+  const r = (await page.locator('#paper-live').boundingBox())!, scale = r.width / 794, cdp = await context.newCDPSession(page);
+  const send = (type: 'mousePressed' | 'mouseMoved' | 'mouseReleased', x: number) => cdp.send('Input.dispatchMouseEvent', { type, pointerType: 'pen', button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, force: type === 'mouseReleased' ? 0 : .65, x: r.x + x * scale, y: r.y + 200 * scale });
+  await send('mousePressed', 100); for (let x = 104; x <= 360; x += 4) await send('mouseMoved', x); await send('mouseReleased', 360);
+  const pixels = () => page.evaluate(() => {
+    const background = document.querySelector<HTMLCanvasElement>('#paper-background')!, ink = document.querySelector<HTMLCanvasElement>('#paper-ink')!;
+    const canvas = document.createElement('canvas'); canvas.width = background.width; canvas.height = background.height;
+    const ctx = canvas.getContext('2d')!; ctx.drawImage(background, 0, 0); ctx.drawImage(ink, 0, 0, canvas.width, canvas.height);
+    const scale = canvas.width / 794, data = ctx.getImageData(Math.round(140 * scale), Math.round(198 * scale), Math.round(180 * scale), Math.round(4 * scale)).data;
+    return Array.from({ length: data.length / 4 }, (_, i) => data[i * 4]);
+  });
+  const before = await pixels(), downloadEvent = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'PDF 내보내기', exact: true }).click(); const path = await (await downloadEvent).path();
+  await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).click();
+  const chooser = page.waitForEvent('filechooser'); await page.getByRole('button', { name: 'PDF 가져오기', exact: true }).click(); await (await chooser).setFiles(path!);
+  await expect(page.locator('#paper-live')).toBeVisible(); await expect(page.locator('.page-loading')).toBeHidden(); const after = await pixels();
+  const error = after.reduce((sum, value, i) => sum + Math.abs(value - before[i]), 0) / after.length;
+  const mean = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
+  const beforeMean = mean(before), afterMean = mean(after);
+  const correlation = after.reduce((sum, value, i) => sum + (value - afterMean) * (before[i] - beforeMean), 0) / Math.sqrt(after.reduce((sum, value) => sum + (value - afterMean) ** 2, 0) * before.reduce((sum, value) => sum + (value - beforeMean) ** 2, 0));
+  console.log('graphite PDF pixels', JSON.stringify({ error, beforeMean, afterMean, correlation }));
+  // PDF.js rasterizes the vector tile at the viewing scale; Canvas samples a
+  // supersampled tile. Allow their edge coverage to differ, while requiring
+  // aligned paper pits, comparable darkness and visible graphite contrast.
+  expect(after.length).toBe(before.length); expect(error).toBeLessThan(40);
+  expect(Math.abs(afterMean - beforeMean)).toBeLessThan(20); expect(correlation).toBeGreaterThan(.75);
+  expect(Math.max(...after) - Math.min(...after)).toBeGreaterThan(100);
+  await cdp.detach();
+});
+
 test('pencil keeps a continuous graphite curve with fine paper texture', async ({ page, context }) => {
   await page.goto('./'); await page.getByRole('button', { name: '새 노트', exact: true }).click();
   await page.locator('[name=title]').fill('연필 질감'); await page.locator('.paper-options label').filter({ hasText: '무지' }).click();
@@ -50,7 +86,7 @@ test('live ballpoint, marker, shape and thin pencil stay connected after lasso s
     const r = (await page.locator('#paper-live').boundingBox())!, scale = r.width / 794;
     return cdp.send('Input.dispatchMouseEvent', { type, pointerType: 'pen', button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, force: type === 'mouseReleased' ? 0 : .65, x: r.x + x * scale, y: r.y + y * scale });
   };
-  for (const [tool, y, minimum] of [['볼펜', 100, 240], ['형광펜', 180, 70], ['도형', 260, 240], ['연필', 340, 85]] as const) {
+  for (const [tool, y, minimum] of [['볼펜', 100, 240], ['형광펜', 180, 70], ['도형', 260, 240], ['연필', 340, 25]] as const) {
     await page.getByRole('button', { name: tool, exact: true }).click();
     if (tool === '도형') {
       await page.getByRole('button', { name: '필기 옵션', exact: true }).click();
@@ -109,6 +145,14 @@ test('ballpoint stays constant, fountain responds to pressure and pencil has sta
   expect(measured[3].area).toBeGreaterThan(measured[2].area * 2.5);
   expect(measured[5].mass).toBeGreaterThan(measured[4].mass * 1.5);
   expect(measured[5].max).toBeLessThan(255); expect(measured[5].shades).toBeGreaterThan(12);
+  // Measure inside the line, excluding edge antialiasing. A faded solid pen
+  // cannot produce both paper pits and dark graphite in this central strip.
+  const graphite = await page.locator('#paper-ink').evaluate((canvas: HTMLCanvasElement) => {
+    const scale = canvas.width / 794, pixels = canvas.getContext('2d')!.getImageData(Math.round(160 * scale), Math.round(408 * scale), Math.round(100 * scale), Math.round(4 * scale)).data;
+    const alpha = Array.from({ length: pixels.length / 4 }, (_, i) => pixels[i * 4 + 3]);
+    return { pits: alpha.filter(a => a < 80).length / alpha.length, graphite: alpha.filter(a => a > 180).length / alpha.length };
+  });
+  expect(graphite.pits).toBeGreaterThan(.04); expect(graphite.graphite).toBeGreaterThan(.15);
   const readStrokes = () => page.evaluate(async () => {
     const noteId = document.querySelector<HTMLElement>('.note-tab.active [data-action=tab]')!.dataset.id;
     const db = await new Promise<IDBDatabase>(resolve => { const r = indexedDB.open('mynotes-v1'); r.onsuccess = () => resolve(r.result); });

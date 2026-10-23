@@ -25,10 +25,18 @@ export class SaveQueue {
   private pending = 0;
   constructor(private database: NotesDB = db, private status: (state: string) => void = () => {}) {}
   save(page: Page, thumbnail?: string) {
-    const snapshot = structuredClone(page);
+    return this.enqueue(structuredClone(page), thumbnail);
+  }
+  // InkEngine treats completed items as immutable and clones only objects being
+  // transformed. Retain those items without copying every historical point.
+  saveImmutable(page: Page, thumbnail?: string) {
+    return this.enqueue({ ...page, items: page.items.slice() }, thumbnail);
+  }
+  private enqueue(snapshot: Page, thumbnail?: string) {
     this.pending++;
     this.status('저장 중…');
     const task = this.tail.then(async () => {
+      await new Promise(resolve => setTimeout(resolve, 0));
       await this.database.transaction('rw', this.database.pages, this.database.notes, async () => {
         await this.database.pages.put(snapshot);
         const note = await this.database.notes.get(snapshot.noteId);

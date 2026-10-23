@@ -6,6 +6,16 @@ let db: NotesDB;
 beforeEach(async () => { db = new NotesDB(`test-${crypto.randomUUID()}`); await db.open(); });
 afterEach(async () => { await db.delete(); });
 describe('durable autosave', () => {
+  it('retains immutable ink snapshots across appended and replaced item arrays', async () => {
+    const { note, page } = createNote('immutable', '#b9cee5', null); await db.notes.add(note);
+    const queue = new SaveQueue(db);
+    page.items.push({ id: 'first', kind: 'stroke', tool: 'pen', width: 3, color: '#252525', pressure: false, points: [{ x: 10, y: 10, p: .6, t: 1 }] });
+    const first = queue.saveImmutable(page);
+    page.items.push({ ...page.items[0], id: 'second' }); const second = queue.saveImmutable(page);
+    page.items = [];
+    await Promise.all([first, second]); await queue.flush();
+    expect((await db.pages.get(page.id))!.items.map(item => item.id)).toEqual(['first', 'second']);
+  });
   it('captures immutable snapshots and commits them in edit order', async () => {
     const { note, page } = createNote('test', '#b9cee5', null);
     await db.notes.add(note); await db.pages.add(page);
