@@ -9,6 +9,9 @@ export function installFastTaps(root: Document = document) {
     if (!['pen', 'touch'].includes(event.pointerType) || event.button !== 0) return;
     const button = buttonAt(event);
     if (!button || button.disabled || button.closest('[inert]')) return;
+    // The action may focus a newly opened text field on pointerup. Suppress
+    // compatibility mousedown too, or it steals focus back onto this button.
+    event.preventDefault();
     tap = { pointer: event.pointerId, type: event.pointerType, button, x: event.clientX, y: event.clientY, time: performance.now() };
   }, { capture: true });
   root.addEventListener('pointermove', event => {

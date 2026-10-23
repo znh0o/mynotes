@@ -13,14 +13,17 @@ export class InlineTextEditor {
   private scale = 1;
   private composing = false;
   private measure = document.createElement('canvas').getContext('2d')!;
+  private mirror = document.createElement('div');
+  private carets = new Map<string, number>();
   mode: 'document' | 'box' = 'document';
   private defaults = { size: 22, bold: false, italic: false, align: 'left' as TextItem['align'] };
   constructor(private surface: HTMLElement, shell: HTMLElement, private engine: InkEngine,
-    private overflow: (head: TextItem, tail: string) => void) {
+    private overflow: (head: TextItem, tail: string) => void, private styleChanged: () => void = () => {}) {
+    this.mirror.className = 'text-layout-mirror'; this.mirror.setAttribute('aria-hidden', 'true'); document.body.append(this.mirror);
     this.layer = document.createElement('div'); this.layer.className = 'page-text-layer'; surface.append(this.layer);
     this.toolbar = document.createElement('div'); this.toolbar.className = 'inline-text-toolbar'; this.toolbar.hidden = true;
     this.toolbar.setAttribute('role', 'toolbar'); this.toolbar.setAttribute('aria-label', '글자 서식');
-    this.toolbar.innerHTML = `<select id="text-entry-mode" aria-label="입력 방식"><option value="document">본문</option><option value="box">글상자</option></select><label>크기<input type="number" min="10" max="100" step="1" value="22" aria-label="글자 크기" /></label><button type="button" data-text="bold" aria-label="굵게" aria-pressed="false"><b>B</b></button><button type="button" data-text="italic" aria-label="기울임" aria-pressed="false"><i>I</i></button><select id="text-align" aria-label="글자 정렬"><option value="left">왼쪽</option><option value="center">가운데</option><option value="right">오른쪽</option></select><button type="button" data-text="delete" aria-label="글상자 삭제">${icon('Trash2', 18)}</button><button type="button" data-text="cancel" aria-label="입력 취소">${icon('X', 18)}</button><button type="button" data-text="done" class="text-done">${icon('Check', 18)}<span>입력 완료</span></button>`;
+    this.toolbar.innerHTML = `<select id="text-entry-mode" aria-label="입력 방식"><option value="document">본문</option><option value="box">글상자</option></select><label>크기<input type="text" inputmode="numeric" pattern="[0-9]*" role="spinbutton" aria-valuemin="10" aria-valuemax="100" aria-valuenow="22" value="22" aria-label="글자 크기" title="글자 크기 10–100" /></label><button type="button" data-text="bold" aria-label="굵게" aria-pressed="false"><b>B</b></button><button type="button" data-text="italic" aria-label="기울임" aria-pressed="false"><i>I</i></button><select id="text-align" aria-label="글자 정렬"><option value="left">왼쪽</option><option value="center">가운데</option><option value="right">오른쪽</option></select><button type="button" data-text="delete" aria-label="글상자 삭제">${icon('Trash2', 18)}</button><button type="button" data-text="cancel" aria-label="입력 취소">${icon('X', 18)}</button><button type="button" data-text="done" class="text-done">${icon('Check', 18)}<span>입력 완료</span></button>`;
     shell.append(this.toolbar);
     const signal = this.abort.signal;
     // Keep the native keyboard/caret when a formatting button is tapped.
@@ -41,9 +44,20 @@ export class InlineTextEditor {
       }
       if (!this.draft) return;
       const size = Number(this.toolbar.querySelector('input')!.value);
-      if (Number.isFinite(size) && size >= 10 && size <= 100) this.draft.size = size;
+      if (!Number.isFinite(size) || size < 10 || size > 100) return;
+      this.draft.size = Math.round(size);
       this.draft.align = this.toolbar.querySelector<HTMLSelectElement>('#text-align')!.value as TextItem['align'];
-      this.sync(); this.publish();
+      this.sync(); this.publish(false);
+    }, { signal });
+    const sizeInput = this.toolbar.querySelector('input')!;
+    sizeInput.addEventListener('focus', () => sizeInput.select(), { signal });
+    sizeInput.addEventListener('pointerup', () => requestAnimationFrame(() => { if (document.activeElement === sizeInput) sizeInput.select(); }), { signal });
+    sizeInput.addEventListener('change', () => this.setSize(Number(sizeInput.value)), { signal });
+    sizeInput.addEventListener('keydown', event => {
+      if (['Enter', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+        event.preventDefault(); this.setSize(event.key === 'Enter' ? Number(sizeInput.value) : this.size + (event.key === 'ArrowUp' ? 1 : -1));
+        if (event.key === 'Enter') this.focus();
+      }
     }, { signal });
     document.addEventListener('pointerdown', event => {
       if (!this.draft || !(event.target instanceof Element)) return;
@@ -60,12 +74,21 @@ export class InlineTextEditor {
     window.visualViewport?.addEventListener('scroll', () => this.positionToolbar(), { signal });
   }
   get active() { return !!this.draft; }
+  get size() { return this.draft?.size ?? this.defaults.size; }
+  setSize(value: number) {
+    if (!Number.isFinite(value)) return;
+    const size = Math.max(10, Math.min(100, Math.round(value)));
+    this.defaults.size = size;
+    if (this.draft) { this.draft.size = size; this.sync(); this.publish(false); }
+    else this.styleChanged();
+  }
+  focus() { this.input?.focus({ preventScroll: true }); this.ensureCaretVisible(); }
   setScale(scale: number) {
     this.scale = scale;
     this.layer.style.width = `${this.engine.page.width}px`; this.layer.style.height = `${this.engine.page.height}px`;
     this.layer.style.transform = `scale(${scale})`;
   }
-  open(point?: Point) {
+  open(point?: Point, atEnd = false) {
     this.finish();
     const page = this.engine.page;
     const body = this.mode === 'document', frame = documentFrame(page);
@@ -86,7 +109,6 @@ export class InlineTextEditor {
     this.input.addEventListener('keyup', () => this.ensureCaretVisible());
     if (!body) { this.drag(this.box.querySelector('.text-move-handle')!, false); this.drag(this.box.querySelector('.text-resize-handle')!, true); }
     this.toolbar.hidden = false; this.sync(); this.positionToolbar();
-    this.input.focus({ preventScroll: true });
     if (item && point) {
       const ctx = this.measure; ctx.font = textFont(this.draft);
       const lines = textLines(this.draft, text => ctx.measureText(text).width);
@@ -102,7 +124,11 @@ export class InlineTextEditor {
         prefix += character;
       }
       offset += prefix.length; this.input.setSelectionRange(offset, offset);
-    } else this.input.setSelectionRange(this.input.value.length, this.input.value.length);
+    } else {
+      const caret = atEnd ? this.input.value.length : Math.min(this.input.value.length, this.carets.get(this.draft.id) ?? 0);
+      this.input.setSelectionRange(caret, caret);
+    }
+    this.input.focus({ preventScroll: true });
     this.ensureCaretVisible();
   }
   setColor(color: string) { if (this.draft) { this.draft.color = color; this.sync(); this.publish(); } }
@@ -110,23 +136,32 @@ export class InlineTextEditor {
     const item = this.draft; if (!item || !this.input || !this.box) return;
     this.defaults = { size: item.size, bold: !!item.bold, italic: !!item.italic, align: item.align ?? 'left' };
     Object.assign(this.box.style, { left: `${item.x}px`, top: `${item.y}px`, width: `${item.w}px` });
-    Object.assign(this.input.style, { font: textFont(item), lineHeight: '1.55', color: item.color, textAlign: item.align ?? 'left', height: '0px' });
-    const ctx = this.measure; ctx.font = textFont(item);
-    item.h = Math.max(item.size * 1.55, textLines(item, text => ctx.measureText(text).width).length * item.size * 1.55, this.input.scrollHeight);
+    Object.assign(this.input.style, { font: textFont(item), lineHeight: '1.55', color: item.color, textAlign: item.align ?? 'left' });
+    // Measure in a separate DOM element. Collapsing the focused textarea to
+    // zero height makes Android's keyboard/caret scrolling jump the page.
+    const layout = this.textLayout();
+    item.h = Math.max(item.size * 1.55, layout.height);
     this.input.style.height = `${item.h}px`;
-    this.input.scrollTop = 0;
     for (const action of ['bold', 'italic'] as const) this.toolbar.querySelector(`[data-text=${action}]`)!.setAttribute('aria-pressed', String(!!item[action]));
     const size = this.toolbar.querySelector('input')!; if (document.activeElement !== size) size.value = String(item.size);
+    size.setAttribute('aria-valuenow', String(item.size));
     this.toolbar.querySelector<HTMLSelectElement>('#text-align')!.value = item.align ?? 'left';
     this.toolbar.querySelector<HTMLSelectElement>('#text-entry-mode')!.value = this.mode;
     const body = item.textMode === 'document';
-    this.input.style.minHeight = body ? `${documentFrame(this.engine.page).h}px` : '';
     this.toolbar.querySelector('[data-text=delete]')!.setAttribute('aria-label', body ? '본문 지우기' : '글상자 삭제');
+    this.styleChanged();
   }
-  private publish() {
+  private textLayout() {
+    const item = this.draft!, input = this.input!;
+    Object.assign(this.mirror.style, { width: `${item.w}px`, font: textFont(item), lineHeight: '1.55', textAlign: item.align ?? 'left' });
+    const caret = input.selectionStart, marker = document.createElement('span'); marker.textContent = '\u200b';
+    this.mirror.replaceChildren(document.createTextNode(input.value.slice(0, caret)), marker, document.createTextNode(input.value.slice(caret) + '\u200b'));
+    return { height: Math.ceil(this.mirror.getBoundingClientRect().height), top: marker.offsetTop, left: marker.offsetLeft };
+  }
+  private publish(paginate = true) {
     if (!this.draft) return;
     this.engine.updateText(this.draft);
-    if (this.composing || this.draft.textMode !== 'document') return;
+    if (!paginate || this.composing || this.draft.textMode !== 'document') return;
     this.measure.font = textFont(this.draft);
     const [text, tail] = splitDocument(this.draft, this.engine.page, text => this.measure.measureText(text).width);
     if (!tail) return;
@@ -136,16 +171,17 @@ export class InlineTextEditor {
     this.engine.updateText(head, false); this.close(); this.engine.finishText(false, false); this.overflow(head, tail);
   }
   private ensureCaretVisible() {
-    if (!this.draft || !this.input) return;
+    if (!this.draft || !this.input || document.activeElement !== this.input) return;
     const viewport = this.surface.closest<HTMLElement>('.paper-viewport'); if (!viewport) return;
-    this.measure.font = textFont(this.draft);
-    const prefix = { ...this.draft, text: this.input.value.slice(0, this.input.selectionStart) };
-    const row = textLines(prefix, text => this.measure.measureText(text).width).length - 1;
+    const layout = this.textLayout();
     const height = this.draft.size * 1.55 * this.scale;
-    const top = this.input.getBoundingClientRect().top + row * height, rect = viewport.getBoundingClientRect();
+    const top = this.input.getBoundingClientRect().top + layout.top * this.scale, rect = viewport.getBoundingClientRect();
     const bottom = Math.min(rect.bottom, this.toolbar.getBoundingClientRect().top - 12);
     if (top + height > bottom) viewport.scrollTop += top + height - bottom + 12;
     else if (top < rect.top + 30) viewport.scrollTop -= rect.top + 30 - top;
+    const left = this.input.getBoundingClientRect().left + layout.left * this.scale;
+    if (left < rect.left + 16) viewport.scrollLeft -= rect.left + 16 - left;
+    else if (left > rect.right - 16) viewport.scrollLeft += left - rect.right + 16;
   }
   private positionToolbar() {
     const viewport = window.visualViewport;
@@ -174,6 +210,9 @@ export class InlineTextEditor {
     this.close();
     this.engine.finishText(cancel);
   }
-  private close() { this.draft = undefined; this.composing = false; this.box?.remove(); this.box = undefined; this.input = undefined; this.toolbar.hidden = true; }
-  destroy() { this.finish(); this.abort.abort(); this.layer.remove(); this.toolbar.remove(); }
+  private close() {
+    if (this.draft && this.input) this.carets.set(this.draft.id, this.input.selectionStart);
+    this.draft = undefined; this.composing = false; this.box?.remove(); this.box = undefined; this.input = undefined; this.toolbar.hidden = true;
+  }
+  destroy() { this.finish(); this.abort.abort(); this.layer.remove(); this.toolbar.remove(); this.mirror.remove(); }
 }

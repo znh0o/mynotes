@@ -59,7 +59,7 @@ export class EditorView {
       this.root.querySelector('#selection-count')!.textContent = `${count}개 선택 · 드래그로 이동`;
     }, (p, tool) => this.insert(p, tool), () => toast('직선으로 정리했어요. 펜을 댄 채 끝점을 움직일 수 있어요.'));
     this.textEditor = new InlineTextEditor(this.root.querySelector('.paper-surface')!, this.root.querySelector('.editor-shell')!, this.engine,
-      (head, tail) => this.continueTyping(head, tail));
+      (head, tail) => this.continueTyping(head, tail), () => this.syncInkControl());
     if (typeof lineSetting?.value === 'boolean') this.engine.options.holdToLine = lineSetting.value;
     this.previews = new PagePreviews(this.root.querySelector('#page-thumbnails')!, this.root.querySelector('.page-sidebar')!,
       () => this.engine.activePointer !== null || this.viewport.classList.contains('zoom-preview'),
@@ -85,6 +85,7 @@ export class EditorView {
       if (this.widthPointer !== e.pointerId) return;
       widthFromPointer(e); this.widthPointer = null;
       if (this.adjustingDarkness) this.persistPencilDarkness();
+      if (this.engine.options.tool === 'text') this.textEditor.focus();
       if (widthSlider.hasPointerCapture(e.pointerId)) widthSlider.releasePointerCapture(e.pointerId);
     }, { signal: this.abort.signal });
     widthSlider.addEventListener('pointercancel', () => this.widthPointer = null, { signal: this.abort.signal });
@@ -150,7 +151,7 @@ export class EditorView {
     // continuation pages and their note order in one transaction.
     const saved = this.queue.savePages(this.note, [source, ...pages]);
     this.displayPage(pages[pages.length - 1], this.index + pages.length);
-    this.textEditor.open(); run(() => this.renderBackground());
+    this.textEditor.open(undefined, true); run(() => this.renderBackground());
     run(async () => { await saved; await this.renderThumbnails(); });
   }
   private async renderBackground() {
@@ -241,6 +242,7 @@ export class EditorView {
       const slider = this.root.querySelector<HTMLInputElement>('#ink-width')!;
       this.setInkValue(Number(slider.value) + Number(slider.step) * (action === 'pen-thinner' ? -1 : 1));
       if (this.adjustingDarkness) this.persistPencilDarkness();
+      if (this.engine.options.tool === 'text') this.textEditor.focus();
     }
     if (action === 'undo') this.engine.undo();
     if (action === 'redo') this.engine.redo();
@@ -314,31 +316,35 @@ export class EditorView {
   private get adjustingDarkness() { return this.engine.options.tool === 'pencil' && this.inkAdjustment === 'darkness'; }
   private setInkValue(value: number) {
     if (!Number.isFinite(value)) return;
+    if (this.engine.options.tool === 'text') {
+      if (!this.textEditor.active) this.textEditor.open();
+      this.textEditor.setSize(value); this.syncInkControl(); return;
+    }
     if (!this.adjustingDarkness) { this.setWidth(value); return; }
     this.engine.options.pencilDarkness = Math.max(10, Math.min(100, Math.round(value / 5) * 5)) / 100;
     this.syncInkControl();
   }
   private persistPencilDarkness() { void db.settings.put({ key: 'pencil-darkness', value: this.engine.options.pencilDarkness }).catch(report); }
   private syncInkControl() {
-    const pencil = this.engine.options.tool === 'pencil', darkness = this.adjustingDarkness;
-    const width = this.engine.options.width, value = darkness ? Math.round(this.engine.options.pencilDarkness * 100) : width;
-    const min = darkness ? 10 : .5, max = darkness ? 100 : 20;
+    const pencil = this.engine.options.tool === 'pencil', darkness = this.adjustingDarkness, text = this.engine.options.tool === 'text';
+    const width = this.engine.options.width, value = text ? this.textEditor.size : darkness ? Math.round(this.engine.options.pencilDarkness * 100) : width;
+    const min = text || darkness ? 10 : .5, max = text || darkness ? 100 : 20;
     const slider = this.root.querySelector<HTMLInputElement>('#ink-width')!;
-    slider.min = String(min); slider.max = String(max); slider.step = darkness ? '5' : '.5'; slider.value = String(value);
-    slider.setAttribute('aria-label', darkness ? '연필 진하기' : '펜 굵기');
-    slider.setAttribute('aria-valuetext', darkness ? `${value}% · 필압과 관계없이 고정` : width.toFixed(1));
+    slider.min = String(min); slider.max = String(max); slider.step = text ? '1' : darkness ? '5' : '.5'; slider.value = String(value);
+    slider.setAttribute('aria-label', text ? '글자 크기' : darkness ? '연필 진하기' : '펜 굵기');
+    slider.setAttribute('aria-valuetext', text ? `${value}px` : darkness ? `${value}% · 필압과 관계없이 고정` : width.toFixed(1));
     slider.style.setProperty('--width-progress', `${(value - min) / (max - min) * 100}%`);
-    this.root.querySelector<HTMLOutputElement>('#width-value')!.value = darkness ? `${value}%` : width.toFixed(1);
+    this.root.querySelector<HTMLOutputElement>('#width-value')!.value = text ? String(value) : darkness ? `${value}%` : width.toFixed(1);
     this.root.querySelector<HTMLElement>('#width-preview')!.style.height = `${Math.min(16, width)}px`;
-    this.root.querySelector<HTMLElement>('#width-preview')!.hidden = pencil;
-    this.root.querySelector<HTMLElement>('#width-label')!.hidden = pencil;
+    this.root.querySelector<HTMLElement>('#width-preview')!.hidden = pencil || text;
+    this.root.querySelector<HTMLElement>('#width-label')!.hidden = pencil || text;
     const mode = this.root.querySelector<HTMLSelectElement>('#ink-adjustment')!;
     mode.hidden = !pencil; mode.value = this.inkAdjustment;
     this.root.querySelector('.pen-width-control')!.classList.toggle('pencil-controls', pencil);
     for (const [action, delta] of [['pen-thinner', -1], ['pen-thicker', 1]] as const) {
       const button = this.root.querySelector<HTMLButtonElement>(`[data-action=${action}]`)!;
       button.disabled = value === (delta < 0 ? min : max);
-      const name = `${darkness ? '연필 진하기' : '펜 굵기'} ${delta < 0 ? '줄이기' : '늘리기'}`;
+      const name = `${text ? '글자 크기' : darkness ? '연필 진하기' : '펜 굵기'} ${delta < 0 ? '줄이기' : '늘리기'}`;
       button.setAttribute('aria-label', name); button.title = name;
     }
   }
