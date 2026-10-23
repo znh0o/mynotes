@@ -100,8 +100,21 @@ test('mid-contact button transitions do not connect across erased ink or erase o
   await cdp.detach();
 });
 
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status !== testInfo.expectedStatus) console.log('cursor input events', await page.evaluate(() => (window as any).cursorEvents).catch(() => []));
+});
+
 test('eraser circle follows its real size, zoom and temporary barrel mode without becoming ink', async ({ page, context }) => {
   await start(page); const cdp = await context.newCDPSession(page);
+  // Keep toolbar input touch-only: mixing an emulated mouse cursor with a
+  // separate CDP pen can generate platform-specific stale hover/leave events.
+  await page.locator('#paper-live').evaluate(canvas => {
+    (window as any).cursorEvents = [];
+    for (const type of ['pointerenter', 'pointerdown', 'pointermove', 'pointerup', 'pointerleave', 'pointercancel']) canvas.addEventListener(type, event => {
+      const e = event as PointerEvent;
+      (window as any).cursorEvents.push({ type, pointerType: e.pointerType, buttons: e.buttons, pressure: e.pressure });
+    });
+  });
   const circle = page.locator('.eraser-cursor');
   await page.getByRole('button', { name: '지우개', exact: true }).tap();
   await page.getByRole('button', { name: '버튼을 누르면 에어 커맨드가 열리나요?', exact: true }).tap();
@@ -125,17 +138,17 @@ test('eraser circle follows its real size, zoom and temporary barrel mode withou
     let sum = 0; for (let i = 3; i < data.length; i += 4) sum += data[i]; return sum;
   }));
   expect(alpha).toEqual([0, 0]);
-  await page.getByRole('button', { name: '축소', exact: true }).click();
+  await page.getByRole('button', { name: '축소', exact: true }).tap();
   await pen(page, cdp, 'mouseMoved', 240, 210, 0, 0); await expect(circle).toBeVisible(); await checkSize();
   await page.screenshot({ path: '../MyNotes-eraser-circle.png' });
-  await page.getByRole('button', { name: '볼펜', exact: true }).click(); await expect(circle).toBeHidden();
+  await page.getByRole('button', { name: '볼펜', exact: true }).tap(); await expect(circle).toBeHidden();
   // Establish an actual held barrel before moving. Forging buttons=2 on a
   // hover move alone lets Chromium correct it back to its real up state.
   await pen(page, cdp, 'mousePressed', 240, 210, 2, 0, 'right');
   await pen(page, cdp, 'mouseMoved', 245, 210, 2, 0, 'right'); await expect(circle).toBeVisible(); await checkSize();
   await pen(page, cdp, 'mouseReleased', 245, 210, 0, 0, 'right'); await expect(circle).toBeHidden();
-  await page.getByRole('button', { name: '지우개', exact: true }).click();
-  await page.getByRole('button', { name: '스트로크 지우개', exact: true }).click();
+  await page.getByRole('button', { name: '지우개', exact: true }).tap();
+  await page.getByRole('button', { name: '스트로크 지우개', exact: true }).tap();
   const rect = (await page.locator('#paper-live').boundingBox())!;
   await page.touchscreen.tap(rect.x + 180 * rect.width / 794, rect.y + 190 * rect.height / 1123);
   await expect(circle).toBeHidden();
