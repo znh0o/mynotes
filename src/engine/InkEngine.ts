@@ -70,6 +70,7 @@ export class InkEngine {
     const ctx = this.context(this.live);
     if (this.stroke) drawItem(ctx, this.stroke);
     if (this.shape) drawItem(ctx, this.shape);
+    ctx.save();
     ctx.strokeStyle = '#5d8ac2'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 5]);
     if (this.lasso.length) { ctx.beginPath(); this.lasso.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); ctx.fillStyle = '#719ad417'; ctx.fill(); ctx.stroke(); }
     if (this.selected.size) {
@@ -78,6 +79,7 @@ export class InkEngine {
       ctx.setLineDash([]); ctx.fillStyle = '#fff';
       for (const p of [{ x: b.x - 8, y: b.y - 8 }, { x: b.x + b.w + 8, y: b.y + b.h + 8 }]) { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
     }
+    ctx.restore();
   }
   private schedule() { if (!this.frame) this.frame = requestAnimationFrame(() => { this.frame = 0; if (this.dirtyInk) { this.dirtyInk = false; this.render(); } this.preview(); }); }
   private checkpoint() { this.before = structuredClone(this.page.items); }

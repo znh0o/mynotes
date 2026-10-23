@@ -30,6 +30,7 @@ export function drawStroke(ctx: CanvasRenderingContext2D, stroke: Stroke) {
   }
   const pts = smooth(stroke.points);
   ctx.save(); ctx.fillStyle = stroke.color; ctx.strokeStyle = stroke.color;
+  ctx.setLineDash([]); ctx.lineDashOffset = 0;
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   if (stroke.tool === 'highlighter' || !stroke.pressure) {
     ctx.globalAlpha = stroke.tool === 'highlighter' ? .32 : 1;
@@ -66,6 +67,7 @@ export function drawItem(ctx: CanvasRenderingContext2D, item: Item) {
   } else if (item.kind === 'image') {
     const image = imageCache.get(item.assetId); if (image) ctx.drawImage(image, item.x, item.y, item.w, item.h);
   } else {
+    ctx.setLineDash([]); ctx.lineDashOffset = 0;
     ctx.strokeStyle = item.color; ctx.lineWidth = item.width; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.beginPath();
     if (item.shape === 'line') { ctx.moveTo(item.x, item.y); ctx.lineTo(item.x + item.w, item.y + item.h); }
     if (item.shape === 'rect') ctx.rect(item.x, item.y, item.w, item.h);

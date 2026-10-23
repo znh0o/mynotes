@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('pencil makes a dense dark graphite curve with visible paper grain', async ({ page, context }) => {
+test('pencil keeps a continuous graphite curve with fine paper texture', async ({ page, context }) => {
   await page.goto('./'); await page.getByRole('button', { name: '새 노트', exact: true }).click();
   await page.locator('[name=title]').fill('연필 질감'); await page.locator('.paper-options label').filter({ hasText: '무지' }).click();
   await page.getByRole('button', { name: '노트 만들기', exact: true }).click(); await expect(page.locator('#app .page-loading')).toBeHidden();
@@ -12,20 +12,69 @@ test('pencil makes a dense dark graphite curve with visible paper grain', async 
     [190, 250, 210, 215, 260, 175, 300, 175], [300, 175, 260, 220, 250, 285, 263, 290],
     [263, 290, 290, 247, 335, 210, 375, 215], [375, 215, 340, 248, 345, 306, 357, 320],
     [357, 320, 383, 278, 430, 247, 465, 250], [465, 250, 426, 290, 430, 345, 448, 360]];
+  const samples: { x: number; y: number }[] = [];
   await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', pointerType: 'pen', button: 'left', buttons: 1, force: .65, x: r.x + 140 * scale, y: r.y + 220 * scale });
   for (const [x0, y0, x1, y1, x2, y2, x3, y3] of curves) for (let i = 1; i <= 28; i++) {
     const t = i / 28, u = 1 - t, x = u ** 3 * x0 + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t ** 3 * x3, y = u ** 3 * y0 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t ** 3 * y3;
+    samples.push({ x, y });
     await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', pointerType: 'pen', button: 'left', buttons: 1, force: .65, x: r.x + x * scale, y: r.y + y * scale });
   }
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const continuity = await page.locator('#paper-live').evaluate((canvas: HTMLCanvasElement, samples) => {
+    const ctx = canvas.getContext('2d')!, scale = canvas.width / 794;
+    return samples.slice(2, -2).map(p => {
+      const pixels = ctx.getImageData(Math.round(p.x * scale) - 1, Math.round(p.y * scale) - 1, 3, 3).data;
+      return Math.max(...Array.from({ length: 9 }, (_, i) => pixels[i * 4 + 3]));
+    });
+  }, samples);
+  expect(Math.min(...continuity)).toBeGreaterThan(85);
   await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', pointerType: 'pen', button: 'left', buttons: 0, force: 0, x: r.x + 448 * scale, y: r.y + 360 * scale });
   const coverage = await page.locator('#paper-ink').evaluate((canvas: HTMLCanvasElement) => {
     const data = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
-    let ink = 0, dark = 0, paper = 0, alpha = 0;
-    for (let i = 3; i < data.length; i += 4) if (data[i]) { ink++; alpha += data[i]; if (data[i] > 150) dark++; if (data[i] < 100) paper++; }
-    return { dark: dark / ink, paper: paper / ink, average: alpha / ink };
+    let ink = 0, dark = 0, alpha = 0;
+    for (let i = 3; i < data.length; i += 4) if (data[i]) { ink++; alpha += data[i]; if (data[i] > 150) dark++; }
+    return { dark: dark / ink, average: alpha / ink };
   });
   await page.screenshot({ path: '../MyNotes-pencil-reference.png' });
-  expect(coverage.dark).toBeGreaterThan(.12); expect(coverage.paper).toBeGreaterThan(.12); expect(coverage.average).toBeGreaterThan(90);
+  expect(coverage.dark).toBeGreaterThan(.12); expect(coverage.average).toBeGreaterThan(110);
+  await cdp.detach();
+});
+
+test('live ballpoint, marker, shape and thin pencil stay connected after lasso selection', async ({ page, context }) => {
+  await page.goto('./'); await page.getByRole('button', { name: '새 노트', exact: true }).click();
+  await page.locator('.paper-options label').filter({ hasText: '무지' }).click();
+  await page.getByRole('button', { name: '노트 만들기', exact: true }).click();
+  await expect(page.locator('#app .page-loading')).toBeHidden(); await expect(page.locator('.app-slide-layer')).toHaveCount(0);
+  const cdp = await context.newCDPSession(page);
+  const send = async (type: 'mousePressed' | 'mouseReleased' | 'mouseMoved', x: number, y: number) => {
+    const r = (await page.locator('#paper-live').boundingBox())!, scale = r.width / 794;
+    return cdp.send('Input.dispatchMouseEvent', { type, pointerType: 'pen', button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, force: type === 'mouseReleased' ? 0 : .65, x: r.x + x * scale, y: r.y + y * scale });
+  };
+  for (const [tool, y, minimum] of [['볼펜', 100, 240], ['형광펜', 180, 70], ['도형', 260, 240], ['연필', 340, 85]] as const) {
+    await page.getByRole('button', { name: tool, exact: true }).click();
+    if (tool === '도형') {
+      await page.getByRole('button', { name: '필기 옵션', exact: true }).click();
+      await page.getByRole('combobox', { name: '도형 종류', exact: true }).selectOption('line');
+      await page.getByRole('button', { name: '필기 옵션 닫기', exact: true }).click();
+    }
+    await send('mousePressed', 100, y);
+    for (let x = 104; x <= 320; x += 4) await send('mouseMoved', x, y);
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const live = await page.locator('#paper-live').evaluate((canvas: HTMLCanvasElement, y) => {
+      const ctx = canvas.getContext('2d')!, scale = canvas.width / 794;
+      const data = ctx.getImageData(Math.ceil(110 * scale), Math.floor((y - 1) * scale), Math.floor(200 * scale), Math.ceil(2 * scale));
+      return Array.from({ length: data.width }, (_, x) => Math.max(...Array.from({ length: data.height }, (_, y) => data.data[(y * data.width + x) * 4 + 3])));
+    }, y);
+    expect(Math.min(...live), `${tool} must stay connected before lifting the pen`).toBeGreaterThan(minimum);
+    if (tool === '볼펜') await page.screenshot({ path: '../MyNotes-live-ballpoint.png' });
+    await send('mouseReleased', 320, y);
+    if (tool === '볼펜') {
+      await page.getByRole('button', { name: '올가미', exact: true }).click();
+      await send('mousePressed', 80, 80);
+      for (const [x, y] of [[340, 80], [340, 120], [80, 120], [80, 80]]) await send('mouseMoved', x, y);
+      await send('mouseReleased', 80, 80); await expect(page.locator('#selection-count')).toContainText('1개 선택');
+    }
+  }
   await cdp.detach();
 });
 

@@ -24,17 +24,17 @@ export function brushLayers(stroke: Stroke, points = smooth(stroke.points)): Bru
     const nib = .5 + .5 * Math.abs(Math.sin(direction - Math.PI / 4));
     const taperLength = Math.min(stroke.width * 1.8, length / 3);
     const taper = length > stroke.width * 2 ? .42 + .58 * Math.min(1, Math.min(distances[i], length - distances[i]) / Math.max(.01, taperLength)) : 1;
-    const radius = stroke.width / 2 * (pencil ? (.78 + .22 * p) * (.92 + random() * .08) : (.12 + .88 * Math.pow(p, .9)) * nib * taper);
+    const radius = stroke.width / 2 * (pencil ? (.78 + .22 * p) * (.985 + random() * .015) : (.12 + .88 * Math.pow(p, .9)) * nib * taper);
     radii.push(radius);
     left.push({ x: point.x + Math.cos(normal) * radius, y: point.y + Math.sin(normal) * radius });
     right.push({ x: point.x - Math.cos(normal) * radius, y: point.y - Math.sin(normal) * radius });
   }
   const body = [[...left, ...right.reverse()], circle(points[0], radii[0]), circle(points[points.length - 1], radii[radii.length - 1])];
   if (!pencil) return [{ opacity: 1, polygons: body }];
-  // Dense, broken graphite coverage rather than a pale solid tube with dots.
-  // Adjacent irregular deposits leave the paper visible between dark grains.
-  const layers: BrushLayer[] = [{ opacity: .06, polygons: body }, ...[.38, .55, .72, .88].map(opacity => ({ opacity, polygons: [] as XY[][] }))];
-  const step = .85, lanes = Math.max(2, Math.min(18, Math.ceil(stroke.width / .85)));
+  // A continuous graphite body carries the line. Fine, low-contrast deposits
+  // add paper texture without turning handwriting into separate dark flecks.
+  const layers: BrushLayer[] = [{ opacity: .36, polygons: body }, ...[.16, .23, .3, .38].map(opacity => ({ opacity, polygons: [] as XY[][] }))];
+  const step = .5, lanes = Math.max(2, Math.min(24, Math.ceil(stroke.width / .6)));
   // Edge sampling grows during a live stroke. Give the graphite a separate
   // stream so extending the tip never shuffles grains already on the paper.
   state = ((stroke.textureSeed ?? 0x6d2b79f5) ^ 0xa511e9b3) >>> 0;
@@ -48,19 +48,33 @@ export function brushLayers(stroke: Stroke, points = smooth(stroke.points)): Bru
     const nx = -Math.sin(angle), ny = Math.cos(angle), dx = Math.cos(angle), dy = Math.sin(angle);
     const radius = stroke.width * (.78 + .22 * p) / 2;
     for (let lane = 0; lane < lanes; lane++) {
-      if (random() > .5 + Math.sqrt(p) * .45) continue;
+      if (random() > .25 + Math.sqrt(p) * .7) continue;
       const laneWidth = radius * 2 / lanes;
-      const grain = laneWidth * (.4 + random() * .3), long = step * (.45 + random() * .3);
-      const offset = -radius + laneWidth * (lane + .5 + (random() - .5) * .65);
-      const along = (random() - .5) * step * .65;
+      const grain = laneWidth * (.38 + random() * .2), long = step * (.42 + random() * .18);
+      const offset = -radius + laneWidth * (lane + .5 + (random() - .5) * .3);
+      const along = (random() - .5) * step * .3;
       const x = a.x + (b.x - a.x) * t + nx * offset + dx * along, y = a.y + (b.y - a.y) * t + ny * offset + dy * along;
-      layers[1 + Math.min(3, Math.floor(p * 2.5 + random() * 1.5))].polygons.push([
+      layers[1 + Math.min(3, Math.floor(p * 2.5 + random() * .8))].polygons.push([
         { x: x - dx * long - nx * grain, y: y - dy * long - ny * grain },
         { x: x - dx * long * .8 + nx * grain, y: y - dy * long * .8 + ny * grain },
         { x: x + dx * long + nx * grain * .7, y: y + dy * long + ny * grain * .7 },
         { x: x + dx * long * .8 - nx * grain, y: y + dy * long * .8 - ny * grain }
       ]);
     }
+  }
+  // Build up soft graphite density with pressure. Each band tapers across its
+  // width as pressure changes, keeping the body connected without hard seams.
+  for (const threshold of [0, .2, .4, .6, .8]) {
+    const bandLeft: XY[] = [], bandRight: XY[] = [], bandRadii: number[] = [];
+    for (let i = 0; i < points.length; i++) {
+      const point = points[i], prev = points[Math.max(0, i - 1)], next = points[Math.min(points.length - 1, i + 1)];
+      const normal = Math.atan2(next.y - prev.y, next.x - prev.x) + Math.PI / 2;
+      const radius = radii[i] * Math.max(0, Math.min(1, (pressure(point.p) - threshold) / .18));
+      bandRadii.push(radius);
+      bandLeft.push({ x: point.x + Math.cos(normal) * radius, y: point.y + Math.sin(normal) * radius });
+      bandRight.push({ x: point.x - Math.cos(normal) * radius, y: point.y - Math.sin(normal) * radius });
+    }
+    if (bandRadii.some(radius => radius > 0)) layers.push({ opacity: .12, polygons: [[...bandLeft, ...bandRight.reverse()], circle(points[0], bandRadii[0]), circle(points[points.length - 1], bandRadii[bandRadii.length - 1])] });
   }
   return layers.filter(layer => layer.polygons.length);
 }
