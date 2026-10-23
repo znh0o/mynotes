@@ -94,6 +94,18 @@ test('custom palette and combined pen presets stay separate for each note', asyn
   const redPencil = pens.getByRole('button', { name: /빨간 연필/ }).locator('.pen-preview');
   await expect(redPencil).toHaveCSS('--ink', '#dd3344');
   await expect(redPencil.locator('.pen-ink-sample path')).toHaveAttribute('stroke', '#dd3344');
+  const pencilImage = redPencil.locator('.pen-pencil-raster');
+  await expect(pencilImage).toHaveAttribute('data-ready', 'true');
+  const { graphite, wood } = await pencilImage.evaluate(canvas => {
+    const context = (canvas as HTMLCanvasElement).getContext('2d')!;
+    return {
+      graphite: [...context.getImageData(100, 100, 1, 1).data],
+      wood: [...context.getImageData(190, 100, 1, 1).data],
+    };
+  });
+  expect(graphite[0]).toBeGreaterThan(graphite[1] * 2);
+  expect(graphite[0]).toBeLessThan(140); // Retain graphite shading instead of a flat red overlay.
+  expect(wood[1]).toBeGreaterThan(130); // The pencil body keeps its original color.
   await expect(page.locator('#ink-width')).toHaveValue('2.5');
   await pens.getByRole('button', { name: '펜 메뉴 닫기' }).click();
   const canvas = (await page.locator('#paper-live').boundingBox())!;

@@ -11,7 +11,7 @@ import { trackDialog } from './history';
 import { InlineTextEditor } from './inline-text';
 import { showPenCheck } from './pen-check';
 import { openColorPicker } from './color-picker';
-import { penPreview } from './pen-preview';
+import { paintPencilPreviews, penPreview } from './pen-preview';
 import { brushKey, brushProfile, inkTools, isInkTool, type BrushProfile, type InkTool } from '../data/brush-settings';
 import { defaultPenCollection, duplicatePen, isPenKind, penCollection, penKinds, penNames, type PenCollection, type PenKind, type PenPreset } from '../data/pen-presets';
 
@@ -602,6 +602,7 @@ export class EditorView {
       return;
     }
     panel.innerHTML = `${heading}<div class="pen-picker-hero">${penPreview(this.selectedPen(), 'pen-preview-hero')}</div><div class="pen-picker-list pen-picker-cards">${this.pens.presets.map(preset => `<button type="button" class="pen-preset-row" data-action="pen-select" data-id="${preset.id}" aria-pressed="${preset.id === this.pens.selectedId}" title="${escape(`${penNames[preset.tool]} · ${preset.color.toUpperCase()} · 굵기 ${preset.width.toFixed(1)}${preset.tool === 'pencil' ? ` · 진하기 ${Math.round(preset.pencilDarkness * 100)}%` : ''}`)}"><span class="pen-preset-art">${penPreview(preset)}</span><span class="pen-preset-name" style="--preset-color:${preset.color}">${escape(preset.name)}</span></button>`).join('')}</div><div class="pen-picker-actions"><button class="button secondary" type="button" data-action="pen-arrange">구성 편집</button><button class="button primary" type="button" data-action="pen-add">${icon('Plus', 16)} 펜 추가</button></div>`;
+    paintPencilPreviews(panel);
   }
   private showPenPicker(anchor: HTMLElement) {
     this.root.querySelector<HTMLElement>('.pen-picker:popover-open')?.hidePopover();

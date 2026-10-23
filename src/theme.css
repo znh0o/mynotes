@@ -47,7 +47,8 @@
 .pen-photo:after{background:var(--ink);mix-blend-mode:screen;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-size:100% 100%;mask-size:100% 100%}
 .pen-preview-pen .pen-photo:after{-webkit-mask-image:url('./assets/pen-ballpoint.png');mask-image:url('./assets/pen-ballpoint.png');clip-path:polygon(32.4% 15%,65.8% 15%,65.8% 80%,32.4% 80%)}
 .pen-preview-fountain .pen-photo:after{-webkit-mask-image:url('./assets/pen-fountain.png');mask-image:url('./assets/pen-fountain.png');clip-path:polygon(37.8% 19%,61.7% 19%,61.7% 76%,37.8% 76%)}
-.pen-preview-pencil .pen-photo:after{-webkit-mask-image:url('./assets/pen-pencil.png');mask-image:url('./assets/pen-pencil.png');clip-path:polygon(10% 24%,24% 24%,24% 76%,10% 76%);opacity:1}
+.pen-preview-pencil .pen-photo:after{display:none}
+.pen-pencil-raster{position:absolute;inset:0;display:block;width:100%;height:100%}
 .pen-ink-sample{position:absolute;left:0;bottom:1px;width:100%;height:18px}
 .pen-preview-hero .pen-photo{top:0;left:4px;width:100%;height:100%}
 .pen-preview-hero .pen-ink-sample{display:none}
