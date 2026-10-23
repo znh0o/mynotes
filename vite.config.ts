@@ -1,9 +1,19 @@
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { readFileSync } from 'node:fs';
+
+const packageVersion = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version as string;
+const releaseRevision = process.env.GITHUB_SHA || `version-${packageVersion}`;
 
 export default defineConfig({
   base: '/mynotes/',
-  plugins: [VitePWA({
+  define: { __NOTELIN_RELEASE__: JSON.stringify(releaseRevision) },
+  plugins: [{
+    name: 'notelin-release-marker',
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'release.json', source: JSON.stringify({ revision: releaseRevision }) });
+    }
+  }, VitePWA({
     registerType: 'prompt',
     injectRegister: null,
     includeAssets: ['icon-192.png', 'icon-512.png'],

@@ -26,7 +26,16 @@ let updateAvailable = false;
 let serviceWorkerRegistration: ServiceWorkerRegistration | undefined;
 let updateChecking = false;
 let updateApplying = false;
-let updateMessage = '버튼을 눌러 새 버전을 확인하세요.';
+let updateMessage = '새 버전을 자동으로 확인하고 있어요.';
+let lastUpdateCheck = 0;
+let updateProbeRunning = false;
+function showAvailableUpdate() {
+  const newlyAvailable = !updateAvailable;
+  updateAvailable = true;
+  updateMessage = '새 버전이 준비됐어요. 필기를 저장한 뒤 적용할 수 있어요.';
+  refreshUpdateControls();
+  if (newlyAvailable) toast('새 버전이 준비됐어요. 서재의 업데이트 버튼을 눌러 적용하세요.');
+}
 function refreshUpdateControls() {
   library?.setUpdateState(updateAvailable, updateApplying);
   const status = document.querySelector<HTMLElement>('#update-status');
@@ -45,32 +54,53 @@ async function applyUpdate() {
     });
   } finally { updateApplying = false; refreshUpdateControls(); }
 }
-registerSW({
-  immediate: true,
-  onNeedReload() { /* Manual activation below reloads only after saving. */ },
-  onOfflineReady() { toast('오프라인 사용 준비가 완료됐어요.'); },
-  onNeedRefresh() {
-    updateAvailable = true; updateMessage = '새 버전이 준비됐어요. 필기를 저장한 뒤 적용할 수 있어요.';
-    refreshUpdateControls(); toast('새 버전이 준비됐어요. 서재의 업데이트 버튼을 눌러 적용하세요.');
-  },
-  onRegisteredSW(_url, registration) {
-    serviceWorkerRegistration = registration;
-    if (registration?.waiting) updateAvailable = true;
-    refreshUpdateControls();
-  },
-  onRegisterError(error) { console.error('Service Worker registration failed', error); toast('오프라인 설치를 준비하지 못했어요. 연결을 확인해 주세요.', true); }
+function watchServiceWorker(registration: ServiceWorkerRegistration) {
+  serviceWorkerRegistration = registration;
+  const noticeIfWaiting = () => { if (registration.waiting) showAvailableUpdate(); };
+  registration.addEventListener('updatefound', () => {
+    registration.installing?.addEventListener('statechange', noticeIfWaiting);
+    noticeIfWaiting();
+  });
+  noticeIfWaiting(); refreshUpdateControls(); void probeUpdate();
+}
+async function registerAppWorker() {
+  const existing = await navigator.serviceWorker.getRegistration(import.meta.env.BASE_URL);
+  const activeUrl = existing?.active && new URL(existing.active.scriptURL);
+  if (existing && activeUrl?.pathname === `${import.meta.env.BASE_URL}sw.js` && activeUrl.searchParams.has('revision')) {
+    // Keep the revisioned script URL after applying it; registering plain sw.js
+    // here would create a second, spurious update on every launch.
+    watchServiceWorker(existing);
+    return;
+  }
+  registerSW({
+    immediate: true,
+    onNeedReload() { /* Manual activation below reloads only after saving. */ },
+    onOfflineReady() { toast('오프라인 사용 준비가 완료됐어요.'); },
+    onNeedRefresh: showAvailableUpdate,
+    onRegisteredSW(_url, registration) { if (registration) watchServiceWorker(registration); },
+    onRegisterError(error) { console.error('Service Worker registration failed', error); toast('오프라인 설치를 준비하지 못했어요. 연결을 확인해 주세요.', true); }
+  });
+}
+if ('serviceWorker' in navigator) void registerAppWorker().catch(error => {
+  console.error('Service Worker registration failed', error);
+  toast('오프라인 설치를 준비하지 못했어요. 연결을 확인해 주세요.', true);
 });
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e as typeof installPrompt; });
 window.addEventListener('appinstalled', () => { installPrompt = undefined; toast('Notelin이 설치됐어요.'); });
 window.addEventListener('offline', () => toast('오프라인이에요. 이 기기에서 계속 필기할 수 있어요.'));
-let lastUpdateCheck = 0;
-function probeUpdate() {
-  if (document.hidden || !navigator.onLine || !serviceWorkerRegistration || Date.now() - lastUpdateCheck < 60000) return;
-  lastUpdateCheck = Date.now(); void serviceWorkerRegistration.update().catch(() => {});
+async function probeUpdate() {
+  if (document.hidden || !navigator.onLine || !serviceWorkerRegistration || updateAvailable || updateApplying || updateChecking || updateProbeRunning || Date.now() - lastUpdateCheck < 15000) return;
+  lastUpdateCheck = Date.now(); updateProbeRunning = true;
+  try {
+    if (await checkForUpdate(serviceWorkerRegistration) === 'available') showAvailableUpdate();
+    else if (!updateAvailable) { updateMessage = '최신 버전을 사용하고 있어요.'; refreshUpdateControls(); }
+  } catch { /* Keep writing available when the network check fails. */ }
+  finally { updateProbeRunning = false; }
 }
-window.addEventListener('focus', probeUpdate); window.addEventListener('online', probeUpdate);
-document.addEventListener('visibilitychange', probeUpdate);
-setInterval(probeUpdate, 10 * 60 * 1000);
+window.addEventListener('focus', () => { void probeUpdate(); });
+window.addEventListener('online', () => { void probeUpdate(); });
+document.addEventListener('visibilitychange', () => { void probeUpdate(); });
+setInterval(() => { void probeUpdate(); }, 60 * 1000);
 
 async function home() {
   if (editor) await navigation.goHome();

@@ -20,6 +20,7 @@ test('settings can check, download and apply a real worker update without losing
       if (!url.pathname.startsWith('/mynotes/') || !path.startsWith(dist + sep)) { res.writeHead(404).end(); return; }
       let body = await readFile(path);
       if (relative === 'sw.js') body = Buffer.from(`${body.toString()}\nself.addEventListener('message', e => { if(e.data?.type === 'TEST_RELEASE') e.ports[0].postMessage(${release}); });\n// test release ${release}`);
+      if (relative === 'release.json' && release > 1) body = Buffer.from(JSON.stringify({ revision: `test-release-${release}` }));
       const mime: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.wasm': 'application/wasm' };
       res.writeHead(200, { 'Content-Type': mime[extname(path)] || 'application/octet-stream', 'Cache-Control': 'no-store' }); res.end(body);
     } catch { res.writeHead(404).end(); }
@@ -61,8 +62,8 @@ test('settings can check, download and apply a real worker update without losing
     expect(strokes).toHaveLength(1); expect(strokes[0].kind).toBe('stroke');
     await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).click();
     release = 3;
-    // A background worker update changes the existing home banner immediately.
-    await page.evaluate(async () => { const registration = await navigator.serviceWorker.ready; await registration.update(); });
+    // Reopening the app checks the deployment marker, then bypasses a cached sw.js.
+    await page.reload();
     await expect(page.locator('.welcome-banner h2')).toHaveText('새로운 업데이트가 준비됐어요.');
     const bannerUpdate = page.getByRole('button', { name: '지금 업데이트', exact: true }); await expect(bannerUpdate).toBeVisible();
     await page.screenshot({ path: '../MyNotes-update-banner.png' });
@@ -70,5 +71,15 @@ test('settings can check, download and apply a real worker update without losing
     expect(await workerRelease(page)).toBe(3);
     await expect(page.locator('.welcome-banner h2')).toHaveText('오늘의 생각을 펼쳐보세요.');
     await expect(page.getByRole('button', { name: '지금 업데이트', exact: true })).toHaveCount(0);
+    await page.waitForTimeout(1200);
+    await expect(page.getByRole('button', { name: '지금 업데이트', exact: true })).toHaveCount(0);
+    release = 4;
+    // Returning to an already-open app also checks for a new deployment.
+    await page.evaluate(() => {
+      const now = Date.now();
+      Date.now = () => now + 20_000;
+      window.dispatchEvent(new Event('focus'));
+    });
+    await expect(page.locator('.welcome-banner h2')).toHaveText('새로운 업데이트가 준비됐어요.');
   } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }
 });
