@@ -94,7 +94,7 @@ test('custom palette and combined pen presets stay separate for each note', asyn
   const redPencil = pens.getByRole('button', { name: /빨간 연필/ }).locator('.pen-preview');
   await expect(redPencil).toHaveCSS('--ink', '#dd3344');
   await expect(redPencil.locator('.pen-ink-sample path')).toHaveAttribute('stroke', '#dd3344');
-  const pencilImage = redPencil.locator('.pen-pencil-raster');
+  const pencilImage = redPencil.locator('.pen-raster');
   await expect(pencilImage).toHaveAttribute('data-ready', 'true');
   const { graphite, wood } = await pencilImage.evaluate(canvas => {
     const context = (canvas as HTMLCanvasElement).getContext('2d')!;
@@ -132,4 +132,33 @@ test('custom palette and combined pen presets stay separate for each note', asyn
   await page.getByRole('button', { name: '펜', exact: true }).click();
   await expect(page.getByRole('dialog', { name: '펜 선택' }).getByRole('button', { name: /빨간 연필/ })).toBeVisible();
   await expect(page.locator('[data-action=color]').first()).toHaveAttribute('data-id', '#b82d36');
+});
+
+test('ballpoint and fountain grips change color through their edges without tinting the metal', async ({ page }) => {
+  await page.goto('./'); await newNote(page, '손잡이 색 확인');
+  await page.getByRole('button', { name: '펜', exact: true }).click();
+  const pens = page.getByRole('dialog', { name: '펜 선택' });
+  for (const [name, color] of [['볼펜', '#DD3344'], ['만년필', '#27A06B']]) {
+    await pens.getByRole('button', { name: '구성 편집' }).click();
+    await pens.getByRole('button', { name: `${name} 수정` }).click();
+    await pens.locator('[data-action=pen-color]').click();
+    const picker = page.getByRole('dialog', { name: '색상 선택' });
+    await picker.getByRole('textbox', { name: 'HEX 색상 코드' }).fill(color);
+    await picker.getByRole('button', { name: '이 색 사용' }).click();
+    await pens.getByRole('button', { name: '펜 저장' }).click();
+  }
+  const previews = pens.locator('.pen-preset-row .pen-raster');
+  await expect(previews).toHaveCount(3);
+  await expect(previews.nth(0)).toHaveAttribute('data-ready', 'true');
+  await expect(previews.nth(1)).toHaveAttribute('data-ready', 'true');
+  const samples = await previews.evaluateAll(canvases => canvases.slice(0, 2).map((canvas, index) => {
+    const context = (canvas as HTMLCanvasElement).getContext('2d')!;
+    const pixel = (x: number) => [...context.getImageData(x, 100, 1, 1).data];
+    return { grip: pixel(index ? 300 : 280), edge: pixel(index ? 360 : 385), body: pixel(440) };
+  }));
+  expect(samples[0].grip[0]).toBeGreaterThan(samples[0].grip[2] * 1.6);
+  expect(samples[0].edge[0]).toBeGreaterThan(samples[0].edge[2] * 1.6);
+  expect(samples[1].grip[1]).toBeGreaterThan(samples[1].grip[0] * 1.6);
+  expect(samples[1].edge[1]).toBeGreaterThan(samples[1].edge[0] * 1.6);
+  for (const sample of samples) expect(Math.abs(sample.body[0] - sample.body[1])).toBeLessThan(12);
 });
