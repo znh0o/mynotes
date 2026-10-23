@@ -55,7 +55,7 @@ export class EditorView {
     document.title = `${this.note.title} · MyNotes`;
     this.root.innerHTML = `<div class="editor-shell">
       <header class="editor-header"><button class="editor-home" data-action="home" aria-label="서재로 돌아가기">${icon('ChevronLeft', 19)}<span class="brand-mark small">${icon('PenLine', 18)}</span><span>서재</span></button><div class="open-tabs">${this.tabs.map(t => `<div class="note-tab ${t.id === this.note.id ? 'active' : ''}"><button data-action="tab" data-id="${t.id}">${icon('BookOpen', 15)}<span>${escape(t.title)}</span></button><button data-action="close-tab" data-id="${t.id}" aria-label="${escape(t.title)} 탭 닫기">${icon('X', 13)}</button></div>`).join('')}</div><div class="editor-header-actions"><button class="save-indicator" id="save-status" data-action="save" title="지금 저장">${icon('Check', 13)} 모든 변경사항 저장됨</button>${button('Search', '노트 내 텍스트 검색', 'search')}${button('Download', 'PDF 내보내기', 'export')}${button('Maximize', '전체 화면', 'fullscreen')}${button('MoreHorizontal', '노트 설정', 'settings')}</div></header>
-      <div class="ink-toolbar" role="toolbar" aria-label="필기 도구"><div class="toolbar-tools"><div class="tool-group editor-utility">${button('PanelLeft', '페이지 목록', 'sidebar')}<span class="toolbar-separator"></span>${button('Undo2', '실행 취소 (Ctrl+Z)', 'undo', 'disabled')}${button('Redo2', '다시 실행 (Ctrl+Shift+Z)', 'redo', 'disabled')}</div><div class="tool-group drawing-tools">${([['pen', 'PenLine', '볼펜'], ['fountain', 'Feather', '만년필'], ['pencil', 'Pencil', '연필'], ['highlighter', 'Highlighter', '형광펜'], ['eraser', 'Eraser', '지우개'], ['lasso', 'Lasso', '올가미'], ['shape', 'Shapes', '도형'], ['text', 'Type', '텍스트'], ['image', 'Image', '이미지'], ['hand', 'Hand', '이동']] as const).map(([tool, i, label]) => `<button class="tool-button ${tool === 'pen' ? 'active' : ''}" data-action="tool" data-id="${tool}" aria-label="${label}" aria-pressed="${tool === 'pen'}" title="${label}">${icon(i, 22)}<span>${label}</span></button>`).join('')}</div></div><div class="ink-style-controls"><div class="color-palette">${['#30445e', '#5e85bd', '#cf7d85', '#83a58a', '#e5c360'].map((c, n) => `<button class="color-swatch ${n === 0 ? 'active' : ''}" style="--color:${c}" data-action="color" data-id="${c}" title="${['잉크', '블루', '로즈', '세이지', '옐로'][n]}" aria-label="${['잉크', '블루', '로즈', '세이지', '옐로'][n]}"></button>`).join('')}<label class="custom-color" title="사용자 색상">${icon('Plus', 15)}<input type="color" id="ink-color" value="#30445e" aria-label="사용자 색상" /></label></div><div class="pen-width-control"><label id="width-label" for="ink-width">굵기</label><select id="ink-adjustment" aria-label="연필 조절 항목" title="연필 굵기와 고정 진하기 조절" hidden><option value="width">굵기</option><option value="darkness">진하기</option></select><span id="width-preview" aria-hidden="true"></span><button type="button" data-action="pen-thinner" aria-label="펜 굵기 줄이기" title="펜 굵기 줄이기">${icon('Minus', 15)}</button><input id="ink-width" type="range" min="0.5" max="20" step="0.5" value="3" aria-label="펜 굵기" /><button type="button" data-action="pen-thicker" aria-label="펜 굵기 늘리기" title="펜 굵기 늘리기">${icon('Plus', 15)}</button><output id="width-value" for="ink-width">3.0</output></div></div><div class="editor-options">${button('Settings2', '필기 옵션', 'writing-options', 'aria-haspopup="dialog" aria-expanded="false" aria-controls="writing-options-panel"')}</div></div>
+      <div class="ink-toolbar" role="toolbar" aria-label="필기 도구"><div class="toolbar-tools"><div class="tool-group editor-utility">${button('PanelLeft', '페이지 목록', 'sidebar')}<span class="toolbar-separator"></span>${button('Undo2', '실행 취소 (Ctrl+Z)', 'undo', 'disabled')}${button('Redo2', '다시 실행 (Ctrl+Shift+Z)', 'redo', 'disabled')}</div><div class="tool-group drawing-tools">${([['pen', 'PenLine', '볼펜'], ['fountain', 'Feather', '만년필'], ['pencil', 'Pencil', '연필'], ['highlighter', 'Highlighter', '형광펜'], ['eraser', 'Eraser', '지우개'], ['lasso', 'Lasso', '올가미'], ['shape', 'Shapes', '도형'], ['text', 'Type', '텍스트'], ['image', 'Image', '이미지'], ['hand', 'Hand', '이동']] as const).map(([tool, i, label]) => `<button class="tool-button ${tool === 'pen' ? 'active' : ''}" data-action="tool" data-id="${tool}" aria-label="${label}" aria-pressed="${tool === 'pen'}" title="${label}">${icon(i, 22)}<span>${label}</span></button>`).join('')}</div></div><div class="ink-style-controls"><div class="color-palette">${['#30445e', '#5e85bd', '#cf7d85', '#83a58a', '#e5c360'].map((c, n) => `<button class="color-swatch ${n === 0 ? 'active' : ''}" style="--color:${c}" data-action="color" data-id="${c}" title="${['잉크', '블루', '로즈', '세이지', '옐로'][n]}" aria-label="${['잉크', '블루', '로즈', '세이지', '옐로'][n]}"></button>`).join('')}<label class="custom-color" title="사용자 색상">${icon('Plus', 15)}<input type="color" id="ink-color" value="#30445e" aria-label="사용자 색상" /></label></div><div class="pen-width-control"><label id="width-label" for="ink-width">굵기</label><div class="pencil-mode-picker" hidden><button type="button" id="ink-adjustment" class="pencil-mode-trigger" data-action="pencil-mode-menu" aria-label="연필 조절 항목: 굵기" aria-expanded="false" aria-controls="pencil-mode-menu"><span>굵기</span>${icon('ChevronDown', 13)}</button><div class="pencil-mode-menu" id="pencil-mode-menu" role="group" aria-label="연필 조절 항목" hidden><span class="pencil-mode-heading">연필 조절</span><button type="button" data-action="pencil-mode" data-id="width" aria-pressed="true"><span><strong>굵기</strong><small>선의 두께</small></span>${icon('Check', 15)}</button><button type="button" data-action="pencil-mode" data-id="darkness" aria-pressed="false"><span><strong>진하기</strong><small>흑연의 농도</small></span>${icon('Check', 15)}</button></div></div><span id="width-preview" aria-hidden="true"></span><button type="button" data-action="pen-thinner" aria-label="펜 굵기 줄이기" title="펜 굵기 줄이기">${icon('Minus', 15)}</button><input id="ink-width" type="range" min="0.5" max="20" step="0.5" value="3" aria-label="펜 굵기" /><button type="button" data-action="pen-thicker" aria-label="펜 굵기 늘리기" title="펜 굵기 늘리기">${icon('Plus', 15)}</button><output id="width-value" for="ink-width">3.0</output></div></div><div class="editor-options">${button('Settings2', '필기 옵션', 'writing-options', 'aria-haspopup="dialog" aria-expanded="false" aria-controls="writing-options-panel"')}</div></div>
       <div class="editor-body"><aside class="page-sidebar"><div class="page-sidebar-heading"><strong>페이지</strong><span>${this.note.pageIds.length}</span>${button('Plus', '페이지 추가', 'add-page')}</div><div id="page-thumbnails"></div><button class="add-page-button" data-action="add-page">${icon('Plus', 17)} 페이지 추가</button></aside>
         <main class="paper-viewport" aria-label="필기 작업 공간"><div class="paper-stage"><div class="paper-sizing"><div class="paper-surface"><canvas id="paper-background" aria-hidden="true"></canvas><canvas id="paper-ink" aria-hidden="true"></canvas><canvas id="paper-live" aria-label="필기 캔버스"></canvas></div></div></div><div class="page-loading" hidden>페이지를 불러오는 중…</div></main>
       </div><footer class="editor-footer"><div><span class="status-dot"></span><span id="paper-description">A4 · 줄노트</span><span class="footer-divider"></span><span>S펜 필압 지원</span></div><div class="page-navigation">${button('ChevronLeft', '이전 페이지', 'prev-page')}<button class="page-position" data-action="goto-page">1 / ${this.note.pageIds.length}</button>${button('ChevronRight', '다음 페이지', 'next-page')}</div><div class="zoom-controls">${button('Minus', '축소', 'zoom-out')}<button id="zoom-value" data-action="fit">80%</button>${button('Plus', '확대', 'zoom-in')}<button class="text-button" data-action="fit">화면에 맞춤</button></div></footer>
@@ -108,8 +108,11 @@ export class EditorView {
     this.root.addEventListener('input', e => this.input(e), { signal: this.abort.signal });
     this.root.addEventListener('change', e => {
       const id = (e.target as HTMLElement).id;
-      if (id === 'ink-width' || id === 'ink-adjustment') this.input(e);
+      if (id === 'ink-width') this.input(e);
       if (id === 'ink-width' && this.adjustingDarkness) this.persistPencilDarkness();
+    }, { signal: this.abort.signal });
+    document.addEventListener('pointerdown', e => {
+      if (!this.root.querySelector('.pencil-mode-picker')?.contains(e.target as Node)) this.closePencilMode();
     }, { signal: this.abort.signal });
     document.addEventListener('keydown', e => this.keyboard(e), { signal: this.abort.signal });
     document.addEventListener('visibilitychange', () => { if (document.hidden) run(() => this.flush()); }, { signal: this.abort.signal });
@@ -246,7 +249,7 @@ export class EditorView {
   private click(e: Event) {
     const target = (e.target as Element).closest<HTMLElement>('[data-action]'); if (!target) return;
     const { action, id } = target.dataset;
-    if (action && !['color', 'pen-thinner', 'pen-thicker'].includes(action)) this.textEditor.finish();
+    if (action && !['color', 'pen-thinner', 'pen-thicker', 'pencil-mode-menu', 'pencil-mode'].includes(action)) this.textEditor.finish();
     if (action === 'home') run(this.home);
     if (action === 'retry-page') run(() => this.showPage(this.index));
     if (action === 'tab' && id !== this.note.id) run(() => this.open(id!));
@@ -268,6 +271,14 @@ export class EditorView {
       this.root.querySelector<HTMLElement>('#eraser-picker')?.hidePopover(); this.engine.cancel(); showPenCheck();
     }
     if (action === 'color') this.setColor(id!);
+    if (action === 'pencil-mode-menu') {
+      const menu = this.root.querySelector<HTMLElement>('#pencil-mode-menu')!;
+      menu.hidden = !menu.hidden; target.setAttribute('aria-expanded', String(!menu.hidden));
+    }
+    if (action === 'pencil-mode' && (id === 'width' || id === 'darkness')) {
+      this.inkAdjustment = id; this.syncInkControl(); this.rememberBrush();
+      this.closePencilMode(); this.root.querySelector<HTMLButtonElement>('#ink-adjustment')!.focus({ preventScroll: true });
+    }
     if (action === 'pen-thinner' || action === 'pen-thicker') {
       const slider = this.root.querySelector<HTMLInputElement>('#ink-width')!;
       this.setInkValue(Number(slider.value) + Number(slider.step) * (action === 'pen-thinner' ? -1 : 1));
@@ -323,7 +334,6 @@ export class EditorView {
     const el = e.target as HTMLInputElement;
     if (el.id === 'ink-color') this.setColor(el.value);
     if (el.id === 'ink-width') this.setInkValue(Number(el.value));
-    if (el.id === 'ink-adjustment') { this.inkAdjustment = el.value as 'width' | 'darkness'; this.syncInkControl(); this.rememberBrush(); }
     if (el.id === 'finger-drawing') { this.engine.options.fingerDrawing = el.checked; toast(el.checked ? '손가락으로도 필기할 수 있어요.' : '손가락은 이동, S펜은 필기에 사용해요.'); }
     if (el.id === 'samsung-pen-button-toggle') {
       this.engine.options.samsungButtonToggle = el.checked;
@@ -430,6 +440,11 @@ export class EditorView {
     });
     panel.showPopover(); anchor.setAttribute('aria-expanded', 'true');
   }
+  private closePencilMode() {
+    const menu = this.root.querySelector<HTMLElement>('#pencil-mode-menu');
+    if (menu) menu.hidden = true;
+    this.root.querySelector<HTMLButtonElement>('#ink-adjustment')?.setAttribute('aria-expanded', 'false');
+  }
   private syncInkControl() {
     const pencil = this.engine.options.tool === 'pencil', darkness = this.adjustingDarkness, text = this.engine.options.tool === 'text';
     const width = this.engine.options.width, value = text ? this.textEditor.size : darkness ? Math.round(this.engine.options.pencilDarkness * 100) : width;
@@ -443,8 +458,14 @@ export class EditorView {
     this.root.querySelector<HTMLElement>('#width-preview')!.style.height = `${Math.min(16, width)}px`;
     this.root.querySelector<HTMLElement>('#width-preview')!.hidden = pencil || text;
     this.root.querySelector<HTMLElement>('#width-label')!.hidden = pencil || text;
-    const mode = this.root.querySelector<HTMLSelectElement>('#ink-adjustment')!;
-    mode.hidden = !pencil; mode.value = this.inkAdjustment;
+    const picker = this.root.querySelector<HTMLElement>('.pencil-mode-picker')!;
+    picker.hidden = !pencil;
+    if (!pencil) this.closePencilMode();
+    const mode = this.root.querySelector<HTMLButtonElement>('#ink-adjustment')!;
+    const modeName = darkness ? '진하기' : '굵기';
+    mode.querySelector('span')!.textContent = modeName;
+    mode.setAttribute('aria-label', `연필 조절 항목: ${modeName}`);
+    this.root.querySelectorAll<HTMLButtonElement>('[data-action=pencil-mode]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.id === this.inkAdjustment)));
     this.root.querySelector('.pen-width-control')!.classList.toggle('pencil-controls', pencil);
     for (const [action, delta] of [['pen-thinner', -1], ['pen-thicker', 1]] as const) {
       const button = this.root.querySelector<HTMLButtonElement>(`[data-action=${action}]`)!;
@@ -454,6 +475,7 @@ export class EditorView {
     }
   }
   private selectTool(tool: Tool) {
+    this.closePencilMode();
     this.root.querySelector<HTMLElement>('.eraser-picker:popover-open')?.hidePopover();
     this.textEditor.finish();
     this.engine.cancel(); this.engine.clearSelection(); this.engine.options.tool = tool;
@@ -536,6 +558,9 @@ export class EditorView {
     dialog.querySelector<HTMLInputElement>('[name=query]')!.placeholder = '입력한 텍스트 검색';
   }
   private keyboard(e: KeyboardEvent) {
+    if (e.key === 'Escape' && !this.root.querySelector<HTMLElement>('#pencil-mode-menu')?.hidden) {
+      e.preventDefault(); this.closePencilMode(); this.root.querySelector<HTMLButtonElement>('#ink-adjustment')?.focus({ preventScroll: true }); return;
+    }
     if (e.key === 'F5' || (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r') {
       e.preventDefault(); toast('필기 화면에서는 새로고침을 막았어요. 서재로 돌아가거나 설정에서 업데이트해 주세요.'); return;
     }

@@ -14,6 +14,10 @@ async function items(page: Page) {
     db.close(); return pages.find(p => p.noteId === note)?.items || [];
   });
 }
+async function pencilMode(page: Page, mode: 'width' | 'darkness') {
+  await page.getByRole('button', { name: /연필 조절 항목:/ }).click();
+  await page.locator(`[data-action="pencil-mode"][data-id="${mode}"]`).click();
+}
 
 test('each pen restores its last width, color and pencil darkness after switching, typing and reopening', async ({ page }) => {
   await create(page);
@@ -28,7 +32,7 @@ test('each pen restores its last width, color and pencil darkness after switchin
     await page.getByRole('slider', { name: '펜 굵기', exact: true }).fill(String(s.width));
     await page.locator('#ink-color').fill(s.color);
     if (s.tool === 'pencil') {
-      await page.getByRole('combobox', { name: '연필 조절 항목' }).selectOption('darkness');
+      await pencilMode(page, 'darkness');
       await page.getByRole('slider', { name: '연필 진하기' }).fill('45');
     }
   }
@@ -37,12 +41,12 @@ test('each pen restores its last width, color and pencil darkness after switchin
       await page.getByRole('button', { name: s.label, exact: true }).click();
       await expect(page.locator('#ink-color')).toHaveValue(s.color);
       if (s.tool === 'pencil') {
-        await expect(page.getByRole('combobox', { name: '연필 조절 항목' })).toHaveValue('darkness');
+        await expect(page.getByRole('button', { name: '연필 조절 항목: 진하기' })).toBeVisible();
         await expect(page.getByRole('slider', { name: '연필 진하기' })).toHaveValue('45');
-        await page.getByRole('combobox', { name: '연필 조절 항목' }).selectOption('width');
+        await pencilMode(page, 'width');
       }
       await expect(page.getByRole('slider', { name: '펜 굵기', exact: true })).toHaveValue(String(s.width));
-      if (s.tool === 'pencil') await page.getByRole('combobox', { name: '연필 조절 항목' }).selectOption('darkness');
+      if (s.tool === 'pencil') await pencilMode(page, 'darkness');
     }
   };
   await check();
@@ -75,9 +79,9 @@ test('new profiles preserve legacy pencil darkness and switching through the era
     await new Promise<void>(resolve => { const tx = db.transaction('settings', 'readwrite'); tx.objectStore('settings').put({ key: 'pencil-darkness', value: .85 }); tx.oncomplete = () => resolve(); }); db.close();
   });
   await create(page); await page.getByRole('button', { name: '연필', exact: true }).click();
-  await page.getByRole('combobox', { name: '연필 조절 항목' }).selectOption('darkness');
+  await pencilMode(page, 'darkness');
   await expect(page.getByRole('slider', { name: '연필 진하기' })).toHaveValue('85');
-  await page.getByRole('combobox', { name: '연필 조절 항목' }).selectOption('width');
+  await pencilMode(page, 'width');
   await page.getByRole('slider', { name: '펜 굵기', exact: true }).fill('2'); await page.locator('#ink-color').fill('#776655');
   await page.getByRole('button', { name: '지우개', exact: true }).click();
   await page.getByRole('slider', { name: '지우개 크기' }).fill('65');

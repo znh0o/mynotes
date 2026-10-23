@@ -152,7 +152,8 @@ test('ballpoint and pencil stay fixed while fountain responds to pressure and pe
   expect(pressureError.reduce((sum, value) => sum + value, 0) / pressureError.length).toBeLessThan(.05);
   await page.getByRole('button', { name: '실행 취소 (Ctrl+Z)', exact: true }).click();
   await stroke(360, .1); await stroke(410, .9);
-  await page.getByRole('combobox', { name: '연필 조절 항목', exact: true }).selectOption('darkness');
+  await page.getByRole('button', { name: /연필 조절 항목:/ }).click();
+  await page.locator('[data-action="pencil-mode"][data-id="darkness"]').click();
   await page.getByRole('slider', { name: '연필 진하기', exact: true }).fill('25'); await stroke(490, .9);
   await page.getByRole('slider', { name: '연필 진하기', exact: true }).fill('85'); await stroke(540, .1);
   await page.getByRole('button', { name: '연필 진하기 늘리기', exact: true }).click(); await expect(page.locator('#width-value')).toHaveText('90%');
@@ -213,7 +214,8 @@ test('ballpoint and pencil stay fixed while fountain responds to pressure and pe
   await expect(page.locator('#app .page-loading')).toBeHidden();
   await compareGraphite();
   await page.getByRole('button', { name: '연필', exact: true }).click();
-  await page.getByRole('combobox', { name: '연필 조절 항목', exact: true }).selectOption('darkness');
+  await page.getByRole('button', { name: /연필 조절 항목:/ }).click();
+  await page.locator('[data-action="pencil-mode"][data-id="darkness"]').click();
   await expect(page.getByRole('slider', { name: '연필 진하기', exact: true })).toHaveValue('85');
   await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).click();
   await page.getByRole('button', { name: '설정 및 백업', exact: true }).click();

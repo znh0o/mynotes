@@ -86,9 +86,28 @@ html,body,#app,.library-shell,.library-main,.library-content,.modal,.modal-body{
 .ink-toolbar .pen-width-control>output{min-width:25px;font-size:10px}
 .ink-toolbar .pen-width-control input[type=range]{appearance:none;-webkit-appearance:none;width:84px;height:44px;margin:0;background:transparent;cursor:pointer;touch-action:none;flex:none}
 .editor-options{flex:none}
-.pen-width-control #ink-adjustment{height:44px;max-width:63px;border:0;background:transparent;color:#386ac8;font-size:11px;padding:0 2px;cursor:pointer}
+.pencil-mode-picker{position:relative;flex:none}
+.pencil-mode-picker[hidden],.pencil-mode-menu[hidden]{display:none}
+.pencil-mode-trigger{display:flex;align-items:center;justify-content:center;gap:2px;width:64px;height:32px;padding:0 5px;border:1px solid #c8d9fa;border-radius:8px;background:#edf4ff;color:#285dc2;font-size:10px;font-weight:650;white-space:nowrap;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pencil-mode-trigger:hover,.pencil-mode-trigger[aria-expanded=true]{background:#dfeaff;border-color:#9fbef5}
+.pencil-mode-trigger svg{width:13px;flex:none;transition:transform .16s ease}
+.pencil-mode-trigger[aria-expanded=true] svg{transform:rotate(180deg)}
+.pencil-mode-trigger:focus-visible{outline:2px solid #7ea5f2;outline-offset:2px}
+.pencil-mode-menu{position:absolute;z-index:35;top:calc(100% + 7px);left:-7px;display:grid;gap:4px;width:168px;padding:8px;border:1px solid #cbdcf7;border-radius:12px;background:linear-gradient(180deg,#fff,#f8fbff);box-shadow:0 14px 32px #2547792e;color:#365884}
+.pencil-mode-heading{padding:3px 7px 5px;color:#8ba1c0;font-size:9px;font-weight:700;letter-spacing:.4px}
+.pencil-mode-menu button{display:flex;align-items:center;justify-content:space-between;min-height:46px;width:100%;padding:6px 9px;border:1px solid transparent;border-radius:8px;text-align:left;color:#49658c;cursor:pointer}
+.pencil-mode-menu button:hover{background:#f0f5ff}
+.pencil-mode-menu button[aria-pressed=true]{border-color:#c9daf9;background:#eaf2ff;color:#245abc}
+.pencil-mode-menu button span{display:grid;gap:2px}
+.pencil-mode-menu button strong{font-size:11px;font-weight:700}
+.pencil-mode-menu button small{font-size:9px;color:#8298b8}
+.pencil-mode-menu button svg{flex:none;width:15px;opacity:0}
+.pencil-mode-menu button[aria-pressed=true] svg{opacity:1}
+.pen-width-control input[type=range]:focus{outline:none;outline-offset:0}
+.pen-width-control input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 4px #dce9ff,0 2px 7px #5079b04d}
+.pen-width-control input[type=range]:focus-visible::-moz-range-thumb{box-shadow:0 0 0 4px #dce9ff,0 2px 7px #5079b04d}
 .pencil-controls>output{min-width:32px!important}
-@media(max-width:760px){.ink-style-controls:has(.pencil-controls) .color-swatch:nth-child(n+4){display:none}.ink-toolbar .pen-width-control.pencil-controls input[type=range]{width:48px}.pen-width-control #ink-adjustment{max-width:60px}}
+@media(max-width:760px){.ink-style-controls:has(.pencil-controls) .color-swatch:nth-child(n+4){display:none}.ink-toolbar .pen-width-control.pencil-controls input[type=range]{width:48px}}
 .editor-options>.icon-button{color:#5277ae}
 .editor-options>.icon-button[aria-expanded=true]{background:#e2ebff;color:#2d63dc}
 .writing-options-panel{position:fixed;inset:auto 14px auto auto;margin:0;width:290px;max-width:calc(100vw - 28px);max-height:calc(100dvh - 160px);overflow-y:auto;padding:14px 16px;border:1px solid #d5e1f6;border-radius:12px;background:#fff;color:#395478;box-shadow:0 10px 35px #24447826;font-size:12px}

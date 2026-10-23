@@ -6,15 +6,25 @@ test('pencil width and fixed darkness share the existing row on a small screen',
   await expect(page.locator('#paper-live')).toBeVisible(); await expect(page.locator('.page-loading')).toBeHidden();
   const before = (await page.locator('.paper-viewport').boundingBox())!;
   await page.getByRole('button', { name: '연필', exact: true }).click();
-  await page.getByRole('combobox', { name: '연필 조절 항목', exact: true }).selectOption('darkness');
+  const adjustment = page.locator('#ink-adjustment');
+  await adjustment.click();
+  await expect(page.locator('#pencil-mode-menu')).toBeVisible();
+  await expect(page.locator('[data-action="pencil-mode"][data-id="width"]')).toHaveAttribute('aria-pressed', 'true');
+  await page.screenshot({ path: '../MyNotes-pencil-menu.png' });
+  await page.locator('[data-action="pencil-mode"][data-id="darkness"]').click();
+  await expect(adjustment).toHaveAttribute('aria-label', '연필 조절 항목: 진하기');
   await page.getByRole('slider', { name: '연필 진하기', exact: true }).fill('40');
   await expect(page.locator('#width-value')).toHaveText('40%');
-  for (const locator of [page.locator('#ink-adjustment'), page.locator('#ink-width'), page.getByRole('button', { name: '필기 옵션', exact: true })]) {
+  for (const locator of [adjustment, page.locator('#ink-width'), page.getByRole('button', { name: '필기 옵션', exact: true })]) {
     const r = (await locator.boundingBox())!; expect(r.x).toBeGreaterThanOrEqual(0); expect(r.x + r.width).toBeLessThanOrEqual(390);
   }
   expect(await page.locator('.paper-viewport').boundingBox()).toEqual(before);
-  await page.getByRole('combobox', { name: '연필 조절 항목', exact: true }).selectOption('width');
+  await adjustment.click(); await page.keyboard.press('Escape');
+  await expect(page.locator('#pencil-mode-menu')).toBeHidden();
+  await adjustment.click(); await page.locator('[data-action="pencil-mode"][data-id="width"]').click();
   await expect(page.getByRole('slider', { name: '펜 굵기', exact: true })).toHaveValue('3');
+  await page.getByRole('slider', { name: '펜 굵기', exact: true }).click();
+  expect(await page.locator('#ink-width').evaluate(el => getComputedStyle(el).outlineStyle)).toBe('none');
   await page.screenshot({ path: '../MyNotes-pencil-controls.png' });
 });
 
