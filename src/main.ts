@@ -9,6 +9,9 @@ import { finishSlide, slidePreviousView } from './ui/transitions';
 import { escape, icon, modal, pickFile, report, run, toast } from './ui/common';
 import { checkForUpdate, applyWaitingUpdate } from './pwa/updates';
 import { version as appVersion } from '../package.json';
+import { installFastTaps } from './ui/tool-taps';
+
+installFastTaps();
 
 const root = document.querySelector<HTMLElement>('#app')!;
 let library: LibraryView | undefined, editor: EditorView | undefined;

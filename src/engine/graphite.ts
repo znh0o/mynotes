@@ -3,7 +3,9 @@ import type { Point, Stroke } from '../data/model';
 export type XY = { x: number; y: number };
 export interface BrushLayer { opacity: number; polygons: XY[][] }
 export const graphiteSize = 32;
+export const graphiteScale = .7;
 export const graphiteOpacities = [.2, .32, .44, .56, .68, .8, .91, 1];
+export const pencilOpacities = (stroke: Stroke) => stroke.pencilDarkness === undefined ? graphiteOpacities : [stroke.pencilDarkness];
 export const graphiteOffset = (seed = 0) => ({ x: seed & 31, y: seed >>> 8 & 31 });
 const clamp = (p: number) => Math.max(.02, Math.min(1, p));
 const hash = (x: number, y: number) => {
@@ -16,14 +18,17 @@ const hash = (x: number, y: number) => {
 let material: BrushLayer[] | undefined;
 export function graphiteMaterial(): BrushLayer[] {
   if (material) return material;
-  const layers = [0, .18, .45, .72, .9, .98].map(opacity => ({ opacity, polygons: [] as XY[][] }));
+  const base = .68;
+  const layers = [.68, .74, .8, .86, .92, .98].map(opacity => ({ opacity: (opacity - base) / (1 - base), polygons: [] as XY[][] }));
   const corner = (x: number, y: number) => ({ x: (x + (hash(x, y) - .5) * .36) / 2, y: (y + (hash(x + 19, y + 37) - .5) * .36) / 2 });
   for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) {
     const value = hash(Math.floor(x / 2), Math.floor(y / 2)) * .65 + hash(x + 7, y + 23) * .35;
     const level = hash(x + 31, y + 9) < .07 || value < .18 ? 0 : value < .27 ? 1 : value < .36 ? 2 : value < .48 ? 3 : value < .66 ? 4 : 5;
     if (level) layers[level].polygons.push([corner(x, y), corner(x, y + 1), corner(x + 1, y + 1), corner(x + 1, y)]);
   }
-  return material = layers.filter(layer => layer.polygons.length);
+  // A paper-wide graphite base prevents subpixel seams between neighboring
+  // cells from becoming white specks, including in PDF vector rasterizers.
+  return material = [{ opacity: base, polygons: [[{ x: 0, y: 0 }, { x: 0, y: graphiteSize }, { x: graphiteSize, y: graphiteSize }, { x: graphiteSize, y: 0 }]] }, ...layers.filter(layer => layer.polygons.length)];
 }
 
 export function curvePiece(points: Point[], i: number): Point[] {
@@ -39,10 +44,10 @@ export function curvePiece(points: Point[], i: number): Point[] {
   }
   return result;
 }
-export function graphiteBand(points: Point[]) { return Math.min(7, Math.floor(clamp(points.reduce((sum, p) => sum + p.p, 0) / points.length) * 8)); }
-export function ribbon(points: Point[], width: number): XY[][] {
+export function graphiteBand(points: Point[], stroke?: Stroke) { return stroke?.pencilDarkness !== undefined ? 0 : Math.min(7, Math.floor(clamp(points.reduce((sum, p) => sum + p.p, 0) / points.length) * 8)); }
+export function ribbon(points: Point[], width: number, fixed = false): XY[][] {
   const left: XY[] = [], right: XY[] = [];
-  const radius = (p: Point) => width * (.82 + .18 * clamp(p.p)) / 2;
+  const radius = (p: Point) => width * (fixed ? 1 : .82 + .18 * clamp(p.p)) / 2;
   for (let i = 0; i < points.length; i++) {
     const p = points[i], a = points[Math.max(0, i - 1)], b = points[Math.min(points.length - 1, i + 1)];
     const angle = Math.atan2(b.y - a.y, b.x - a.x) + Math.PI / 2, r = radius(p);
@@ -54,8 +59,8 @@ export function ribbon(points: Point[], width: number): XY[][] {
 }
 export function pencilLayers(stroke: Stroke): BrushLayer[] {
   if (!stroke.points.length) return [];
-  const layers = graphiteOpacities.map(opacity => ({ opacity, polygons: [] as XY[][] }));
-  const add = (points: Point[]) => layers[graphiteBand(points)].polygons.push(...ribbon(points, stroke.width));
+  const layers = pencilOpacities(stroke).map(opacity => ({ opacity, polygons: [] as XY[][] }));
+  const add = (points: Point[]) => layers[graphiteBand(points, stroke)].polygons.push(...ribbon(points, stroke.width, stroke.pencilDarkness !== undefined));
   if (stroke.points.length < 3) add(stroke.points);
   else for (let i = 1; i < stroke.points.length; i++) add(curvePiece(stroke.points, i));
   return layers.filter(layer => layer.polygons.length);

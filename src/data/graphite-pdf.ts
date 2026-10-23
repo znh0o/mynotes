@@ -1,6 +1,6 @@
 import { PDFDict, PDFName, PDFOperator, type PDFOperatorNames, type PDFPage, concatTransformationMatrix, pushGraphicsState, popGraphicsState, setGraphicsState, moveTo, lineTo, closePath, fill } from 'pdf-lib';
 import type { Stroke } from './model';
-import { graphiteMaterial, graphiteOffset, graphiteSize, pencilLayers } from '../engine/graphite';
+import { graphiteMaterial, graphiteOffset, graphiteSize, graphiteScale, pencilLayers } from '../engine/graphite';
 
 const patterns = new WeakMap<PDFPage, Map<string, PDFName>>();
 const number = (value: number) => String(Math.round(value * 1000) / 1000);
@@ -18,7 +18,7 @@ export function graphitePDF(page: PDFPage, stroke: Stroke, height: number) {
     });
     const pattern = context.register(context.flateStream(content, { Type: 'Pattern', PatternType: 1, PaintType: 1, TilingType: 1,
       BBox: [0, 0, graphiteSize, graphiteSize], XStep: graphiteSize, YStep: graphiteSize,
-      Matrix: [1, 0, 0, -1, offset.x, height - offset.y], Resources: { ExtGState: ext } }));
+      Matrix: [graphiteScale, 0, 0, -graphiteScale, offset.x, height - offset.y], Resources: { ExtGState: ext } }));
     const resources = page.node.normalizedEntries().Resources;
     let dictionary = resources.lookupMaybe(PDFName.of('Pattern'), PDFDict);
     if (!dictionary) { dictionary = context.obj({}); resources.set(PDFName.of('Pattern'), dictionary); }

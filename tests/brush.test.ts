@@ -30,4 +30,18 @@ describe('versioned brush geometry', () => {
     const heavy = brushLayers({ ...pencil, points: pencil.points.map(p => ({ ...p, p: .9 })) });
     expect(heavy[0].opacity).toBeGreaterThan(light[0].opacity * 2);
   });
+  it('fixes new pencil width and darkness independently of pressure', () => {
+    const fixed = { ...pencil, pressure: false, pencilDarkness: .7 };
+    const light = brushLayers({ ...fixed, points: fixed.points.map(p => ({ ...p, p: .1 })) });
+    const heavy = brushLayers({ ...fixed, points: fixed.points.map(p => ({ ...p, p: .9 })) });
+    expect(light).toEqual(heavy);
+    const darker = brushLayers({ ...fixed, pencilDarkness: .9 });
+    expect(darker[0].polygons).toEqual(light[0].polygons);
+    expect(darker[0].opacity).toBe(.9);
+  });
+  it('keeps paper texture fine and low in contrast without empty white cells', () => {
+    const [base, ...grains] = graphiteMaterial();
+    expect(base.opacity).toBeGreaterThanOrEqual(.65);
+    expect((1 - base.opacity) * Math.max(...grains.map(layer => layer.opacity))).toBeLessThan(.32);
+  });
 });

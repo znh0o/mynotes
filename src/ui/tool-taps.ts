@@ -1,34 +1,38 @@
-// Tablet browsers can delay or omit the compatibility click after stylus use.
-// Activate completed pen/touch taps directly, while preserving horizontal drags
-// and suppressing the later click so undo, toggles, etc. only execute once.
-export function bindToolTaps(root: HTMLElement, activate: (event: PointerEvent) => void, signal: AbortSignal) {
-  const selector = 'button[data-action]';
-  let tap: { pointer: number; button: HTMLButtonElement; x: number; y: number } | null = null;
-  let consumed: { button: HTMLButtonElement; time: number }[] = [];
+// Normalize completed stylus/touch taps, including dialogs, form submit and
+// menus. The native click path keeps every button's actual action intact.
+export function installFastTaps(root: Document = document) {
+  type Tap = { pointer: number; type: string; button: HTMLButtonElement; x: number; y: number; time: number };
+  let tap: Tap | null = null, consumed: Tap[] = [];
+  const buttonAt = (event: Event) => event.target instanceof Element ? event.target.closest<HTMLButtonElement>('button') : null;
   root.addEventListener('pointerdown', event => {
-    if (event.pointerType !== 'pen' && event.pointerType !== 'touch') return;
-    const button = (event.target as Element).closest<HTMLButtonElement>(selector);
-    if (!button || button.disabled || event.button !== 0) return;
-    tap = { pointer: event.pointerId, button, x: event.clientX, y: event.clientY };
-  }, { signal });
+    if (event.pointerType === 'mouse') { consumed = []; return; }
+    if (!['pen', 'touch'].includes(event.pointerType) || event.button !== 0) return;
+    const button = buttonAt(event);
+    if (!button || button.disabled || button.closest('[inert]')) return;
+    tap = { pointer: event.pointerId, type: event.pointerType, button, x: event.clientX, y: event.clientY, time: performance.now() };
+  }, { capture: true });
   root.addEventListener('pointermove', event => {
-    if (tap?.pointer === event.pointerId && Math.hypot(event.clientX - tap.x, event.clientY - tap.y) > 10) tap = null;
-  }, { signal });
-  root.addEventListener('pointercancel', event => { if (tap?.pointer === event.pointerId) tap = null; }, { signal });
+    if (tap?.pointer === event.pointerId && Math.hypot(event.clientX - tap.x, event.clientY - tap.y) > 14) tap = null;
+  }, { capture: true });
+  root.addEventListener('pointercancel', event => { if (tap?.pointer === event.pointerId) tap = null; }, { capture: true });
   root.addEventListener('pointerup', event => {
     if (tap?.pointer !== event.pointerId) return;
-    const target = (event.target as Element).closest<HTMLButtonElement>(selector), current = tap; tap = null;
-    if (target !== current.button || target.disabled || Math.hypot(event.clientX - current.x, event.clientY - current.y) > 10) return;
+    const current = tap; tap = null;
+    if (buttonAt(event) !== current.button || current.button.disabled || !current.button.isConnected || Math.hypot(event.clientX - current.x, event.clientY - current.y) > 14) return;
     event.preventDefault();
     const now = performance.now(); consumed = consumed.filter(tap => now - tap.time < 700);
-    consumed.push({ button: target, time: now }); activate(event);
-  }, { signal });
+    consumed.push({ ...current, x: event.clientX, y: event.clientY, time: now });
+    current.button.click();
+  }, { capture: true });
   root.addEventListener('click', event => {
-    if (event.detail === 0) return;
+    if (event.detail === 0) return; // Programmatic, keyboard and assistive activation.
     const now = performance.now(); consumed = consumed.filter(tap => now - tap.time < 700);
-    const button = (event.target as Element).closest(selector), index = consumed.findIndex(tap => tap.button === button);
+    const target = buttonAt(event);
+    const index = consumed.findIndex(tap => {
+      return target === tap.button || Math.hypot(event.clientX - tap.x, event.clientY - tap.y) < 20;
+    });
     if (index !== -1) {
       event.preventDefault(); event.stopImmediatePropagation(); consumed.splice(index, 1);
     }
-  }, { signal, capture: true });
+  }, { capture: true });
 }

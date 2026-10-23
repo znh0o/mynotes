@@ -5,7 +5,7 @@ export interface Point { x: number; y: number; p: number; t: number }
 export interface Stroke {
   id: string; kind: 'stroke'; tool: 'pen' | 'fountain' | 'pencil' | 'highlighter';
   color: string; width: number; pressure: boolean; points: Point[];
-  brushVersion?: 2; textureSeed?: number;
+  brushVersion?: 2; textureSeed?: number; pencilDarkness?: number;
 }
 export interface ShapeItem {
   id: string; kind: 'shape'; shape: Shape; x: number; y: number; w: number; h: number;

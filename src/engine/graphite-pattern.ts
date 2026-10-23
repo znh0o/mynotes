@@ -1,4 +1,4 @@
-import { graphiteMaterial, graphiteOffset, graphiteSize } from './graphite';
+import { graphiteMaterial, graphiteOffset, graphiteSize, graphiteScale } from './graphite';
 
 const sources = new Map<string, HTMLCanvasElement>();
 const patterns = new WeakMap<CanvasRenderingContext2D, Map<string, CanvasPattern>>();
@@ -23,6 +23,6 @@ export function graphitePattern(ctx: CanvasRenderingContext2D, color: string, se
     cache.set(color, pattern);
   }
   const offset = graphiteOffset(seed);
-  pattern.setTransform(new DOMMatrix([.25, 0, 0, .25, offset.x, offset.y]));
+  pattern.setTransform(new DOMMatrix([.25 * graphiteScale, 0, 0, .25 * graphiteScale, offset.x, offset.y]));
   return pattern;
 }

@@ -29,10 +29,12 @@ test('pencil PDF preserves the paper grain and its position', async ({ page, con
   console.log('graphite PDF pixels', JSON.stringify({ error, beforeMean, afterMean, correlation }));
   // PDF.js rasterizes the vector tile at the viewing scale; Canvas samples a
   // supersampled tile. Allow their edge coverage to differ, while requiring
-  // aligned paper pits, comparable darkness and visible graphite contrast.
-  expect(after.length).toBe(before.length); expect(error).toBeLessThan(40);
-  expect(Math.abs(afterMean - beforeMean)).toBeLessThan(20); expect(correlation).toBeGreaterThan(.75);
-  expect(Math.max(...after) - Math.min(...after)).toBeGreaterThan(100);
+  // comparable darkness and correlated fine texture. The soft material has
+  // much less contrast, so differences in subpixel sampling affect correlation.
+  expect(after.length).toBe(before.length); expect(error).toBeLessThan(15);
+  expect(Math.abs(afterMean - beforeMean)).toBeLessThan(8); expect(correlation).toBeGreaterThan(.5);
+  expect(Math.max(...after) - Math.min(...after)).toBeGreaterThan(10);
+  expect(Math.max(...after) - Math.min(...after)).toBeLessThan(100);
   await cdp.detach();
 });
 
@@ -114,7 +116,7 @@ test('live ballpoint, marker, shape and thin pencil stay connected after lasso s
   await cdp.detach();
 });
 
-test('ballpoint stays constant, fountain responds to pressure and pencil has stable graphite texture', async ({ page, context }) => {
+test('ballpoint and pencil stay fixed while fountain responds to pressure and pencil darkness is adjustable', async ({ page, context }) => {
   await page.goto('./'); await page.getByRole('button', { name: '새 노트', exact: true }).click();
   await page.locator('[name=title]').fill('세 가지 필기 도구'); await page.locator('.paper-options label').filter({ hasText: '무지' }).click();
   await page.getByRole('button', { name: '노트 만들기', exact: true }).click(); await expect(page.locator('#app .page-loading')).toBeHidden();
@@ -130,9 +132,14 @@ test('ballpoint stays constant, fountain responds to pressure and pencil has sta
   await stroke(100, .1); await stroke(150, .9);
   await page.getByRole('button', { name: '만년필', exact: true }).click(); await stroke(230, .1); await stroke(280, .9);
   await page.getByRole('button', { name: '연필', exact: true }).click(); await stroke(360, .1); await stroke(410, .9);
+  await page.getByRole('combobox', { name: '연필 조절 항목', exact: true }).selectOption('darkness');
+  await page.getByRole('slider', { name: '연필 진하기', exact: true }).fill('25'); await stroke(490, .9);
+  await page.getByRole('slider', { name: '연필 진하기', exact: true }).fill('85'); await stroke(540, .1);
+  await page.getByRole('button', { name: '연필 진하기 늘리기', exact: true }).click(); await expect(page.locator('#width-value')).toHaveText('90%');
+  await page.getByRole('button', { name: '연필 진하기 줄이기', exact: true }).click(); await expect(page.locator('#width-value')).toHaveText('85%');
   const measured = await page.locator('#paper-ink').evaluate((canvas: HTMLCanvasElement) => {
     const ctx = canvas.getContext('2d')!, scale = canvas.width / 794;
-    return [100, 150, 230, 280, 360, 410].map(y => {
+    return [100, 150, 230, 280, 360, 410, 490, 540].map(y => {
       const data = ctx.getImageData(Math.round(160 * scale), Math.floor((y - 14) * scale), Math.ceil(100 * scale), Math.ceil(28 * scale));
       const alphas: number[] = [];
       for (let i = 3; i < data.data.length; i += 4) alphas.push(data.data[i]);
@@ -143,27 +150,31 @@ test('ballpoint stays constant, fountain responds to pressure and pencil has sta
   // Integrated alpha avoids a one-pixel threshold difference from subpixel Y.
   expect(measured[1].mass / measured[0].mass).toBeCloseTo(1, 1);
   expect(measured[3].area).toBeGreaterThan(measured[2].area * 2.5);
-  expect(measured[5].mass).toBeGreaterThan(measured[4].mass * 1.5);
+  expect(measured[5].mass / measured[4].mass).toBeCloseTo(1, 1);
+  expect(measured[7].mass).toBeGreaterThan(measured[6].mass * 2.8);
   expect(measured[5].max).toBeLessThan(255); expect(measured[5].shades).toBeGreaterThan(12);
-  // Measure inside the line, excluding edge antialiasing. A faded solid pen
-  // cannot produce both paper pits and dark graphite in this central strip.
+  // Texture remains visible, with a bounded contrast inside the line and no
+  // white flecks. Exclude edge antialiasing from this material measurement.
   const graphite = await page.locator('#paper-ink').evaluate((canvas: HTMLCanvasElement) => {
     const scale = canvas.width / 794, pixels = canvas.getContext('2d')!.getImageData(Math.round(160 * scale), Math.round(408 * scale), Math.round(100 * scale), Math.round(4 * scale)).data;
     const alpha = Array.from({ length: pixels.length / 4 }, (_, i) => pixels[i * 4 + 3]);
-    return { pits: alpha.filter(a => a < 80).length / alpha.length, graphite: alpha.filter(a => a > 180).length / alpha.length };
+    const mean = alpha.reduce((sum, a) => sum + a, 0) / alpha.length;
+    return { low: Math.min(...alpha), variation: Math.sqrt(alpha.reduce((sum, a) => sum + (a - mean) ** 2, 0) / alpha.length) };
   });
-  expect(graphite.pits).toBeGreaterThan(.04); expect(graphite.graphite).toBeGreaterThan(.15);
+  expect(graphite.low).toBeGreaterThan(90); expect(graphite.variation).toBeGreaterThan(3); expect(graphite.variation).toBeLessThan(25);
   const readStrokes = () => page.evaluate(async () => {
     const noteId = document.querySelector<HTMLElement>('.note-tab.active [data-action=tab]')!.dataset.id;
     const db = await new Promise<IDBDatabase>(resolve => { const r = indexedDB.open('mynotes-v1'); r.onsuccess = () => resolve(r.result); });
     const pages = await new Promise<any[]>(resolve => { const r = db.transaction('pages').objectStore('pages').getAll(); r.onsuccess = () => resolve(r.result); });
     db.close(); return pages.find(p => p.noteId === noteId)?.items || [];
   });
-  await expect.poll(async () => (await readStrokes()).length).toBe(6);
+  await expect.poll(async () => (await readStrokes()).length).toBe(8);
   const saved = await readStrokes();
-  expect(saved.map((s: any) => s.tool)).toEqual(['pen', 'pen', 'fountain', 'fountain', 'pencil', 'pencil']);
+  expect(saved.map((s: any) => s.tool)).toEqual(['pen', 'pen', 'fountain', 'fountain', 'pencil', 'pencil', 'pencil', 'pencil']);
   expect(saved.slice(0, 2).every((s: any) => s.pressure === false)).toBe(true);
-  expect(saved.slice(2).every((s: any) => s.pressure === true && s.brushVersion === 2)).toBe(true);
+  expect(saved.slice(2, 4).every((s: any) => s.pressure === true && s.brushVersion === 2)).toBe(true);
+  expect(saved.slice(4).every((s: any) => s.pressure === false)).toBe(true);
+  expect(saved.slice(4).map((s: any) => s.pencilDarkness)).toEqual([.7, .7, .25, .85]);
   const fingerprint = () => page.locator('#paper-ink').evaluate((canvas: HTMLCanvasElement) => {
     const scale = canvas.width / 794;
     const pixels = canvas.getContext('2d')!.getImageData(Math.floor(90 * scale), Math.floor(345 * scale), Math.ceil(240 * scale), Math.ceil(80 * scale)).data;
@@ -180,6 +191,9 @@ test('ballpoint stays constant, fountain responds to pressure and pencil has sta
   await page.reload(); await page.getByRole('button', { name: '세 가지 필기 도구 열기', exact: true }).click();
   await expect(page.locator('#app .page-loading')).toBeHidden();
   await compareGraphite();
+  await page.getByRole('button', { name: '연필', exact: true }).click();
+  await page.getByRole('combobox', { name: '연필 조절 항목', exact: true }).selectOption('darkness');
+  await expect(page.getByRole('slider', { name: '연필 진하기', exact: true })).toHaveValue('85');
   await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).click();
   await page.getByRole('button', { name: '설정 및 백업', exact: true }).click();
   const download = page.waitForEvent('download'); await page.getByRole('button', { name: '전체 백업', exact: true }).click();

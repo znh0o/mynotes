@@ -3,16 +3,16 @@ import { graphitePattern } from './graphite-pattern';
 export { smooth } from './brush';
 import type { Item, Page, Stroke } from '../data/model';
 export const imageCache = new Map<string, HTMLImageElement>();
-interface CachedBrush { width: number; seed?: number; tool: Stroke['tool']; points: Float64Array; layers: { opacity: number; path: Path2D }[] }
+interface CachedBrush { width: number; seed?: number; darkness?: number; tool: Stroke['tool']; points: Float64Array; layers: { opacity: number; path: Path2D }[] }
 const brushCache = new WeakMap<Stroke, CachedBrush>();
 export function rememberBrush(stroke: Stroke, layers: CachedBrush['layers']) {
   const points = new Float64Array(stroke.points.length * 3);
   stroke.points.forEach((point, i) => { points[i * 3] = point.x; points[i * 3 + 1] = point.y; points[i * 3 + 2] = point.p; });
-  brushCache.set(stroke, { width: stroke.width, seed: stroke.textureSeed, tool: stroke.tool, points, layers });
+  brushCache.set(stroke, { width: stroke.width, seed: stroke.textureSeed, darkness: stroke.pencilDarkness, tool: stroke.tool, points, layers });
 }
 function brushPaths(stroke: Stroke) {
   const previous = brushCache.get(stroke);
-  if (previous && previous.width === stroke.width && previous.seed === stroke.textureSeed && previous.tool === stroke.tool && previous.points.length === stroke.points.length * 3 &&
+  if (previous && previous.width === stroke.width && previous.seed === stroke.textureSeed && previous.darkness === stroke.pencilDarkness && previous.tool === stroke.tool && previous.points.length === stroke.points.length * 3 &&
     stroke.points.every((point, i) => previous.points[i * 3] === point.x && previous.points[i * 3 + 1] === point.y && previous.points[i * 3 + 2] === point.p)) return previous.layers;
   const layers = brushLayers(stroke).map(layer => {
     const path = new Path2D();

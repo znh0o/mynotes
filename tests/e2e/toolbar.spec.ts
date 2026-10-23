@@ -1,5 +1,23 @@
 import { test, expect } from '@playwright/test';
 
+test('pencil width and fixed darkness share the existing row on a small screen', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 }); await page.goto('./');
+  await page.getByRole('button', { name: '새 노트', exact: true }).click(); await page.getByRole('button', { name: '노트 만들기', exact: true }).click();
+  await expect(page.locator('#paper-live')).toBeVisible(); await expect(page.locator('.page-loading')).toBeHidden();
+  const before = (await page.locator('.paper-viewport').boundingBox())!;
+  await page.getByRole('button', { name: '연필', exact: true }).click();
+  await page.getByRole('combobox', { name: '연필 조절 항목', exact: true }).selectOption('darkness');
+  await page.getByRole('slider', { name: '연필 진하기', exact: true }).fill('40');
+  await expect(page.locator('#width-value')).toHaveText('40%');
+  for (const locator of [page.locator('#ink-adjustment'), page.locator('#ink-width'), page.getByRole('button', { name: '필기 옵션', exact: true })]) {
+    const r = (await locator.boundingBox())!; expect(r.x).toBeGreaterThanOrEqual(0); expect(r.x + r.width).toBeLessThanOrEqual(390);
+  }
+  expect(await page.locator('.paper-viewport').boundingBox()).toEqual(before);
+  await page.getByRole('combobox', { name: '연필 조절 항목', exact: true }).selectOption('width');
+  await expect(page.getByRole('slider', { name: '펜 굵기', exact: true })).toHaveValue('3');
+  await page.screenshot({ path: '../MyNotes-pencil-controls.png' });
+});
+
 test('writing options preserve canvas space and keep finger, paper and tool settings accessible', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 800 }); await page.goto('./');
   await page.getByRole('button', { name: '새 노트', exact: true }).click();

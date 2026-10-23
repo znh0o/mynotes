@@ -2,7 +2,6 @@ import { db, persistNew, deletePermanently } from '../data/store';
 import { covers, createNote, paperNames, uid, type Folder, type Note, type Paper } from '../data/model';
 import { importPDF, thumbnail } from '../data/pdf';
 import { icon, button, escape, safeColor, modal, toast, run, pickFile, contextMenu, confirmAction, formatDate } from './common';
-import { bindToolTaps } from './tool-taps';
 export interface LibraryState { filter: string; query: string; sort: string; list: boolean }
 
 export class LibraryView {
@@ -17,7 +16,6 @@ export class LibraryView {
   constructor(private root: HTMLElement, private openNote: (id: string) => Promise<void>, private settings: () => void,
     private navigateFilter: (filter: string) => Promise<void> = async filter => this.setFilter(filter), initial?: LibraryState) {
     if (initial) { this.filter = initial.filter; this.query = initial.query; this.sort = initial.sort; this.list = initial.list; }
-    bindToolTaps(root, e => this.click(e), this.abort.signal);
     root.addEventListener('click', e => this.click(e), { signal: this.abort.signal });
     root.addEventListener('input', e => {
       const el = e.target as HTMLInputElement;

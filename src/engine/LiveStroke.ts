@@ -1,5 +1,5 @@
 import type { Point, Stroke } from '../data/model';
-import { curvePiece, graphiteBand, graphiteOpacities, ribbon, type XY } from './graphite';
+import { curvePiece, graphiteBand, pencilOpacities, ribbon, type XY } from './graphite';
 import { graphitePattern } from './graphite-pattern';
 import { rememberBrush } from './render';
 
@@ -20,7 +20,7 @@ export class LiveStroke {
   private next = 1;
   private tail: Point[] = [];
   reset() { this.stroke = undefined; this.paths = []; this.chunks = []; this.tail = []; this.next = 1; }
-  private empty() { return Array.from({ length: this.stroke!.tool === 'pencil' ? 8 : 1 }, () => new Path2D()); }
+  private empty() { return Array.from({ length: this.stroke!.tool === 'pencil' ? pencilOpacities(this.stroke!).length : 1 }, () => new Path2D()); }
   draw(ctx: CanvasRenderingContext2D, stroke: Stroke, ratio: number) {
     if (!['pencil', 'pen', 'highlighter'].includes(stroke.tool) || stroke.tool === 'pen' && stroke.pressure) return false;
     if (this.stroke !== stroke) {
@@ -31,7 +31,7 @@ export class LiveStroke {
     this.tail.forEach(visit);
     const add = (paths: Path2D[], points: Point[]) => {
       points.forEach(visit);
-      if (stroke.tool === 'pencil') append(paths[graphiteBand(points)], ribbon(points, stroke.width));
+      if (stroke.tool === 'pencil') append(paths[graphiteBand(points, stroke)], ribbon(points, stroke.width, stroke.pencilDarkness !== undefined));
       else points.slice(1).forEach(p => paths[0].lineTo(p.x, p.y));
     };
     while (this.next < stroke.points.length - 1) {
@@ -64,7 +64,7 @@ export class LiveStroke {
     ctx.save(); ctx.setLineDash([]); ctx.lineDashOffset = 0;
     if (stroke.tool === 'pencil') {
       ctx.fillStyle = graphitePattern(ctx, stroke.color, stroke.textureSeed);
-      this.paths.forEach((path, i) => { ctx.globalAlpha = graphiteOpacities[i]; ctx.fill(path); });
+      this.paths.forEach((path, i) => { ctx.globalAlpha = pencilOpacities(stroke)[i]; ctx.fill(path); });
     } else {
       ctx.globalAlpha = stroke.tool === 'highlighter' ? .32 : 1;
       ctx.strokeStyle = ctx.fillStyle = stroke.color; ctx.lineWidth = stroke.width; ctx.lineCap = ctx.lineJoin = 'round';
@@ -78,8 +78,8 @@ export class LiveStroke {
     if (stroke.tool === 'pencil') {
       const paths = this.empty();
       for (const chunk of this.chunks) chunk.paths.forEach((path, i) => paths[i].addPath(path));
-      append(paths[graphiteBand(this.tail)], ribbon(this.tail, stroke.width));
-      rememberBrush(stroke, paths.map((path, i) => ({ path, opacity: graphiteOpacities[i] })));
+      append(paths[graphiteBand(this.tail, stroke)], ribbon(this.tail, stroke.width, stroke.pencilDarkness !== undefined));
+      rememberBrush(stroke, paths.map((path, i) => ({ path, opacity: pencilOpacities(stroke)[i] })));
     }
     return true;
   }
