@@ -1,0 +1,29 @@
+.install-page{min-height:100dvh;overflow:hidden;background:#fafbfd;color:#172b4d;font-family:Inter,"Segoe UI","Malgun Gothic",sans-serif}
+.install-header{height:108px;max-width:1440px;margin:auto;padding:18px clamp(28px,6.5vw,94px);display:flex;align-items:center}
+.install-header img{display:block;width:158px;height:60px;object-fit:contain;object-position:left center;mix-blend-mode:multiply}
+.install-main{max-width:1440px;min-height:calc(100dvh - 108px);margin:auto;padding:30px clamp(28px,6.5vw,94px) 85px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.03fr);align-items:center;gap:clamp(20px,3vw,65px)}
+.install-copy{position:relative;z-index:2;max-width:590px;padding-bottom:36px}
+.install-kicker{display:flex;align-items:center;gap:12px;margin-bottom:30px;color:#4774c6;font-size:13px;font-weight:650;letter-spacing:.13em}
+.install-kicker-line{width:26px;height:1px;background:#4774c6}
+.install-copy h1{font-size:clamp(44px,4.35vw,70px);line-height:1.2;letter-spacing:-.065em;font-weight:700;word-break:keep-all}
+.install-copy h1 em{font-style:normal;color:#4776db}
+.install-description{max-width:490px;margin:28px 0 37px;color:#63718b;font-size:16px;line-height:1.9;word-break:keep-all}
+.install-cta{height:58px;min-width:238px;display:inline-flex;align-items:center;justify-content:space-between;gap:27px;padding:0 22px 0 27px;border:1px solid #2d61c4;border-radius:13px;background:#3167cd;color:#fff;font-size:16px;font-weight:650;box-shadow:0 13px 25px #2b5bc82c;transition:transform .15s,background .15s,box-shadow .15s}
+.install-cta:hover{transform:translateY(-2px);background:#2359c1;box-shadow:0 17px 30px #2b5bc838}.install-cta:active{transform:translateY(0)}
+.install-cta svg{width:20px;height:20px}
+.install-caption{margin-top:17px;color:#8290a7;font-size:12px;line-height:1.6}
+.install-manual{max-width:510px;margin-top:28px;padding-top:18px;border-top:1px solid #e4eaf3;color:#8290a6;font-size:12px;line-height:1.8;word-break:keep-all;transition:color .2s,border-color .2s}
+.install-manual-emphasis{color:#315da9;border-color:#a8c0ed}
+.install-visual{position:relative;min-height:620px;height:min(70vw,710px);display:grid;place-items:center;isolation:isolate}
+.install-orbit{position:absolute;width:min(100%,610px);aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 44% 43%,#f0f4ff 0,#e7efff 55%,#edf2fb 72%,transparent 73%);transform:translate(18px,-8px);z-index:-2}
+.install-note-shadow{position:absolute;width:68%;height:68%;max-height:560px;transform:rotate(9deg) translate(44px,8px);border:1px solid #dae4f4;border-radius:13px;background:#e8effb;box-shadow:0 24px 55px #667fa520}
+.install-note{position:relative;width:69%;height:70%;max-height:560px;transform:rotate(-8deg) translate(-6px,-10px);border:1px solid #e3e9f2;border-radius:12px;background:#fff;box-shadow:0 28px 60px #60769c2c,0 3px 8px #6a7f9a15;overflow:hidden}
+.install-note-header{height:55px;display:flex;gap:8px;align-items:center;padding:0 27px;border-bottom:1px solid #ecf0f5}.install-note-header span{width:6px;height:6px;border-radius:50%;background:#cfdbec}.install-note-header span:first-child{background:#6b91dc}
+.install-note-rule{position:absolute;top:55px;bottom:0;left:15%;border-left:1px solid #f2e1e0}
+.install-note-lines{position:absolute;inset:100px 27px 20px 27px;display:grid;grid-template-rows:repeat(3,1fr);pointer-events:none}.install-note-lines i{border-bottom:1px solid #e7edf5;background:repeating-linear-gradient(to bottom,transparent 0,transparent 42px,#edf1f6 43px,#edf1f6 44px)}
+.install-ink{position:absolute;left:15%;top:32%;width:77%;height:auto;z-index:1;filter:drop-shadow(0 1px 0 #19315422)}
+.install-stylus{position:absolute;left:13%;bottom:18%;width:55%;height:16px;border-radius:20px;background:linear-gradient(180deg,#27466f 0,#152e54 42%,#102947 76%,#546f92 100%);box-shadow:0 10px 15px #20395e38;transform:rotate(-36deg);transform-origin:right center;z-index:3}
+.install-stylus:before{content:"";position:absolute;left:-32px;top:1px;border-top:7px solid transparent;border-bottom:7px solid transparent;border-right:33px solid #172f50}.install-stylus:after{content:"";position:absolute;right:12%;top:2px;width:2px;height:12px;background:#ffffff5c}
+@media(max-width:900px){.install-header{height:85px;padding-top:10px;padding-bottom:10px}.install-main{min-height:calc(100dvh - 85px);padding-top:18px;grid-template-columns:1fr 1fr;gap:10px}.install-copy h1{font-size:clamp(36px,5vw,56px)}.install-description{font-size:14px}.install-visual{min-height:470px;height:62vw}}
+@media(max-width:700px){.install-page{overflow:auto}.install-header{height:80px;padding:10px 27px}.install-header img{width:144px;height:55px}.install-main{min-height:calc(100dvh - 80px);padding:45px 27px 60px;display:flex;flex-direction:column;align-items:stretch;gap:0}.install-copy{padding:0}.install-kicker{font-size:10px;margin-bottom:20px}.install-copy h1{font-size:clamp(39px,9vw,58px)}.install-description{margin:24px 0 30px;font-size:14px}.install-cta{height:54px;min-width:220px;font-size:14px}.install-manual{margin-top:25px}.install-visual{width:100%;min-height:350px;height:65vw;max-height:470px;margin-top:24px}.install-note{width:59%;height:84%}.install-note-shadow{width:59%;height:81%}.install-stylus{bottom:16%}}
+@media(max-width:400px){.install-main{padding-top:30px}.install-copy h1{font-size:39px}.install-visual{min-height:300px}}

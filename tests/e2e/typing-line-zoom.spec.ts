@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, emulateStandalone, type Page } from './standalone-test';
 import { selectPen } from './helpers';
 import { PDFDocument, PDFName, PDFRawStream } from 'pdf-lib';
 import { readFile } from 'node:fs/promises';
@@ -142,6 +142,7 @@ test('holding a pen straightens the live stroke before release and lets the endp
 
 test('mobile home stays at device scale while the paper keeps its own pinch zoom', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 800, height: 1000 }, isMobile: true, hasTouch: true });
+  await emulateStandalone(context);
   const page = await context.newPage(); await page.goto('./'); await expect(page.locator('h1')).toBeVisible();
   // Exercise the event guard with viewport zoom allowed, like a browser that
   // overrides the maximum-scale restriction. Single-finger scrolling survives.

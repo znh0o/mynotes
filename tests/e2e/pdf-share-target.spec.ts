@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './standalone-test';
 import { PDFDocument } from 'pdf-lib';
 
 test('an installed PWA receives a shared PDF and opens it as a note', async ({ page }) => {

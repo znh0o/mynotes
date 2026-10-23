@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './standalone-test';
 test.use({ hasTouch: true });
 
 for (const pointer of ['pen', 'touch'] as const) test(`every button path responds to a short ${pointer} tap without native compatibility clicks`, async ({ page, context }) => {

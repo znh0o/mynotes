@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './standalone-test';
 import { selectPen, setInkColor } from './helpers';
 
 async function create(page: Page) {
@@ -64,7 +64,7 @@ test('each pen restores its last width, color and pencil darkness after switchin
   }
   await expect.poll(async () => (await items(page)).length).toBe(4);
   const strokes = await items(page);
-  settings.forEach((s, index) => expect(strokes[index]).toMatchObject({ tool: s.tool, color: s.color, width: s.tool === 'highlighter' ? 40 : s.width }));
+  settings.forEach((s, index) => expect(strokes[index]).toMatchObject({ tool: s.tool, color: s.color, width: s.width }));
   expect(strokes[2].pencilDarkness).toBe(.45);
   await page.getByRole('button', { name: '텍스트', exact: true }).click();
   await page.getByRole('slider', { name: '글자 크기', exact: true }).fill('32'); await setInkColor(page, '#aa1122');
@@ -97,4 +97,29 @@ test('new profiles preserve legacy pencil darkness and switching through the era
   await page.getByRole('button', { name: '지우개', exact: true }).click();
   await expect(page.getByRole('slider', { name: '지우개 크기' })).toHaveValue('65');
   await expect(page.getByRole('button', { name: '펜 지우개', exact: true })).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('highlighter width has its own thinner, capped range', async ({ page }) => {
+  await create(page);
+  await selectPen(page, '볼펜');
+  await page.getByRole('slider', { name: '펜 굵기', exact: true }).fill('2.5');
+  await page.getByRole('button', { name: '형광펜', exact: true }).click();
+  const slider = page.getByRole('slider', { name: '펜 굵기', exact: true });
+  await expect(slider).toHaveAttribute('min', '4');
+  await expect(slider).toHaveAttribute('max', '32');
+  await slider.fill('4');
+  const r = (await page.locator('#paper-live').boundingBox())!;
+  await page.mouse.move(r.x + 120, r.y + 210); await page.mouse.down();
+  await page.mouse.move(r.x + 250, r.y + 210, { steps: 6 }); await page.mouse.up();
+  await expect.poll(async () => (await items(page)).length).toBe(1);
+  expect((await items(page))[0].width).toBe(4);
+  await slider.fill('32');
+  await page.mouse.move(r.x + 120, r.y + 260); await page.mouse.down();
+  await page.mouse.move(r.x + 250, r.y + 260, { steps: 6 }); await page.mouse.up();
+  await expect.poll(async () => (await items(page)).length).toBe(2);
+  expect((await items(page))[1].width).toBe(32);
+  await selectPen(page, '볼펜');
+  await expect(page.getByRole('slider', { name: '펜 굵기', exact: true })).toHaveValue('2.5');
+  await page.getByRole('button', { name: '형광펜', exact: true }).click();
+  await expect(slider).toHaveValue('32');
 });

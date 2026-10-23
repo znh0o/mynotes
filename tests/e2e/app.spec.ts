@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './standalone-test';
 import { selectPen } from './helpers';
 import { PDFDocument, PDFRawStream, PDFName, StandardFonts, rgb } from 'pdf-lib';
 import { readFile } from 'node:fs/promises';
@@ -119,7 +119,9 @@ test('shape, lasso move/resize/copy/delete, partial eraser and zoom coordinates'
   const current = async () => (await records(page, 'pages')).find(p => p.noteId === testNote.id);
   const rect = await page.locator('#paper-live').boundingBox();
   const draw = async (x1: number, y1: number, x2: number, y2: number) => { await page.mouse.move(rect!.x + x1, rect!.y + y1); await page.mouse.down(); await page.mouse.move(rect!.x + x2, rect!.y + y2, { steps: 15 }); await page.mouse.up(); };
-  await page.getByRole('button', { name: '도형', exact: true }).click(); await draw(180, 170, 340, 280);
+  await page.getByRole('button', { name: '도형', exact: true }).click();
+  await page.getByRole('dialog', { name: '도형 선택' }).getByRole('button', { name: '사각형' }).click();
+  await draw(180, 170, 340, 280);
   await expect.poll(async () => (await current())?.items.length).toBe(1);
   expect((await current()).items[0].kind).toBe('shape');
   const original = (await current()).items[0];
@@ -146,6 +148,7 @@ test('shape, lasso move/resize/copy/delete, partial eraser and zoom coordinates'
   await page.getByRole('button', { name: '확대', exact: true }).click();
   const zoomRect = await page.locator('#paper-live').boundingBox();
   await page.getByRole('button', { name: '도형', exact: true }).click();
+  await page.getByRole('dialog', { name: '도형 선택' }).getByRole('button', { name: '사각형' }).click();
   await page.mouse.move(zoomRect!.x + 100, zoomRect!.y + 100); await page.mouse.down(); await page.mouse.move(zoomRect!.x + 180, zoomRect!.y + 180, { steps: 5 }); await page.mouse.up();
   await expect.poll(async () => (await current()).items.length).toBe(3);
   const last = (await current()).items.at(-1);

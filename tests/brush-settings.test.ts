@@ -14,3 +14,10 @@ it('recovers invalid persisted preferences without losing valid fields', () => {
     .toEqual({ width: 2, color: '#30445e', pencilDarkness: .6, pencilAdjustment: 'width' });
   expect(brushProfile('fountain', null)).toEqual({ width: 3, color: '#30445e' });
 });
+
+it('migrates older highlighter widths to the independent 4–32 range', () => {
+  expect(brushProfile('highlighter')).toMatchObject({ width: 15, highlighterWidthVersion: 2 });
+  expect(brushProfile('highlighter', { width: 8, color: '#aabbcc' })).toMatchObject({ width: 32, color: '#aabbcc' });
+  expect(brushProfile('highlighter', { width: 4, highlighterWidthVersion: 2 })).toMatchObject({ width: 4 });
+  expect(brushProfile('highlighter', { width: 32, highlighterWidthVersion: 2 })).toMatchObject({ width: 32 });
+});

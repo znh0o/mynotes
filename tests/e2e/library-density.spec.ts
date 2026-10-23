@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './standalone-test';
 
 test('choose four, five or six notes per row in folders and retain it across navigation and reopening', async ({ page }) => {
   await page.goto('./'); await expect(page.locator('h1')).toBeVisible();

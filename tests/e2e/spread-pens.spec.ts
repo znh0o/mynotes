@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './standalone-test';
 
 async function newNote(page: Page, title: string) {
   await page.getByRole('button', { name: '새 노트', exact: true }).click();

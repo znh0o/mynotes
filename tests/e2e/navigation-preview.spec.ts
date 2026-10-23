@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './standalone-test';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 test.use({ reducedMotion: 'no-preference' });
 

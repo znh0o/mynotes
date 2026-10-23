@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, emulateStandalone } from './standalone-test';
 import { selectPen } from './helpers';
 
 for (const viewport of [{ width: 1280, height: 800 }, { width: 800, height: 1280 }]) {
@@ -6,6 +6,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 800, height: 1280
     const context = await browser.newContext({ viewport, deviceScaleFactor: 2, isMobile: true, hasTouch: true,
       userAgent: 'Mozilla/5.0 (Linux; Android 15; Tablet) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36' });
     try {
+      await emulateStandalone(context);
       const page = await context.newPage(); await page.goto('./');
       await page.getByRole('button', { name: '새 노트', exact: true }).tap(); await page.locator('[name=title]').fill('태블릿 타이핑');
       await page.getByRole('button', { name: '노트 만들기', exact: true }).tap();

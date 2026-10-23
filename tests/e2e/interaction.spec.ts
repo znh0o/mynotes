@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './standalone-test';
 test.use({ hasTouch: true });
 
 test('tools switch on the first stylus or touch tap even when compatibility clicks are dropped', async ({ page, context }) => {

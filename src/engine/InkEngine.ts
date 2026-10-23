@@ -200,7 +200,7 @@ export class InkEngine {
       this.page.items = erase(this.page.items, p, p, this.options.eraserSize / 2, this.options.partialEraser); this.dirtyInk = true;
     } else if (tool === 'shape') this.shape = { id: uid(), kind: 'shape', shape: this.options.shape, x: p.x, y: p.y, w: 0, h: 0, color: this.options.color, width: this.options.width };
     else if (['pen', 'fountain', 'pencil', 'highlighter'].includes(tool)) this.stroke = { id: uid(), kind: 'stroke', tool: tool as Stroke['tool'], color: this.options.color,
-      width: tool === 'highlighter' ? Math.max(14, this.options.width * 5) : this.options.width,
+      width: this.options.width,
       pressure: tool === 'fountain', brushVersion: 2,
       ...(tool === 'pencil' ? { textureSeed: Math.floor(Math.random() * 0x100000000), pencilDarkness: this.options.pencilDarkness } : {}), points: [p] };
   }

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './standalone-test';
 
 test('profile opens beside the avatar, saves details, and closes without leaving the library', async ({ page }) => {
   await page.goto('./');

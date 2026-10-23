@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './standalone-test';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 
 test('PDF loads without new Map APIs and home still works after a rendering failure', async ({ context, page }) => {

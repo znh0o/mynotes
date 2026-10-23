@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './standalone-test';
 import { selectPen } from './helpers';
 
 test('long pencil input leaves time for a toolbar tap', async ({ page, context }) => {

@@ -1,5 +1,5 @@
 import { db, SaveQueue } from '../data/store';
-import { newPage, paperNames, uid, type Item, type Note, type Page, type Paper, type Point, type TextItem, type Tool } from '../data/model';
+import { newPage, paperNames, uid, type Item, type Note, type Page, type Paper, type Point, type Shape, type TextItem, type Tool } from '../data/model';
 import { documentFrame, splitDocument, textFont } from '../engine/text';
 import { background, exportPDF, loadImages, thumbnail } from '../data/pdf';
 import { InkEngine } from '../engine/InkEngine';
@@ -14,6 +14,14 @@ import { openColorPicker } from './color-picker';
 import { paintPenPreviews, penPreview } from './pen-preview';
 import { brushKey, brushProfile, inkTools, isInkTool, type BrushProfile, type InkTool } from '../data/brush-settings';
 import { defaultPenCollection, duplicatePen, isPenKind, penCollection, penKinds, penNames, type PenCollection, type PenKind, type PenPreset } from '../data/pen-presets';
+
+const shapeChoices: { id: Shape; name: string; drawing: string }[] = [
+  { id: 'rect', name: '사각형', drawing: '<rect x="8" y="11" width="40" height="30" rx="2" />' },
+  { id: 'ellipse', name: '원 · 타원', drawing: '<ellipse cx="28" cy="26" rx="20" ry="15" />' },
+  { id: 'line', name: '직선', drawing: '<path d="M9 39 47 13" />' },
+  { id: 'triangle', name: '삼각형', drawing: '<path d="M28 10 48 42H8Z" />' },
+];
+const shapeIcon = (shape: Shape, size: number) => `<svg aria-hidden="true" width="${size}" height="${size}" viewBox="0 0 56 52" fill="none" stroke="currentColor" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round">${shapeChoices.find(choice => choice.id === shape)!.drawing}</svg>`;
 
 export class EditorView {
   private engine!: InkEngine;
@@ -63,8 +71,8 @@ export class EditorView {
     });
   }
   async start() {
-    const [pencilSetting, lineSetting, eraserSetting, penButtonSetting, spreadSetting, paletteSetting, penSetting, ...brushSettings] = await db.settings.bulkGet([
-      'pencil-darkness', 'hold-to-line', 'eraser-settings', 'samsung-pen-button-toggle', 'two-page-view', `note-palette:${this.note.id}`, `note-pen-presets:${this.note.id}`,
+    const [pencilSetting, lineSetting, eraserSetting, penButtonSetting, spreadSetting, paletteSetting, penSetting, shapeSetting, ...brushSettings] = await db.settings.bulkGet([
+      'pencil-darkness', 'hold-to-line', 'eraser-settings', 'samsung-pen-button-toggle', 'two-page-view', `note-palette:${this.note.id}`, `note-pen-presets:${this.note.id}`, `note-shape:${this.note.id}`,
       ...inkTools.map(brushKey), ...inkTools.map(tool => `note-brush:${this.note.id}:${tool}`),
     ]);
     inkTools.forEach((tool, index) => this.brushes[tool] = brushProfile(tool, brushSettings[index + inkTools.length]?.value ?? brushSettings[index]?.value, pencilSetting?.value));
@@ -87,6 +95,7 @@ export class EditorView {
     }, (p, tool) => this.insert(p, tool), () => toast('직선으로 정리했어요. 펜을 댄 채 끝점을 움직일 수 있어요.'), () => this.togglePenEraser());
     this.engine.options.samsungButtonToggle = typeof penButtonSetting?.value === 'boolean'
       ? penButtonSetting.value : /SamsungBrowser\//.test(navigator.userAgent);
+    if (shapeChoices.some(choice => choice.id === shapeSetting?.value)) this.engine.options.shape = shapeSetting!.value as Shape;
     this.textEditor = new InlineTextEditor(this.root.querySelector('.paper-surface')!, this.root.querySelector('.editor-shell')!, this.engine,
       (head, tail) => this.continueTyping(head, tail), () => this.syncInkControl());
     if (typeof lineSetting?.value === 'boolean') this.engine.options.holdToLine = lineSetting.value;
@@ -95,6 +104,11 @@ export class EditorView {
     if (typeof eraser?.size === 'number' && eraser.size >= 8 && eraser.size <= 100) this.engine.options.eraserSize = eraser.size;
     const eraserButton = this.root.querySelector('[data-action=tool][data-id=eraser]')!;
     eraserButton.setAttribute('aria-haspopup', 'dialog'); eraserButton.setAttribute('aria-expanded', 'false'); eraserButton.setAttribute('aria-controls', 'eraser-picker');
+    const shapeButton = this.root.querySelector('[data-action=tool][data-id=shape]')!;
+    shapeButton.setAttribute('aria-haspopup', 'dialog'); shapeButton.setAttribute('aria-expanded', 'false'); shapeButton.setAttribute('aria-controls', 'shape-picker');
+    const imageButton = this.root.querySelector('[data-action=tool][data-id=image]')!;
+    imageButton.setAttribute('aria-haspopup', 'dialog'); imageButton.setAttribute('aria-expanded', 'false'); imageButton.setAttribute('aria-controls', 'image-picker');
+    this.syncShapeButton();
     this.previews = new PagePreviews(this.root.querySelector('#page-thumbnails')!, this.root.querySelector('.page-sidebar')!,
       () => this.engine.activePointer !== null || this.viewport.classList.contains('zoom-preview'),
       (id, preview, revision) => { if (this.page?.id === id && this.page.revision === revision) this.page.thumbnail = preview; });
@@ -363,9 +377,34 @@ export class EditorView {
     if (action === 'tab' && id !== this.note.id) run(() => this.open(id!));
     if (action === 'close-tab') run(() => this.closeTab(id!));
     if (action === 'tool') {
-      this.selectTool(id as Tool);
-      if (id === 'eraser') this.showEraserPicker(target);
+      if (id === 'shape' && this.root.querySelector('.shape-picker:popover-open')) this.root.querySelector<HTMLElement>('.shape-picker:popover-open')!.hidePopover();
+      else if (id === 'image' && this.root.querySelector('.image-picker:popover-open')) this.root.querySelector<HTMLElement>('.image-picker:popover-open')!.hidePopover();
+      else {
+        this.selectTool(id as Tool);
+        if (id === 'eraser') this.showEraserPicker(target);
+        if (id === 'shape') this.showShapePicker(target);
+        if (id === 'image') this.showImagePicker(target);
+      }
     }
+    if (action === 'shape-select') {
+      const selected = shapeChoices.find(choice => choice.id === id);
+      if (selected) {
+        this.engine.options.shape = selected.id;
+        this.syncShapeButton();
+        this.root.querySelector<HTMLElement>('.shape-picker:popover-open')?.hidePopover();
+        void db.settings.put({ key: `note-shape:${this.note.id}`, value: selected.id }).catch(report);
+      }
+    }
+    if (action === 'image-upload') {
+      this.root.querySelector<HTMLElement>('.image-picker:popover-open')?.hidePopover();
+      const page = this.page;
+      run(async () => {
+        const file = await pickFile('image/png,image/jpeg,image/webp');
+        if (file) await this.addImage(file, page);
+      });
+    }
+    if (action === 'image-place') this.root.querySelector<HTMLElement>('.image-picker:popover-open')?.hidePopover();
+    if (action === 'close-image') this.root.querySelector<HTMLElement>('.image-picker:popover-open')?.hidePopover();
     if (action === 'pen-menu') {
       const open = this.root.querySelector<HTMLElement>('.pen-picker:popover-open');
       if (open) open.hidePopover();
@@ -499,7 +538,6 @@ export class EditorView {
       const output = this.root.querySelector('#eraser-size-value'); if (output) output.textContent = el.value;
     }
     if (el.id === 'eraser-mode') this.setEraserMode(el.value === 'partial');
-    if (el.id === 'shape-type') this.engine.options.shape = el.value as 'rect';
     if (el.id === 'hold-to-line') { this.engine.options.holdToLine = el.checked; void db.settings.put({ key: 'hold-to-line', value: el.checked }).catch(report); }
   }
   private setColor(color: string) {
@@ -521,7 +559,9 @@ export class EditorView {
   }
   private setWidth(value: number) {
     if (!Number.isFinite(value)) return;
-    const width = Math.max(.5, Math.min(20, Math.round(value * 2) / 2));
+    const width = this.engine.options.tool === 'highlighter'
+      ? Math.max(4, Math.min(32, Math.round(value)))
+      : Math.max(.5, Math.min(20, Math.round(value * 2) / 2));
     this.engine.options.width = width;
     this.syncInkControl(); this.rememberBrush();
   }
@@ -545,7 +585,8 @@ export class EditorView {
       if (tool === 'pencil') { preset.pencilDarkness = this.engine.options.pencilDarkness; preset.pencilAdjustment = this.inkAdjustment; }
       this.rememberPens(); return;
     }
-    this.brushes[tool] = { width: this.engine.options.width, color: this.engine.options.color };
+    this.brushes[tool] = { width: this.engine.options.width, color: this.engine.options.color,
+      ...(tool === 'highlighter' ? { highlighterWidthVersion: 2 as const } : {}) };
     this.dirtyBrushes.add(tool); clearTimeout(this.brushTimer);
     this.brushTimer = setTimeout(() => { void this.persistBrushes().catch(report); }, 150);
   }
@@ -656,6 +697,60 @@ export class EditorView {
     }
     this.rememberPens(); this.renderPenPicker(this.root.querySelector<HTMLElement>('.pen-picker')!, 'arrange');
   }
+  private syncShapeButton() {
+    const choice = shapeChoices.find(choice => choice.id === this.engine.options.shape)!;
+    const button = this.root.querySelector<HTMLButtonElement>('[data-action=tool][data-id=shape]')!;
+    button.innerHTML = `${shapeIcon(choice.id, 22)}<span>도형</span>`;
+    button.title = `도형 · ${choice.name}`;
+  }
+  private showShapePicker(anchor: HTMLElement) {
+    this.root.querySelector<HTMLElement>('.shape-picker:popover-open')?.hidePopover();
+    const panel = document.createElement('div'); panel.id = 'shape-picker'; panel.className = 'shape-picker'; panel.popover = 'manual';
+    panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', '도형 선택');
+    panel.innerHTML = `<div class="shape-picker-grid">${shapeChoices.map(choice => `<button type="button" data-action="shape-select" data-id="${choice.id}" aria-label="${choice.name}" title="${choice.name}" aria-pressed="${choice.id === this.engine.options.shape}">${shapeIcon(choice.id, 50)}</button>`).join('')}</div>`;
+    this.root.querySelector('.editor-shell')!.append(panel);
+    const rect = anchor.getBoundingClientRect();
+    panel.style.left = `${Math.max(8, Math.min(rect.left - 12, innerWidth - 272))}px`;
+    panel.style.top = `${this.root.querySelector('.ink-toolbar')!.getBoundingClientRect().bottom + 6}px`;
+    const dismiss = new AbortController();
+    this.abort.signal.addEventListener('abort', () => dismiss.abort(), { once: true, signal: dismiss.signal });
+    document.addEventListener('pointerdown', event => {
+      if (!panel.contains(event.target as Node) && !anchor.contains(event.target as Node)) panel.hidePopover();
+    }, { capture: true, signal: dismiss.signal });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); panel.hidePopover(); anchor.focus({ preventScroll: true }); }
+    }, { capture: true, signal: dismiss.signal });
+    panel.addEventListener('toggle', () => {
+      const open = panel.matches(':popover-open');
+      if (this.root.querySelector('#shape-picker') === panel) anchor.setAttribute('aria-expanded', String(open));
+      if (!open) { panel.remove(); dismiss.abort(); }
+    });
+    panel.showPopover(); anchor.setAttribute('aria-expanded', 'true');
+  }
+  private showImagePicker(anchor: HTMLElement) {
+    this.root.querySelector<HTMLElement>('.image-picker:popover-open')?.hidePopover();
+    const panel = document.createElement('div'); panel.id = 'image-picker'; panel.className = 'image-picker'; panel.popover = 'manual';
+    panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', '사진 추가');
+    panel.innerHTML = `<div class="writing-options-heading"><strong>사진 추가</strong>${button('X', '사진 팝업 닫기', 'close-image')}</div><div class="image-picker-actions"><button type="button" data-action="image-upload">${icon('Upload', 21)}<span><strong>사진 선택</strong><small>가운데에 바로 추가</small></span></button><button type="button" data-action="image-place">${icon('Move', 21)}<span><strong>위치 지정</strong><small>종이를 눌러 추가할 위치 선택</small></span></button></div><p>PNG, JPG, WebP · 최대 20MB</p>`;
+    this.root.querySelector('.editor-shell')!.append(panel);
+    const rect = anchor.getBoundingClientRect();
+    panel.style.left = `${Math.max(8, Math.min(rect.left - 12, innerWidth - 292))}px`;
+    panel.style.top = `${this.root.querySelector('.ink-toolbar')!.getBoundingClientRect().bottom + 6}px`;
+    const dismiss = new AbortController();
+    this.abort.signal.addEventListener('abort', () => dismiss.abort(), { once: true, signal: dismiss.signal });
+    document.addEventListener('pointerdown', event => {
+      if (!panel.contains(event.target as Node) && !anchor.contains(event.target as Node)) panel.hidePopover();
+    }, { capture: true, signal: dismiss.signal });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); panel.hidePopover(); anchor.focus({ preventScroll: true }); }
+    }, { capture: true, signal: dismiss.signal });
+    panel.addEventListener('toggle', () => {
+      const open = panel.matches(':popover-open');
+      if (this.root.querySelector('#image-picker') === panel) anchor.setAttribute('aria-expanded', String(open));
+      if (!open) { panel.remove(); dismiss.abort(); }
+    });
+    panel.showPopover(); anchor.setAttribute('aria-expanded', 'true');
+  }
   private showEraserPicker(anchor: HTMLElement) {
     this.root.querySelector('#eraser-picker')?.remove();
     // Fast pen/touch taps activate on pointerup. Native auto light-dismiss can
@@ -693,9 +788,11 @@ export class EditorView {
   private syncInkControl() {
     const pencil = this.engine.options.tool === 'pencil', darkness = this.adjustingDarkness, text = this.engine.options.tool === 'text';
     const width = this.engine.options.width, value = text ? this.textEditor.size : darkness ? Math.round(this.engine.options.pencilDarkness * 100) : width;
-    const min = text || darkness ? 10 : .5, max = text || darkness ? 100 : 20;
+    const highlighter = this.engine.options.tool === 'highlighter';
+    const min = text || darkness ? 10 : highlighter ? 4 : .5;
+    const max = text || darkness ? 100 : highlighter ? 32 : 20;
     const slider = this.root.querySelector<HTMLInputElement>('#ink-width')!;
-    slider.min = String(min); slider.max = String(max); slider.step = text ? '1' : darkness ? '5' : '.5'; slider.value = String(value);
+    slider.min = String(min); slider.max = String(max); slider.step = text || highlighter ? '1' : darkness ? '5' : '.5'; slider.value = String(value);
     slider.setAttribute('aria-label', text ? '글자 크기' : darkness ? '연필 진하기' : '펜 굵기');
     slider.setAttribute('aria-valuetext', text ? `${value}px` : darkness ? `${value}% · 필압과 관계없이 고정` : width.toFixed(1));
     slider.style.setProperty('--width-progress', `${(value - min) / (max - min) * 100}%`);
@@ -722,6 +819,8 @@ export class EditorView {
   private selectTool(tool: Tool) {
     this.closePencilMode();
     this.root.querySelector<HTMLElement>('.eraser-picker:popover-open')?.hidePopover();
+    if (tool !== 'shape') this.root.querySelector<HTMLElement>('.shape-picker:popover-open')?.hidePopover();
+    if (tool !== 'image') this.root.querySelector<HTMLElement>('.image-picker:popover-open')?.hidePopover();
     if (!isPenKind(tool)) this.root.querySelector<HTMLElement>('.pen-picker:popover-open')?.hidePopover();
     this.textEditor.finish();
     this.engine.cancel(); this.engine.clearSelection(); this.engine.options.tool = tool;
@@ -745,13 +844,13 @@ export class EditorView {
     penButton.style.setProperty('--pen-color', current.color);
     this.viewport.classList.toggle('hand-mode', tool === 'hand');
     if (isInkTool(tool)) this.restoreBrush(tool); else this.syncInkControl();
-    const hints: Record<Tool, string> = { pen: '볼펜 · 일정한 굵기 · 선 끝에서 0.6초 멈추면 직선으로', fountain: '만년필 · 필압과 펜촉 방향에 따라 달라지는 굵기', pencil: '연필 · 굵기와 진하기를 직접 조절 · 필압과 관계없이 고정', highlighter: '형광펜 · 중요한 부분을 선명하게', eraser: '지우개 · 원으로 지우는 범위 표시 · S펜 버튼 안내는 지우개 설정에서', lasso: '올가미 · 둘러싸서 선택한 다음 드래그로 이동', shape: '도형 · 드래그로 반듯한 도형 그리기', text: '타이핑 · 손글씨와 관계없이 페이지 여백 안에서 이어 쓰기 · 본문과 별도 글상자 전환', image: '이미지 · 종이를 눌러 이미지 추가', hand: '이동 · 드래그로 종이 이동, 두 손가락으로 확대' };
+    const hints: Record<Tool, string> = { pen: '볼펜 · 일정한 굵기 · 선 끝에서 0.6초 멈추면 직선으로', fountain: '만년필 · 필압과 펜촉 방향에 따라 달라지는 굵기', pencil: '연필 · 굵기와 진하기를 직접 조절 · 필압과 관계없이 고정', highlighter: '형광펜 · 펜과 별도 굵기 · 4~32', eraser: '지우개 · 원으로 지우는 범위 표시 · S펜 버튼 안내는 지우개 설정에서', lasso: '올가미 · 둘러싸서 선택한 다음 드래그로 이동', shape: '도형 · 드래그로 반듯한 도형 그리기', text: '타이핑 · 손글씨와 관계없이 페이지 여백 안에서 이어 쓰기 · 본문과 별도 글상자 전환', image: '사진 · 버튼에서 바로 선택하거나 종이를 눌러 위치 지정', hand: '이동 · 드래그로 종이 이동, 두 손가락으로 확대' };
     this.toolHint = hints[tool];
     if (tool === 'text' && this.page && !this.switching && this.textEditor.mode === 'document') this.textEditor.open();
   }
   private contextOptions() {
     const tool = this.engine.options.tool;
-    return tool === 'eraser' ? `<select id="eraser-mode" aria-label="지우개 모드"><option value="stroke" ${!this.engine.options.partialEraser ? 'selected' : ''}>스트로크 지우개</option><option value="partial" ${this.engine.options.partialEraser ? 'selected' : ''}>펜 지우개</option></select><input id="eraser-size" type="range" min="8" max="100" value="${this.engine.options.eraserSize}" aria-label="지우개 크기"/>` : tool === 'shape' ? `<select id="shape-type" aria-label="도형 종류">${[['rect', '사각형'], ['ellipse', '원'], ['line', '직선'], ['triangle', '삼각형']].map(([v, t]) => `<option value="${v}" ${this.engine.options.shape === v ? 'selected' : ''}>${t}</option>`).join('')}</select>` : tool === 'pen' ? '<p>볼펜은 필압과 관계없이 설정한 굵기를 유지해요.</p>' : tool === 'lasso' ? `<button class="text-button" data-action="selection-paste">${icon('Copy', 14)} 붙여넣기</button>` : '';
+    return tool === 'eraser' ? `<select id="eraser-mode" aria-label="지우개 모드"><option value="stroke" ${!this.engine.options.partialEraser ? 'selected' : ''}>스트로크 지우개</option><option value="partial" ${this.engine.options.partialEraser ? 'selected' : ''}>펜 지우개</option></select><input id="eraser-size" type="range" min="8" max="100" value="${this.engine.options.eraserSize}" aria-label="지우개 크기"/>` : tool === 'pen' ? '<p>볼펜은 필압과 관계없이 설정한 굵기를 유지해요.</p>' : tool === 'lasso' ? `<button class="text-button" data-action="selection-paste">${icon('Copy', 14)} 붙여넣기</button>` : '';
   }
   private insert(point: Point, tool: Tool) {
     const page = this.page;
@@ -759,18 +858,28 @@ export class EditorView {
       this.textEditor.open(point);
     } else run(async () => {
       const file = await pickFile('image/png,image/jpeg,image/webp'); if (!file) return;
-      if (file.size > 20 * 1024 * 1024) throw new Error('이미지는 20MB 이하로 추가해 주세요.');
-      const img = new Image(), url = URL.createObjectURL(file);
-      try {
-        img.src = url; await img.decode();
-        if (img.width * img.height > 40000000) throw new Error('이미지 해상도가 너무 커요. 크기를 줄여 주세요.');
-        const id = uid(); await db.assets.add({ id, noteId: this.note.id, blob: file, name: file.name });
-        if (this.page !== page) return;
-        const w = Math.min(img.width, page.width * .65), h = w * img.height / img.width;
-        const item: Item = { id: uid(), kind: 'image', assetId: id, x: point.x, y: point.y, w, h };
-        page.items.push(item); await loadImages(page); page.items.pop(); this.engine.mutate(() => page.items.push(item));
-      } finally { URL.revokeObjectURL(url); }
+      await this.addImage(file, page, point);
     });
+  }
+  private async addImage(file: File, page: Page, point?: Point) {
+    if (file.size > 20 * 1024 * 1024) throw new Error('이미지는 20MB 이하로 추가해 주세요.');
+    const img = new Image(), url = URL.createObjectURL(file);
+    try {
+      img.src = url; await img.decode();
+      if (img.width * img.height > 40000000) throw new Error('이미지 해상도가 너무 커요. 크기를 줄여 주세요.');
+      if (this.page !== page) return;
+      const id = uid(); await db.assets.add({ id, noteId: this.note.id, blob: file, name: file.name });
+      const w = Math.min(img.width, page.width * .65, img.width * page.height * .65 / img.height);
+      const h = w * img.height / img.width;
+      const item: Item = { id: uid(), kind: 'image', assetId: id,
+        x: point?.x ?? (page.width - w) / 2, y: point?.y ?? (page.height - h) / 2, w, h };
+      page.items.push(item);
+      try { await loadImages(page); }
+      catch (error) { await db.assets.delete(id); throw error; }
+      finally { const index = page.items.indexOf(item); if (index !== -1) page.items.splice(index, 1); }
+      if (this.page !== page) { await db.assets.delete(id); return; }
+      this.engine.mutate(() => page.items.push(item));
+    } finally { URL.revokeObjectURL(url); }
   }
   private async addPage(source?: Page) {
     await this.flush();

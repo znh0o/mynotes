@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './standalone-test';
 import { selectPen } from './helpers';
 
 test('pencil width and fixed darkness share the existing row on a small screen', async ({ page }) => {
@@ -52,11 +52,14 @@ test('writing options preserve canvas space and keep finger, paper and tool sett
   await page.getByRole('button', { name: '속지 설정', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible(); await page.locator('select[name=paper]').selectOption('grid');
   await page.getByRole('button', { name: '적용', exact: true }).click(); await expect(page.locator('#paper-description')).toHaveText('모눈');
-  await page.getByRole('button', { name: '도형', exact: true }).click(); await options.click();
-  await page.getByRole('combobox', { name: '도형 종류', exact: true }).selectOption('ellipse');
+  const shapeButton = page.getByRole('button', { name: '도형', exact: true });
+  await shapeButton.click();
+  await page.getByRole('dialog', { name: '도형 선택' }).getByRole('button', { name: '원 · 타원' }).click();
+  await options.click();
   await page.evaluate(() => history.back()); await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.locator('#paper-live')).toBeVisible(); await expect(options).toHaveAttribute('aria-expanded', 'false');
-  await options.click(); await expect(page.getByRole('combobox', { name: '도형 종류', exact: true })).toHaveValue('ellipse');
+  await shapeButton.click();
+  await expect(page.getByRole('dialog', { name: '도형 선택' }).getByRole('button', { name: '원 · 타원' })).toHaveAttribute('aria-pressed', 'true');
   await page.keyboard.press('Escape'); await expect(page.getByRole('dialog')).toHaveCount(0);
   expect(await page.locator('.paper-viewport').boundingBox()).toEqual(canvas);
   await page.screenshot({ path: '../MyNotes-compact-toolbar.png' });

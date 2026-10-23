@@ -1,4 +1,4 @@
-import { test, expect, type Page, type CDPSession } from '@playwright/test';
+import { test, expect, type Page, type CDPSession } from './standalone-test';
 import { selectPen } from './helpers';
 test.use({ hasTouch: true });
 

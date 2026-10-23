@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './standalone-test';
 import { selectPen, setInkColor } from './helpers';
 
 test('pencil PDF preserves the paper grain and its position', async ({ page, context }) => {
@@ -93,9 +93,7 @@ test('live ballpoint, marker, shape and thin pencil stay connected after lasso s
     if (tool === '볼펜' || tool === '연필') await selectPen(page, tool);
     else await page.getByRole('button', { name: tool, exact: true }).click();
     if (tool === '도형') {
-      await page.getByRole('button', { name: '필기 옵션', exact: true }).click();
-      await page.getByRole('combobox', { name: '도형 종류', exact: true }).selectOption('line');
-      await page.getByRole('button', { name: '필기 옵션 닫기', exact: true }).click();
+      await page.getByRole('dialog', { name: '도형 선택' }).getByRole('button', { name: '직선' }).click();
     }
     await send('mousePressed', 100, y);
     for (let x = 104; x <= 320; x += 4) await send('mouseMoved', x, y);
