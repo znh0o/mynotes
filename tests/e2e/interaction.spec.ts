@@ -81,7 +81,9 @@ test('pinch and wheel bursts reuse canvas buffers until the gesture ends', async
 
 test('editor blocks refresh shortcuts and asks before browser reload while updates remain allowed', async ({ page }) => {
   await page.goto('./'); await page.getByRole('button', { name: '새 노트', exact: true }).click();
-  await page.getByRole('button', { name: '노트 만들기', exact: true }).click(); await expect(page.locator('.page-loading')).toBeHidden();
+  await page.getByRole('button', { name: '노트 만들기', exact: true }).click();
+  await expect(page.locator('#paper-live')).toBeVisible(); await expect(page.locator('.page-loading')).toBeHidden();
+  await expect(page.locator('.app-slide-layer')).toHaveCount(0);
   await page.evaluate(() => (window as any).sameDocument = 'editor-session');
   for (const shortcut of ['F5', 'Control+r', 'Control+Shift+r']) {
     await page.keyboard.press(shortcut);
