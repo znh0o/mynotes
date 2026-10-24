@@ -23,7 +23,8 @@ if (standaloneMode.matches) {
   showInstallPage();
 }
 
-standaloneMode.addEventListener?.('change', () => location.reload());
+// Fullscreen temporarily changes the display-mode media query too. The route
+// is chosen at launch; reloading here would close an open note on fullscreen.
 
 function manualInstallGuide() {
   const ua = navigator.userAgent;

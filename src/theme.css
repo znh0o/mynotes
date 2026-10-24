@@ -297,3 +297,10 @@ html,body,#app,.library-shell,.library-main,.library-content,.modal,.modal-body{
 .spread-companion .spread-live{pointer-events:auto;touch-action:none;cursor:crosshair}
 .hand-mode .spread-companion .spread-live{cursor:grab}
 @media(max-width:760px){.editor-header{gap:5px}.editor-page-controls .icon-button{width:24px}.editor-page-controls .page-position{min-width:43px;font-size:10px}.editor-header .note-tab>button:first-child{max-width:84px}.editor-header .note-tab>button:first-child span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+html:fullscreen{background:#f4f6f9}
+.editor-shell.focus-fullscreen .editor-header{height:0;min-height:0;padding:0;border:0;z-index:20;overflow:visible}
+.editor-shell.focus-fullscreen .editor-header>:not(.editor-header-actions){display:none}
+.editor-shell.focus-fullscreen .editor-header-actions{position:fixed;top:10px;right:10px;z-index:20;padding:3px;border:1px solid #dce6f4;border-radius:10px;background:#fff;box-shadow:0 4px 18px #27466e24}
+.editor-shell.focus-fullscreen .editor-header-actions>:not([data-action=fullscreen]){display:none}
+.editor-shell.focus-fullscreen .editor-header-actions [data-action=fullscreen]{display:inline-flex}
+.editor-shell.focus-fullscreen .page-sidebar{display:none}

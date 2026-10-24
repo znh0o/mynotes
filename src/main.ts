@@ -109,6 +109,7 @@ async function open(id: string) {
   await navigation.navigate({ screen: 'note', id });
 }
 async function renderRoute(route: AppRoute, direction: Direction) {
+  if (route.screen === 'library' && document.fullscreenElement) await document.exitFullscreen().catch(() => {});
   if (route.screen === 'library' && library && !editor) {
     library.setFilter(route.filter); libraryState = library.snapshot(); return;
   }

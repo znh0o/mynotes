@@ -38,6 +38,7 @@ export class EditorView {
   private switching = false;
   private fit = true;
   private twoPage = false;
+  private focusFullscreen = false;
   private spreadPage?: Page;
   private spreadGeneration = 0;
   private palette = ['#30445e', '#5e85bd', '#cf7d85', '#83a58a', '#e5c360'];
@@ -160,12 +161,43 @@ export class EditorView {
       if (!this.root.querySelector('.pencil-mode-picker')?.contains(e.target as Node)) this.closePencilMode();
     }, { signal: this.abort.signal });
     document.addEventListener('keydown', e => this.keyboard(e), { signal: this.abort.signal });
+    document.addEventListener('fullscreenchange', () => this.syncFullscreenButton(), { signal: this.abort.signal });
     document.addEventListener('visibilitychange', () => { if (document.hidden) run(() => this.flush()); }, { signal: this.abort.signal });
     window.addEventListener('beforeunload', e => { if (!isAppReloadApproved()) { e.preventDefault(); e.returnValue = ''; } }, { signal: this.abort.signal });
     this.setupGestures();
     await this.showPage(0);
     this.resizeObserver = new ResizeObserver(() => { if (this.fit && this.page) { this.setScale(this.fitScale(), true); void this.renderBackground(); void this.renderSpread(); } });
     this.resizeObserver.observe(this.viewport);
+    this.syncFullscreenButton();
+  }
+  private syncFullscreenButton() {
+    const button = this.root.querySelector<HTMLButtonElement>('[data-action=fullscreen]');
+    if (!button) return;
+    const active = !!document.fullscreenElement || this.focusFullscreen;
+    const label = active ? '전체 화면 종료' : '전체 화면';
+    button.setAttribute('aria-label', label); button.setAttribute('aria-pressed', String(active)); button.title = label;
+    button.innerHTML = icon(active ? 'Minimize' : 'Maximize');
+    this.root.querySelector('.editor-shell')?.classList.toggle('focus-fullscreen', this.focusFullscreen);
+  }
+  private toggleFullscreen() {
+    if (this.focusFullscreen) { this.focusFullscreen = false; this.syncFullscreenButton(); return; }
+    if (document.fullscreenElement) { run(() => document.exitFullscreen()); return; }
+    const request = document.documentElement.requestFullscreen;
+    if (!request) { this.useFocusFullscreen(); return; }
+    // Keep the request in the button's user gesture; some tablet browsers
+    // reject a delayed fullscreen request.
+    try {
+      void Promise.resolve(request.call(document.documentElement)).catch(error => this.fullscreenFailed(error));
+    } catch (error) { this.fullscreenFailed(error); }
+  }
+  private fullscreenFailed(error: unknown) {
+    console.warn('Native fullscreen unavailable.', error);
+    this.useFocusFullscreen();
+  }
+  private useFocusFullscreen() {
+    if (this.abort.signal.aborted) return;
+    this.focusFullscreen = true; this.syncFullscreenButton();
+    toast('브라우저가 전체 화면을 허용하지 않아 작업 영역을 넓혔어요.');
   }
   private companionIndex(index = this.index) { return index % 2 ? index - 1 : index + 1; }
   private spreadStart() { return Math.floor(this.index / 2) * 2; }
@@ -546,7 +578,7 @@ export class EditorView {
       if (panel?.open) { panel.addEventListener('close', () => this.paperSettings(), { once: true }); panel.close(); }
       else this.paperSettings();
     }
-    if (action === 'fullscreen') run(async () => { if (document.fullscreenElement) await document.exitFullscreen(); else await this.root.requestFullscreen(); });
+    if (action === 'fullscreen') this.toggleFullscreen();
     if (action === 'search') this.search();
     if (action === 'settings') this.settings();
     if (action === 'save') run(async () => { await this.flush(); await this.saveThumbnail(this.page); toast('저장했어요.'); });
