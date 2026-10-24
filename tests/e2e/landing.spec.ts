@@ -2,10 +2,11 @@ import { test, expect } from '@playwright/test';
 
 test('browser mode shows only the install experience and never opens the notes database', async ({ page }) => {
   await page.goto('./');
-  await expect(page.getByRole('heading', { name: /필기와 자료가/ })).toBeVisible();
-  await expect(page.getByText('S펜으로 쓰고', { exact: true })).toBeVisible();
-  await expect(page.getByText('PDF에 표시하고', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /생각이 쌓이는/ })).toBeVisible();
+  await expect(page.getByText('S펜에 맞춘 필기', { exact: true })).toBeVisible();
+  await expect(page.getByText('PDF 위에 바로 기록', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Notelin 설치하기' })).toBeVisible();
+  await expect.poll(() => page.locator('.install-device img').evaluate(image => (image as HTMLImageElement).naturalWidth)).toBe(1440);
   await expect(page.locator('#paper-live,.library-shell')).toHaveCount(0);
   expect(await page.evaluate(() => indexedDB.databases().then(rows => rows.some(row => row.name === 'mynotes-v1')))).toBe(false);
   const manifest = await page.evaluate(async () => (await fetch(new URL('manifest.webmanifest', location.href))).json());
@@ -66,8 +67,8 @@ test('install button uses the browser prompt when available and otherwise explai
   await expect(page.locator('.library-shell')).toHaveCount(0);
 });
 
-test('install page fits tablet and phone screens without horizontal scrolling', async ({ page }) => {
-  for (const size of [{ width: 800, height: 1280 }, { width: 390, height: 844 }]) {
+test('install page fits desktop, tablet and phone screens without horizontal scrolling', async ({ page }) => {
+  for (const size of [{ width: 1440, height: 900 }, { width: 800, height: 1280 }, { width: 390, height: 844 }]) {
     await page.setViewportSize(size);
     await page.goto('./');
     await expect(page.getByRole('button', { name: 'Notelin 설치하기' })).toBeVisible();

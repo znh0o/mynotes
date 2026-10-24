@@ -1,46 +1,199 @@
-.install-page{min-height:100dvh;background:#f8f9fb;color:#1b2f4c;font-family:Inter,"Segoe UI","Malgun Gothic",sans-serif;overflow-x:hidden}
-.install-header{height:88px;max-width:1440px;margin:auto;padding:0 clamp(28px,5.5vw,84px);display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e6ebf2}
-.install-header img{display:block;width:158px;height:60px;object-fit:contain;object-position:left center;mix-blend-mode:multiply}
-.install-header>span{color:#8290a4;font-size:12px;letter-spacing:.02em}
-.install-main{max-width:1440px;min-height:650px;margin:auto;padding:58px clamp(28px,5.5vw,84px) 62px;display:grid;grid-template-columns:minmax(0,.91fr) minmax(0,1.09fr);align-items:center;gap:clamp(42px,5vw,90px)}
-.install-copy{position:relative;max-width:560px;padding-bottom:18px}
-.install-kicker{display:flex;align-items:center;gap:10px;margin-bottom:25px;color:#42669a;font-size:12px;font-weight:700;letter-spacing:.04em}
-.install-kicker-line{width:23px;height:2px;background:#4f78b7}
-.install-copy h1{font-size:clamp(55px,5.4vw,84px);line-height:1.14;letter-spacing:-.07em;font-weight:720;word-break:keep-all}
-.install-copy h1 em{font-style:normal;color:#4b74bb}
-.install-description{max-width:490px;margin:27px 0 30px;color:#5f7087;font-size:17px;line-height:1.85;word-break:keep-all}
-.install-cta{height:58px;min-width:235px;display:inline-flex;align-items:center;justify-content:space-between;gap:30px;padding:0 20px 0 23px;border-radius:10px;background:#233d62;color:#fff;font-size:15px;font-weight:700;box-shadow:0 8px 20px #1d38501d;transition:transform .15s,background .15s,box-shadow .15s}
-.install-cta:hover{transform:translateY(-2px);background:#315383;box-shadow:0 13px 26px #1d38502a}.install-cta:active{transform:translateY(0)}
-.install-cta svg{width:18px;height:18px}
-.install-caption{margin-top:15px;color:#7e8da0;font-size:12px;line-height:1.7}
-.install-manual{max-width:490px;margin-top:30px;padding:13px 0 0 14px;border-top:1px solid #e2e8f0;border-left:2px solid #c8d5e8;color:#8290a3;font-size:11px;line-height:1.75;word-break:keep-all;transition:color .2s,border-color .2s}
-.install-manual-emphasis{color:#315d9f;border-left-color:#4f7bc6}
-.install-visual{width:100%;min-width:0}
-.install-preview-label{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:17px;color:#63758f;font-size:11px;font-weight:600;letter-spacing:.03em}
-.install-preview-label span{font-weight:500;color:#a2afbe;font-variant-numeric:tabular-nums}
-.install-tablet{position:relative;aspect-ratio:1.38;min-height:360px;padding:12px;border:2px solid #33465c;border-radius:27px;background:#1c2d43;box-shadow:0 35px 62px #31496827,0 6px 15px #3149681d;transform:rotate(-1.5deg)}
-.install-tablet-camera{position:absolute;top:50%;left:3px;width:4px;height:4px;border-radius:50%;background:#697e94;transform:translateY(-50%)}
-.install-tablet-screen{height:100%;overflow:hidden;border-radius:17px;background:#e9eef5;display:flex;flex-direction:column}
-.preview-top{height:43px;flex:none;display:flex;align-items:center;gap:9px;padding:0 16px;background:#fff;border-bottom:1px solid #e7edf3;color:#3d5574;font-size:9px}
-.preview-top strong{font-size:10px;color:#253f61}.preview-top>span{margin-right:auto;color:#9aacc0}.preview-top i{display:block;width:9px;height:9px;border:1.5px solid #8095ad;border-radius:2px}.preview-top i:last-child{border-radius:50%}
-.preview-tools{height:44px;flex:none;display:flex;align-items:center;gap:14px;padding:0 18px;background:#f8faff;border-bottom:1px solid #dce6f1;color:#7791af;font-size:15px}
-.preview-tools span{display:grid;place-items:center;width:25px;height:25px}.preview-tools .preview-tool-active{background:#e0ebfc;border-radius:6px;color:#316cba}.preview-tools b{height:19px;width:1px;background:#d3dce9;margin-left:1px}.preview-tools i{width:12px;height:12px;border-radius:50%;background:#2d4664}.preview-tools i:nth-last-child(2){background:#dfbc5b}.preview-tools i:last-child{background:#bb7f86}
-.preview-workspace{display:flex;align-items:stretch;gap:2%;flex:1;min-height:0;padding:17px 18px 18px 0;background:#e8edf5}
-.preview-pages{width:11%;min-width:38px;flex:none;display:flex;align-items:center;flex-direction:column;gap:11px;padding-top:2px}
-.preview-pages span{display:block;width:55%;height:23%;background:#fff;border:1px solid #cbd7e8;border-radius:2px;box-shadow:0 2px 4px #47617b15}
-.preview-pages span:nth-child(2){border:2px solid #638bd0}
-.preview-paper{position:relative;flex:1;min-width:0;overflow:hidden;padding:clamp(15px,2.2vw,29px);background:#fffefa;box-shadow:0 3px 12px #344c6b21}
-.preview-paper small{font-size:8px;color:#94a2b3}.preview-paper h2{font-size:clamp(15px,1.7vw,22px);letter-spacing:-.04em;font-weight:650;margin:12px 0 8px;color:#243a55}
-.preview-rule{width:37px;height:2px;background:#6c92c9;margin-bottom:18px}
-.preview-paper p{font-size:clamp(8px,.86vw,11px);line-height:1.8;color:#536378;white-space:nowrap}
-.preview-marker{position:absolute;left:10%;top:44%;width:69%;height:7px;background:#f5db78a6;transform:rotate(-2deg)}
-.preview-diagram{position:absolute;left:15%;top:58%;width:70%;height:21%;border:2px solid #7897be;border-radius:50%;background:#dce9fb5e}.preview-diagram:before{content:'';position:absolute;inset:13%;border:1px solid #9fb8d8;border-radius:50%}.preview-diagram span{position:absolute;width:14%;aspect-ratio:1;border-radius:50%;background:#a8bfdf}.preview-diagram span:nth-child(1){left:18%;top:25%}.preview-diagram span:nth-child(2){right:22%;top:18%}.preview-diagram span:nth-child(3){left:50%;bottom:15%;background:#688ec1}
-.preview-lines{position:absolute;left:11%;right:11%;bottom:9%;height:8%;border-top:1px solid #dce5ef;border-bottom:1px solid #dce5ef}
-.preview-second .preview-lines{top:43%;bottom:auto;height:34%;background:repeating-linear-gradient(to bottom,transparent 0,transparent 25%,#dfe7ef 26%,transparent 27%)}
-.preview-note-line{position:absolute;top:51%;left:17%;width:62%;height:26px;border-bottom:3px solid #426eae;border-radius:30% 0 40% 0;transform:rotate(-5deg)}
-.install-visual-caption{text-align:right;margin-top:16px;color:#8b9bb0;font-size:11px}
-.install-benefits{max-width:1272px;margin:0 auto;padding:0 0 45px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid #e0e7f0}
-.install-benefits>div{padding:26px 27px 0;border-right:1px solid #e7ecf2}.install-benefits>div:last-child{border-right:0}.install-benefits span{display:block;color:#90a7c8;font-size:10px;font-weight:700;margin-bottom:11px}.install-benefits strong{display:block;color:#314c71;font-size:15px;letter-spacing:-.03em}.install-benefits p{margin-top:8px;color:#77889e;font-size:12px;line-height:1.6;word-break:keep-all}
-@media(max-width:1100px){.install-main{gap:35px}.install-copy h1{font-size:clamp(47px,5.4vw,67px)}.install-description{font-size:15px}.install-tablet{min-height:310px}.install-benefits{margin-inline:clamp(28px,5.5vw,84px)}}
-@media(max-width:1020px){.install-main{grid-template-columns:1fr;min-height:0;padding-top:48px;gap:44px}.install-copy{max-width:650px;padding:0}.install-copy h1{font-size:clamp(50px,8vw,72px)}.install-visual{max-width:660px;margin:0 auto}.install-benefits{margin-top:35px}}
-@media(max-width:570px){.install-header{height:72px;padding:0 24px}.install-header img{width:140px}.install-header>span{font-size:10px}.install-main{padding:42px 24px 0;gap:42px}.install-kicker{font-size:11px;margin-bottom:18px}.install-copy h1{font-size:clamp(44px,10vw,59px)}.install-description{font-size:14px;margin:23px 0 27px}.install-cta{height:55px;min-width:221px;font-size:14px}.install-tablet{min-height:0;padding:8px;border-radius:17px}.install-tablet-screen{border-radius:10px}.preview-top{height:27px;padding:0 9px;gap:5px;font-size:6px}.preview-top strong{font-size:7px}.preview-top i{width:6px;height:6px}.preview-tools{height:29px;padding:0 9px;gap:7px;font-size:10px}.preview-tools span{width:17px;height:17px}.preview-tools i{width:8px;height:8px}.preview-workspace{padding:9px 9px 9px 0}.preview-pages{min-width:22px;gap:6px}.preview-paper{padding:12px}.preview-paper small{font-size:6px}.preview-paper h2{font-size:12px;margin:8px 0 5px}.preview-rule{margin-bottom:9px}.preview-paper p{font-size:6px}.install-visual-caption{margin-top:10px}.install-benefits{margin:32px 24px 0;padding-bottom:28px;grid-template-columns:1fr}.install-benefits>div{padding:16px 0;border-right:0;border-bottom:1px solid #e7ecf2}.install-benefits>div:last-child{border:0}.install-benefits span{margin-bottom:4px}.install-benefits strong{font-size:14px}.install-benefits p{font-size:11px;margin-top:4px}}
+.install-page{
+  --install-ink:#172a45;
+  --install-blue:#386ce1;
+  --install-muted:#63748a;
+  min-height:100dvh;
+  overflow-x:hidden;
+  background:#fff;
+  color:var(--install-ink);
+  font-family:Inter,"Segoe UI","Malgun Gothic",-apple-system,BlinkMacSystemFont,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.install-page h1,.install-page h2,.install-page h3{font-weight:690;word-break:keep-all}
+.install-page p{word-break:keep-all}
+.install-header{
+  position:relative;
+  z-index:2;
+  height:82px;
+  max-width:1320px;
+  margin:auto;
+  padding:0 clamp(24px,4.7vw,70px);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:28px;
+}
+.install-brand{display:inline-flex;align-items:center;flex:none}
+.install-brand img{display:block;width:154px;height:58px;object-fit:contain;mix-blend-mode:multiply}
+.install-nav{display:flex;align-items:center;gap:34px;margin-left:auto}
+.install-nav a,.install-header-link{font-size:12px;font-weight:600;color:#53677f;white-space:nowrap}
+.install-nav a:hover,.install-header-link:hover{color:var(--install-blue)}
+.install-header-link{display:flex;align-items:center;gap:11px;padding-left:28px;border-left:1px solid #dfe6ef;color:#315b9d}
+.install-header-link span{font-size:18px;line-height:1}
+.install-hero{
+  min-height:650px;
+  display:grid;
+  grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);
+  align-items:center;
+  gap:clamp(38px,5vw,78px);
+  padding:60px max(clamp(24px,4.7vw,70px),calc((100vw - 1320px)/2 + 70px)) 72px;
+  background:#f8f9fb;
+}
+.install-hero-copy{max-width:580px;min-width:0}
+.install-overline{display:flex;align-items:center;gap:11px;color:#41649c;font-size:11px;font-weight:750;letter-spacing:.13em}
+.install-overline span{width:25px;height:2px;background:#4f80d7}
+.install-hero h1{margin-top:25px;font-size:clamp(48px,4.3vw,64px);line-height:1.16;letter-spacing:-.075em}
+.install-hero h1 em{font-style:normal;color:#4674ce}
+.install-description{max-width:510px;margin-top:29px;color:#5e7188;font-size:16px;line-height:1.85;letter-spacing:-.025em}
+.install-hero-actions{display:flex;align-items:center;flex-wrap:wrap;gap:27px;margin-top:35px}
+.install-cta{
+  min-width:226px;
+  height:56px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:20px;
+  padding:0 20px 0 23px;
+  border-radius:10px;
+  background:#24477f;
+  color:#fff;
+  box-shadow:0 9px 22px #1d3d731d;
+  font-size:14px;
+  font-weight:700;
+  transition:background .18s,transform .18s,box-shadow .18s;
+}
+.install-cta:hover{background:#3568bd;transform:translateY(-2px);box-shadow:0 13px 26px #1d3d7327}
+.install-cta:active{transform:translateY(0)}
+.install-cta svg{width:18px;height:18px;flex:none}
+.install-hero-actions>a{display:inline-flex;align-items:center;gap:9px;color:#48658b;font-size:13px;font-weight:650}
+.install-hero-actions>a:hover{color:var(--install-blue)}
+.install-hero-actions>a span{font-size:18px}
+.install-caption{margin-top:16px;color:#8796a8;font-size:11px;line-height:1.6}
+.install-product-showcase{min-width:0;width:100%;margin:0}
+.install-showcase-backdrop{
+  position:relative;
+  padding:clamp(28px,4vw,55px) clamp(20px,3.3vw,45px);
+  overflow:hidden;
+  border:1px solid #dae3f0;
+  border-radius:31px;
+  background:#e8eef7;
+}
+.install-showcase-backdrop:before{
+  content:"";
+  position:absolute;
+  width:46%;
+  aspect-ratio:1;
+  top:-31%;
+  right:-8%;
+  border:1px solid #ccd9ed;
+  border-radius:50%;
+}
+.install-device{
+  position:relative;
+  overflow:hidden;
+  padding:9px;
+  border-radius:20px;
+  background:#1f3049;
+  box-shadow:0 32px 60px #1931522b,0 4px 12px #19315222;
+}
+.install-device img{display:block;width:100%;height:auto;border-radius:11px;background:#fff}
+.install-product-showcase figcaption{text-align:right;margin-top:14px;color:#71839b;font-size:11px}
+.install-product-showcase figcaption span{padding:0 5px;color:#a7b6c9}
+.install-capabilities{
+  max-width:1220px;
+  margin:auto;
+  padding:0;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  border-bottom:1px solid #e6ebf1;
+}
+.install-capabilities>div{min-width:0;padding:34px 32px 38px;border-right:1px solid #e6ebf1}
+.install-capabilities>div:first-child{padding-left:0}
+.install-capabilities>div:last-child{border-right:0;padding-right:0}
+.install-capabilities span{display:block;color:#5e85c4;font-size:11px;font-weight:750;letter-spacing:.08em}
+.install-capabilities strong{display:block;margin-top:12px;color:#263d5b;font-size:16px;letter-spacing:-.04em}
+.install-capabilities p{max-width:300px;margin-top:8px;color:#76879c;font-size:12px;line-height:1.7}
+.install-workflow{max-width:1360px;margin:auto;padding:110px clamp(24px,5.3vw,70px) 125px}
+.install-section-heading p,.install-guide-intro>p{color:#557bb6;font-size:11px;font-weight:750;letter-spacing:.16em}
+.install-section-heading h2{margin-top:17px;font-size:clamp(35px,3.4vw,49px);line-height:1.26;letter-spacing:-.06em}
+.install-section-heading>span{display:block;max-width:520px;margin-top:17px;color:#708197;font-size:14px;line-height:1.75}
+.install-workflow-grid{display:grid;grid-template-columns:minmax(0,1.28fr) minmax(0,.72fr);align-items:center;gap:clamp(38px,5vw,84px);margin-top:48px}
+.install-library-shot{min-width:0;padding:18px;border:1px solid #e1e8f1;border-radius:20px;background:#f4f7fb;box-shadow:0 16px 38px #30476310}
+.install-library-shot img{display:block;width:100%;height:auto;border:1px solid #e0e7f1;border-radius:9px;box-shadow:0 3px 15px #223d5e10}
+.install-workflow-copy{min-width:0}
+.install-workflow-step{padding:23px 0 25px;border-top:1px solid #dfe6ee}
+.install-workflow-step:last-child{border-bottom:1px solid #dfe6ee}
+.install-workflow-step span{color:#5e85c4;font-size:10px;font-weight:800;letter-spacing:.12em}
+.install-workflow-step h3{margin-top:9px;color:#263d5b;font-size:19px;letter-spacing:-.04em}
+.install-workflow-step p{margin-top:8px;color:#75869b;font-size:13px;line-height:1.7}
+.install-guide{padding:94px max(clamp(24px,5.3vw,70px),calc((100vw - 1220px)/2));background:#192e4d;color:#fff;scroll-margin-top:20px}
+.install-guide-intro>p{color:#8bb4f3}
+.install-guide-intro h2{margin-top:15px;font-size:clamp(34px,3.5vw,48px);letter-spacing:-.06em}
+.install-guide-intro>span{display:block;margin-top:16px;color:#b8c9df;font-size:14px;line-height:1.75}
+.install-guide ol{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:27px;margin:43px 0 0;padding:0;list-style:none}
+.install-guide li{padding-top:22px;border-top:1px solid #536989}
+.install-guide li>span{display:block;color:#93b6ed;font-size:11px;font-weight:800;letter-spacing:.12em}
+.install-guide li strong{display:block;margin-top:18px;font-size:17px;letter-spacing:-.04em}
+.install-guide li p{margin-top:9px;color:#b8c9df;font-size:12px;line-height:1.7}
+.install-manual{max-width:880px;margin-top:45px;padding:17px 20px;border:1px solid #526989;border-left:3px solid #8bb4f3;border-radius:7px;background:#243b5e;color:#d0def0;font-size:13px;line-height:1.75;transition:border-color .2s,background .2s}
+.install-manual-emphasis{border-color:#b9d5ff;border-left-color:#b9d5ff;background:#30517e}
+.install-footer{max-width:1360px;margin:auto;padding:28px clamp(24px,5.3vw,70px);display:flex;align-items:center;gap:24px}
+.install-footer img{display:block;width:124px;height:46px;object-fit:contain;mix-blend-mode:multiply}
+.install-footer span{color:#8897a8;font-size:11px}
+.install-footer a{margin-left:auto;color:#5574a0;font-size:11px;font-weight:650}
+@media(max-width:1050px){
+  .install-hero{grid-template-columns:1fr;gap:50px;padding-top:68px;padding-bottom:68px}
+  .install-hero-copy{max-width:760px}
+  .install-product-showcase{max-width:760px;margin:auto}
+  .install-capabilities{margin:0 clamp(24px,4.7vw,70px)}
+  .install-workflow-grid{grid-template-columns:1fr;gap:32px}
+  .install-library-shot{max-width:820px}
+  .install-workflow-copy{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}
+  .install-workflow-step:last-child{border-bottom:0}
+}
+@media(max-width:650px){
+  .install-header{height:70px;padding:0 22px}
+  .install-brand img{width:133px;height:50px}
+  .install-nav{display:none}
+  .install-header-link{padding-left:0;border-left:0;font-size:11px}
+  .install-header-link span{font-size:16px}
+  .install-hero{gap:38px;padding:56px 22px 58px}
+  .install-overline{font-size:10px}
+  .install-hero h1{font-size:clamp(42px,9vw,60px);line-height:1.18}
+  .install-description{margin-top:22px;font-size:14px;line-height:1.8}
+  .install-hero-actions{gap:22px;margin-top:29px}
+  .install-cta{height:54px;min-width:214px}
+  .install-showcase-backdrop{padding:18px;border-radius:20px}
+  .install-device{padding:6px;border-radius:12px}
+  .install-device img{border-radius:6px}
+  .install-product-showcase figcaption{font-size:10px}
+  .install-capabilities{grid-template-columns:1fr;margin:0 22px}
+  .install-capabilities>div,.install-capabilities>div:first-child,.install-capabilities>div:last-child{display:grid;grid-template-columns:39px 1fr;padding:18px 0;border-right:0;border-bottom:1px solid #e6ebf1}
+  .install-capabilities>div:last-child{border-bottom:0}
+  .install-capabilities span{grid-row:span 2;margin-top:3px}
+  .install-capabilities strong{margin:0;font-size:14px}
+  .install-capabilities p{margin-top:4px;font-size:11px}
+  .install-workflow{padding:76px 22px 86px}
+  .install-section-heading h2{font-size:35px}
+  .install-section-heading>span{font-size:13px}
+  .install-workflow-grid{margin-top:32px}
+  .install-library-shot{padding:10px;border-radius:12px}
+  .install-workflow-copy{display:block}
+  .install-workflow-step h3{font-size:17px}
+  .install-guide{padding:76px 22px}
+  .install-guide-intro h2{font-size:34px}
+  .install-guide-intro>span{font-size:13px}
+  .install-guide ol{grid-template-columns:1fr;gap:0;margin-top:36px}
+  .install-guide li{padding:20px 0}
+  .install-guide li strong{margin-top:10px}
+  .install-manual{margin-top:22px;padding:15px;font-size:12px}
+  .install-footer{flex-wrap:wrap;gap:8px 18px;padding:20px 22px 26px}
+  .install-footer span{flex-basis:calc(100% - 150px)}
+  .install-footer a{margin-left:0}
+}
+@media(max-width:390px){
+  .install-header-link{font-size:10px}
+  .install-hero h1{font-size:41px}
+  .install-hero-actions>a{font-size:12px}
+  .install-cta{min-width:204px}
+}
