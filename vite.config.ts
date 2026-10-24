@@ -35,7 +35,14 @@ export default defineConfig({
     },
     workbox: {
       importScripts: ['share-target-sw.js'],
-      globPatterns: ['**/*.{js,mjs,css,html,png,svg,woff2,wasm,bcmap,pfb,ttf}'],
+      // Keep Korean PDF CMaps offline; fetch other language maps only when a PDF needs them.
+      // Avoid hundreds of requests in the service worker's first install event.
+      globPatterns: ['**/*.{js,mjs,css,html,png,svg,woff2,wasm,pfb,ttf}', 'pdf/cmaps/UniKS-*.bcmap', 'pdf/cmaps/Adobe-Korea1-*.bcmap'],
+      runtimeCaching: [{
+        urlPattern: /\/mynotes\/pdf\/cmaps\/.*\.bcmap$/,
+        handler: 'CacheFirst',
+        options: { cacheName: 'notelin-pdf-cmaps-v1', expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 365 } }
+      }],
       maximumFileSizeToCacheInBytes: 12000000,
       cleanupOutdatedCaches: true,
       clientsClaim: true,

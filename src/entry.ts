@@ -77,7 +77,9 @@ function showInstallPage() {
       await prompt.prompt();
       const choice = await prompt.userChoice;
       guide.textContent = choice.outcome === 'accepted'
-        ? '설치가 끝나면 홈 화면이나 앱 목록의 Notelin 아이콘에서 열어 주세요.'
+        ? /SamsungBrowser\//.test(navigator.userAgent)
+          ? '설치가 끝나면 앱 목록의 Notelin 아이콘을 열어 주세요. “Failed installing”이 뜬다면 삼성 인터넷 메뉴에서 “앱 설치”를 다시 시도해 주세요.'
+          : '설치가 끝나면 홈 화면이나 앱 목록의 Notelin 아이콘에서 열어 주세요.'
         : manualInstallGuide();
     } catch {
       guide.textContent = manualInstallGuide();
