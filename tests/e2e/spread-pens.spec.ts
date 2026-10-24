@@ -104,7 +104,7 @@ test('the second page of an imported PDF accepts ink without switching pages', a
   })).toBe(true);
 });
 
-test('custom palette and combined pen presets stay separate for each note', async ({ page }) => {
+test('saved pens are shared across notes while the palette stays local to each note', async ({ page }) => {
   await page.goto('./'); await newNote(page, '프리셋 노트');
   await page.getByRole('button', { name: '기본 색상 편집' }).click();
   const colors = page.getByRole('dialog', { name: '기본 색상 편집' });
@@ -173,7 +173,12 @@ test('custom palette and combined pen presets stay separate for each note', asyn
   await page.getByRole('button', { name: '서재로 돌아가기' }).click();
   await newNote(page, '다른 노트');
   await page.getByRole('button', { name: '펜', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: '펜 선택' }).locator('.pen-preset-row')).toHaveCount(3);
+  await expect(page.getByRole('dialog', { name: '펜 선택' }).locator('.pen-preset-row')).toHaveCount(4);
+  await expect(page.getByRole('dialog', { name: '펜 선택' }).getByRole('button', { name: /빨간 연필/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#ink-width')).toHaveValue('2.5');
+  await page.getByRole('dialog', { name: '펜 선택' }).getByRole('button', { name: '구성 편집' }).click();
+  await expect(page.locator('.pen-arrange-name').nth(2)).toHaveText('빨간 연필');
+  await page.getByRole('dialog', { name: '펜 선택' }).getByRole('button', { name: '완료' }).click();
   await page.getByRole('button', { name: '펜 메뉴 닫기' }).click();
   await expect(page.locator('[data-action=color]').first()).not.toHaveAttribute('data-id', '#b82d36');
   await page.getByRole('button', { name: '서재로 돌아가기' }).click();

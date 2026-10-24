@@ -28,7 +28,14 @@ test('scroll reveals finish and reduced motion keeps every section available', a
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('./');
   const lastSection = page.locator('.install-guide-details');
-  await lastSection.scrollIntoViewIfNeeded();
+  const position = await lastSection.evaluate(element => element.getBoundingClientRect().top + window.scrollY);
+  await page.evaluate(top => window.scrollTo(0, top - 100), position);
+  await expect(lastSection).toHaveClass(/is-visible/);
+  await expect(lastSection).toHaveCSS('opacity', '1');
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(lastSection).not.toHaveClass(/is-visible/);
+  await expect(lastSection).toHaveCSS('opacity', '0');
+  await page.evaluate(top => window.scrollTo(0, top - 100), position);
   await expect(lastSection).toHaveClass(/is-visible/);
   await expect(lastSection).toHaveCSS('opacity', '1');
   await page.emulateMedia({ reducedMotion: 'reduce' });

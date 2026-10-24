@@ -103,7 +103,7 @@
 .install-footer img{display:block;width:124px;height:46px;object-fit:contain;mix-blend-mode:multiply}
 .install-footer span{color:#7a8a9f;font-size:11px}
 .install-footer a{margin-left:auto;color:#5574a0;font-size:11px;font-weight:650}
-/* Motion is finite and uses only opacity/transform; scrolling has no animation loop. */
+/* Native scroll timelines run in both directions; older browsers use repeatable reveals. */
 @media(prefers-reduced-motion:no-preference){
   .install-hero-copy>*{animation:install-enter .8s cubic-bezier(.22,1,.36,1) both}
   .install-hero-copy h1{animation-delay:.08s}
@@ -117,8 +117,12 @@
   .install-motion [data-reveal].is-visible{opacity:1;transform:translateY(0)}
   .install-motion .install-capabilities>div:nth-child(2){transition-delay:.08s}
   .install-motion .install-capabilities>div:nth-child(3){transition-delay:.16s}
-  .install-motion .install-drawn{stroke-dasharray:1;stroke-dashoffset:1}
-  .install-motion .is-visible .install-drawn{animation:install-draw 1.2s .25s ease both}
+  .install-motion .install-drawn{stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset 1.2s ease}
+  .install-motion .is-visible .install-drawn{stroke-dashoffset:0}
+  @supports(animation-timeline:view()){
+    .install-motion [data-reveal]{view-timeline:--install-reveal block;animation:install-enter linear both;animation-timeline:--install-reveal;animation-range:entry 0% entry 100%;transition:none}
+    .install-motion [data-reveal] .install-drawn{animation:install-draw linear both;animation-timeline:--install-reveal;animation-range:entry 15% entry 100%;transition:none}
+  }
 }
 @keyframes install-enter{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}
 @keyframes install-preview{from{opacity:.4;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}

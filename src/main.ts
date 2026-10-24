@@ -8,7 +8,7 @@ import { LibraryView, type LibraryState } from './ui/library';
 import { AppHistory, type AppRoute, type Direction } from './ui/history';
 import { finishSlide, slidePreviousView } from './ui/transitions';
 import { escape, icon, modal, pickFile, report, run, toast } from './ui/common';
-import { checkForUpdate, applyWaitingUpdate } from './pwa/updates';
+import { checkForUpdate, applyWaitingUpdate, hasWaitingUpdate } from './pwa/updates';
 import { version as appVersion } from '../package.json';
 import { installAppZoomGuard } from './ui/app-zoom';
 
@@ -35,6 +35,9 @@ function showAvailableUpdate() {
   refreshUpdateControls();
   if (newlyAvailable) toast('새 버전이 준비됐어요. 서재의 업데이트 버튼을 눌러 적용하세요.');
 }
+function showLatestVersion() {
+  updateAvailable = false; updateMessage = '최신 버전을 사용하고 있어요.'; refreshUpdateControls();
+}
 function refreshUpdateControls() {
   library?.setUpdateState(updateAvailable, updateApplying);
   const status = document.querySelector<HTMLElement>('#update-status');
@@ -48,18 +51,24 @@ async function applyUpdate() {
   if (updateApplying) return;
   updateApplying = true; refreshUpdateControls();
   try {
-    await applyWaitingUpdate(serviceWorkerRegistration, async () => {
+    const result = await applyWaitingUpdate(serviceWorkerRegistration, async () => {
       await editor?.flush(); updateMessage = '저장했어요. 새 버전을 적용하고 있어요…'; refreshUpdateControls();
     });
+    if (result === 'latest') { showLatestVersion(); toast('최신 버전을 사용하고 있어요.'); }
   } finally { updateApplying = false; refreshUpdateControls(); }
 }
 function watchServiceWorker(registration: ServiceWorkerRegistration) {
   serviceWorkerRegistration = registration;
-  const noticeIfWaiting = () => { if (registration.waiting) showAvailableUpdate(); };
+  const noticeIfWaiting = () => {
+    void hasWaitingUpdate(registration).then(available => {
+      if (available) showAvailableUpdate(); else if (!updateApplying) showLatestVersion();
+    }).catch(() => {});
+  };
   registration.addEventListener('updatefound', () => {
     registration.installing?.addEventListener('statechange', noticeIfWaiting);
     noticeIfWaiting();
   });
+  navigator.serviceWorker.addEventListener('controllerchange', noticeIfWaiting);
   noticeIfWaiting(); refreshUpdateControls(); void probeUpdate();
 }
 async function registerAppWorker() {
@@ -75,7 +84,7 @@ async function registerAppWorker() {
     immediate: true,
     onNeedReload() { /* Manual activation below reloads only after saving. */ },
     onOfflineReady() { toast('오프라인 사용 준비가 완료됐어요.'); },
-    onNeedRefresh: showAvailableUpdate,
+    onNeedRefresh() { if (serviceWorkerRegistration) void hasWaitingUpdate(serviceWorkerRegistration).then(available => { if (available) showAvailableUpdate(); else showLatestVersion(); }); },
     onRegisteredSW(_url, registration) { if (registration) watchServiceWorker(registration); },
     onRegisterError(error) { console.error('Service Worker registration failed', error); toast('오프라인 설치를 준비하지 못했어요. 연결을 확인해 주세요.', true); }
   });
@@ -88,11 +97,11 @@ window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); instal
 window.addEventListener('appinstalled', () => { installPrompt = undefined; toast('Notelin이 설치됐어요.'); });
 window.addEventListener('offline', () => toast('오프라인이에요. 이 기기에서 계속 필기할 수 있어요.'));
 async function probeUpdate() {
-  if (document.hidden || !navigator.onLine || !serviceWorkerRegistration || updateAvailable || updateApplying || updateChecking || updateProbeRunning || Date.now() - lastUpdateCheck < 15000) return;
+  if (document.hidden || !navigator.onLine || !serviceWorkerRegistration || updateApplying || updateChecking || updateProbeRunning || Date.now() - lastUpdateCheck < 15000) return;
   lastUpdateCheck = Date.now(); updateProbeRunning = true;
   try {
     if (await checkForUpdate(serviceWorkerRegistration) === 'available') showAvailableUpdate();
-    else if (!updateAvailable) { updateMessage = '최신 버전을 사용하고 있어요.'; refreshUpdateControls(); }
+    else showLatestVersion();
   } catch { /* Keep writing available when the network check fails. */ }
   finally { updateProbeRunning = false; }
 }

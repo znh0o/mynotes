@@ -12,6 +12,7 @@ export default defineConfig({
     name: 'notelin-release-marker',
     generateBundle() {
       this.emitFile({ type: 'asset', fileName: 'release.json', source: JSON.stringify({ revision: releaseRevision }) });
+      this.emitFile({ type: 'asset', fileName: 'release-worker.js', source: `self.addEventListener('message', event => { if (event.data?.type === 'NOTELIN_RELEASE') event.ports[0]?.postMessage({ revision: ${JSON.stringify(releaseRevision)} }); });` });
     }
   }, VitePWA({
     registerType: 'prompt',
@@ -20,7 +21,7 @@ export default defineConfig({
     // index.html selects the Samsung-compatible or full manifest before app startup.
     manifest: false,
     workbox: {
-      importScripts: ['share-target-sw.js'],
+      importScripts: ['share-target-sw.js', 'release-worker.js'],
       // Keep Korean PDF CMaps offline; fetch other language maps only when a PDF needs them.
       // Avoid hundreds of requests in the service worker's first install event.
       globPatterns: ['**/*.{js,mjs,css,html,png,webp,svg,woff2,wasm,pfb,ttf,webmanifest}', 'pdf/cmaps/UniKS-*.bcmap', 'pdf/cmaps/Adobe-Korea1-*.bcmap'],

@@ -12,14 +12,17 @@ async function workerRelease(page: Page) {
 
 test('settings can check, download and apply a real worker update without losing ink', async ({ page, context }) => {
   let release = 1;
+  let duplicate = 0;
   const dist = resolve('dist');
+  const builtRevision = JSON.parse(await readFile(resolve(dist, 'release.json'), 'utf8')).revision;
   const server = createServer(async (req, res) => {
     try {
       const url = new URL(req.url!, 'http://localhost'), relative = decodeURIComponent(url.pathname).replace(/^\/mynotes\//, '') || 'index.html';
       const path = resolve(dist, relative);
       if (!url.pathname.startsWith('/mynotes/') || !path.startsWith(dist + sep)) { res.writeHead(404).end(); return; }
       let body = await readFile(path);
-      if (relative === 'sw.js') body = Buffer.from(`${body.toString()}\nself.addEventListener('message', e => { if(e.data?.type === 'TEST_RELEASE') e.ports[0].postMessage(${release}); });\n// test release ${release}`);
+      if (relative === 'sw.js') body = Buffer.from(`${body.toString()}\nself.addEventListener('message', e => { if(e.data?.type === 'TEST_RELEASE') e.ports[0].postMessage(${release}); });\n// test release ${release}, registration ${duplicate}`);
+      if (relative === 'release-worker.js' && release > 1) body = Buffer.from(body.toString().replace(JSON.stringify(builtRevision), JSON.stringify(`test-release-${release}`)));
       if (relative === 'release.json' && release > 1) body = Buffer.from(JSON.stringify({ revision: `test-release-${release}` }));
       const mime: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.wasm': 'application/wasm' };
       res.writeHead(200, { 'Content-Type': mime[extname(path)] || 'application/octet-stream', 'Cache-Control': 'no-store' }); res.end(body);
@@ -38,6 +41,12 @@ test('settings can check, download and apply a real worker update without losing
     const check = page.getByRole('button', { name: '업데이트 확인', exact: true });
     await expect(check).toBeVisible(); await check.click();
     await expect(page.locator('#update-status')).toHaveText('최신 버전을 사용하고 있어요.');
+    // A different SW script can still contain the same application release.
+    duplicate++;
+    await check.click();
+    await expect(page.locator('#update-status')).toHaveText('최신 버전을 사용하고 있어요.');
+    await expect(page.getByRole('button', { name: '저장 후 새 버전 적용', exact: true })).toBeHidden();
+    await expect(page.getByRole('button', { name: '지금 업데이트', exact: true })).toHaveCount(0);
     await context.setOffline(true); await check.click();
     await expect(page.locator('#update-status')).toContainText('오프라인'); await expect(check).toBeEnabled();
     await context.setOffline(false); await page.getByRole('button', { name: '완료', exact: true }).click();
@@ -81,5 +90,16 @@ test('settings can check, download and apply a real worker update without losing
       window.dispatchEvent(new Event('focus'));
     });
     await expect(page.locator('.welcome-banner h2')).toHaveText('업데이트가 있어요.');
+    // Another window may activate an update after this window showed the banner.
+    await page.evaluate(async () => {
+      const registration = await navigator.serviceWorker.getRegistration();
+      await new Promise<void>(resolve => {
+        navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), { once: true });
+        registration!.waiting!.postMessage({ type: 'SKIP_WAITING' });
+      });
+    });
+    await expect(page.getByRole('button', { name: '지금 업데이트', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: '설정 및 백업', exact: true }).click(); await check.click();
+    await expect(page.locator('#update-status')).toHaveText('최신 버전을 사용하고 있어요.');
   } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }
 });

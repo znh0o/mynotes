@@ -1,4 +1,4 @@
-import { uid, type Item, type Page, type Point, type Shape, type ShapeItem, type Stroke, type TextItem, type Tool } from '../data/model';
+import { uid, type ImageItem, type Item, type Page, type Point, type Shape, type ShapeItem, type Stroke, type TextItem, type Tool } from '../data/model';
 import { bounds, erase, inside, transform } from './geometry';
 import { drawItem, drawItems } from './render';
 import { LiveStroke } from './LiveStroke';
@@ -23,6 +23,7 @@ export class InkEngine {
   private start: Point | null = null;
   private before: Item[] | null = null;
   private moving = false;
+  private imageGesture?: { original: ImageItem; start: Point; corner?: { x: number; y: number } };
   private gestureTool: Tool | null = null;
   private frame = 0;
   private ratio = 1;
@@ -100,10 +101,15 @@ export class InkEngine {
     ctx.strokeStyle = '#5d8ac2'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 5]);
     if (this.lasso.length) { ctx.beginPath(); this.lasso.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); ctx.fillStyle = '#719ad417'; ctx.fill(); ctx.stroke(); }
     if (this.selected.size) {
-      const b = bounds(this.page.items.filter(i => this.selected.has(i.id)));
-      ctx.strokeRect(b.x - 8, b.y - 8, b.w + 16, b.h + 16);
+      const items = this.page.items.filter(i => this.selected.has(i.id));
+      const b = bounds(items), image = this.options.tool === 'image' && items.length === 1 && items[0].kind === 'image';
+      const screenScale = this.live.getBoundingClientRect().width / this.page.width;
+      const pad = image ? 0 : 8, radius = image ? 5 / screenScale : 4;
+      if (image) { ctx.setLineDash([]); ctx.lineWidth = 1.5 / screenScale; }
+      ctx.strokeRect(b.x - pad, b.y - pad, b.w + pad * 2, b.h + pad * 2);
       ctx.setLineDash([]); ctx.fillStyle = '#fff';
-      for (const p of [{ x: b.x - 8, y: b.y - 8 }, { x: b.x + b.w + 8, y: b.y + b.h + 8 }]) { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+      const corners = image ? this.imageCorners(b) : [{ x: b.x - 8, y: b.y - 8 }, { x: b.x + b.w + 8, y: b.y + b.h + 8 }];
+      for (const p of corners) { ctx.beginPath(); ctx.arc(p.x, p.y, radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
     }
     ctx.restore();
   }
@@ -153,6 +159,42 @@ export class InkEngine {
   get canUndo() { return !!this.history.length; }
   get canRedo() { return !!this.future.length; }
   clearSelection() { this.selected.clear(); this.selection(0); this.preview(); }
+  selectImage(id: string) {
+    this.selected = new Set([id]); this.selection(1); this.preview();
+  }
+  private imageCorners(b: { x: number; y: number; w: number; h: number }) {
+    return [{ x: b.x, y: b.y }, { x: b.x + b.w, y: b.y }, { x: b.x + b.w, y: b.y + b.h }, { x: b.x, y: b.y + b.h }];
+  }
+  private beginImage(e: PointerEvent, p: Point) {
+    const selected = this.page.items.find((item): item is ImageItem => item.kind === 'image' && this.selected.has(item.id));
+    const hitRadius = (e.pointerType === 'touch' ? 20 : 13) * this.page.width / this.inputRect!.width;
+    const corner = selected && this.imageCorners(selected).find(c => Math.hypot(c.x - p.x, c.y - p.y) <= hitRadius);
+    const item = corner ? selected : [...this.page.items].reverse().find((item): item is ImageItem => item.kind === 'image'
+      && p.x >= item.x && p.x <= item.x + item.w && p.y >= item.y && p.y <= item.y + item.h);
+    if (!item) { this.clearSelection(); this.inputRect = undefined; return; }
+    this.selectImage(item.id); this.checkpoint(); this.mutableSelection();
+    this.imageGesture = { original: { ...item }, start: p, corner: corner ? { x: corner.x === item.x ? -1 : 1, y: corner.y === item.y ? -1 : 1 } : undefined };
+    this.activePointer = e.pointerId; this.live.setPointerCapture(e.pointerId);
+    this.start = this.last = p; this.gestureTool = 'image';
+  }
+  private moveImage(p: Point) {
+    const { original: source, start, corner } = this.imageGesture!;
+    const item = this.page.items.find((item): item is ImageItem => item.id === source.id && item.kind === 'image')!;
+    const dx = p.x - start.x, dy = p.y - start.y;
+    if (!corner) {
+      item.x = Math.max(0, Math.min(this.page.width - source.w, source.x + dx));
+      item.y = Math.max(0, Math.min(this.page.height - source.h, source.y + dy));
+    } else {
+      const anchorX = source.x + (corner.x < 0 ? source.w : 0), anchorY = source.y + (corner.y < 0 ? source.h : 0);
+      const max = Math.min((corner.x < 0 ? anchorX : this.page.width - anchorX) / source.w,
+        (corner.y < 0 ? anchorY : this.page.height - anchorY) / source.h);
+      const min = Math.min(1, 24 / Math.min(source.w, source.h));
+      const scale = Math.max(Math.min(min, max), Math.min(max, 1 + (dx * corner.x * source.w + dy * corner.y * source.h) / (source.w ** 2 + source.h ** 2)));
+      item.w = source.w * scale; item.h = source.h * scale;
+      item.x = anchorX - (corner.x < 0 ? item.w : 0); item.y = anchorY - (corner.y < 0 ? item.h : 0);
+    }
+    this.dirtyInk = true;
+  }
   selectionAction(action: string) {
     const items = this.page.items.filter(i => this.selected.has(i.id));
     if (action === 'copy') { this.clipboard = structuredClone(items); return; }
@@ -171,7 +213,7 @@ export class InkEngine {
     this.eraserCursor.clear();
     clearTimeout(this.holdTimer); this.holdTimer = undefined; this.holdAnchor = undefined; this.straightSource = undefined;
     if (this.before && this.page) { this.page.items = this.before; this.before = null; this.render(); }
-    this.stroke = null; this.shape = null; this.lasso = []; this.activePointer = null; this.moving = false; this.gestureTool = null; this.inputRect = undefined;
+    this.stroke = null; this.shape = null; this.lasso = []; this.activePointer = null; this.moving = false; this.imageGesture = undefined; this.gestureTool = null; this.inputRect = undefined;
     this.liveStroke.reset(); this.dirtyInk = false;
     if (this.page) this.preview();
   }
@@ -185,7 +227,8 @@ export class InkEngine {
     e.preventDefault();
     this.inputRect = this.live.getBoundingClientRect();
     const p = this.point(e);
-    if (tool === 'text' || tool === 'image') { this.inputRect = undefined; this.insert(p, tool); return; }
+    if (tool === 'image') { this.beginImage(e, p); return; }
+    if (tool === 'text') { this.inputRect = undefined; this.insert(p, tool); return; }
     this.activePointer = e.pointerId; this.live.setPointerCapture(e.pointerId); this.start = this.last = p;
     this.checkpoint();
     this.beginSegment(tool, p); this.armStraightLine(p); this.schedule();
@@ -234,6 +277,10 @@ export class InkEngine {
     if (e.pointerType === 'pen' && this.activePointer === null && penContact(e)) { this.down(e); return; }
     if (e.pointerId !== this.activePointer || !this.last) return;
     e.preventDefault();
+    if (this.imageGesture) {
+      if (e.pointerType === 'pen' && !penContact(e)) { this.up(e); return; }
+      this.moveImage(this.point(e)); this.schedule(); return;
+    }
     let switched = false;
     if (e.pointerType === 'pen') {
       if (!penContact(e)) { this.up(e); return; }
@@ -277,6 +324,10 @@ export class InkEngine {
     else this.render();
     if (this.stroke) this.page.items.push(this.stroke);
     if (this.shape && Math.abs(this.shape.w) + Math.abs(this.shape.h) > 2) this.page.items.push(this.shape);
+    if (this.imageGesture) {
+      const source = this.imageGesture.original, item = this.page.items.find(i => i.id === source.id) as ImageItem;
+      if (item.x === source.x && item.y === source.y && item.w === source.w && item.h === source.h) this.before = null;
+    }
     if (this.lasso.length) {
       const polygon = this.lasso;
       for (const item of this.page.items) {
@@ -286,7 +337,7 @@ export class InkEngine {
       }
       this.before = null; this.selection(this.selected.size);
     } else this.commit();
-    this.stroke = null; this.shape = null; this.lasso = []; this.moving = false; this.straightSource = undefined;
+    this.stroke = null; this.shape = null; this.lasso = []; this.moving = false; this.imageGesture = undefined; this.straightSource = undefined;
     this.activePointer = null; this.gestureTool = null; this.inputRect = undefined; this.dirtyInk = false; this.preview();
     if (this.live.hasPointerCapture(e.pointerId)) this.live.releasePointerCapture(e.pointerId);
   }

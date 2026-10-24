@@ -7,9 +7,7 @@ export function initInstallExperience(root: HTMLElement) {
   if (!reducedMotion.matches && 'IntersectionObserver' in window) {
     const observer = new IntersectionObserver(entries => {
       for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
-        entry.target.classList.add('is-visible');
-        observer.unobserve(entry.target);
+        entry.target.classList.toggle('is-visible', entry.isIntersecting && entry.intersectionRatio >= 0.12);
       }
     }, { threshold: 0.12 });
     page.classList.add('install-motion');

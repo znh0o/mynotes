@@ -27,7 +27,7 @@ export function penCollection(value: unknown, fallback: PenCollection): PenColle
   if (!Array.isArray(raw.presets)) return fallback;
   const ids = new Set<string>();
   const presets: PenPreset[] = [];
-  for (const row of raw.presets.slice(0, 12)) {
+  for (const row of raw.presets) {
     if (!row || typeof row !== 'object') continue;
     const pen = row as Record<string, unknown>;
     if (!isPenKind(pen.tool) || typeof pen.id !== 'string' || !pen.id || ids.has(pen.id)) continue;
