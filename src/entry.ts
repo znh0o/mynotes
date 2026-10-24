@@ -88,6 +88,6 @@ function showInstallPage() {
   });
   if ('serviceWorker' in navigator) {
     // The install page has no open notes to save, so activate new releases immediately.
-    const applyUpdate = registerSW({ immediate: true, onNeedReload() { void applyUpdate(true); } });
+    const applyUpdate = registerSW({ immediate: true, onNeedRefresh() { void applyUpdate(true); } });
   }
 }
