@@ -17,6 +17,7 @@ test('tools switch on the first stylus or touch tap even when compatibility clic
     const target = ['볼펜', '만년필', '연필'].includes(name)
       ? page.locator('.pen-preset-row').filter({ hasText: name }).first()
       : page.getByRole('button', { name, exact: true });
+    await expect(target).toBeVisible();
     const r = (await target.boundingBox())!, x = r.x + r.width / 2, y = r.y + r.height / 2;
     await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', pointerType: 'pen', buttons: 0, x, y });
     await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', pointerType: 'pen', button: 'left', buttons: 1, x, y, force: .2, clickCount: 1 });
@@ -29,6 +30,7 @@ test('tools switch on the first stylus or touch tap even when compatibility clic
   for (const name of ['만년필', '지우개', '볼펜']) {
     if (name !== '지우개') await page.getByRole('button', { name: '펜', exact: true }).tap();
     const target = name === '지우개' ? page.getByRole('button', { name, exact: true }) : page.locator('.pen-preset-row').filter({ hasText: name }).first();
+    await expect(target).toBeVisible();
     const r = (await target.boundingBox())!;
     await page.touchscreen.tap(r.x + r.width / 2, r.y + r.height / 2);
     await expect(name === '지우개' ? target : page.locator('.pen-tool')).toHaveAttribute('aria-pressed', 'true');
