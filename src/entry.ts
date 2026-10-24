@@ -86,5 +86,8 @@ function showInstallPage() {
     }
     guide.classList.add('install-manual-emphasis');
   });
-  if ('serviceWorker' in navigator) registerSW({ immediate: true, onNeedReload() { /* The app applies updates after saving. */ } });
+  if ('serviceWorker' in navigator) {
+    // The install page has no open notes to save, so activate new releases immediately.
+    const applyUpdate = registerSW({ immediate: true, onNeedReload() { void applyUpdate(true); } });
+  }
 }
