@@ -145,7 +145,9 @@ test('shape, lasso move/resize/copy/delete, partial eraser and zoom coordinates'
   await page.getByRole('button', { name: '선택 삭제', exact: true }).click();
   await expect.poll(async () => (await current()).items.length).toBe(1);
   await selectPen(page, '볼펜'); await pen(page, 120, 380);
-  await page.getByRole('button', { name: '확대', exact: true }).click();
+  await page.getByRole('button', { name: '보기 옵션' }).click();
+  await page.locator('#view-options-panel [data-action=zoom-in]').click();
+  await page.getByRole('button', { name: '보기 옵션' }).click();
   const zoomRect = await page.locator('#paper-live').boundingBox();
   await page.getByRole('button', { name: '도형', exact: true }).click();
   await page.getByRole('dialog', { name: '도형 선택' }).getByRole('button', { name: '사각형' }).click();

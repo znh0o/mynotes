@@ -161,7 +161,7 @@ test('Samsung Internet compatibility toggles once, waits for contact, restores p
   await primaryMove(0, 1);
   await expect(page.getByRole('button', { name: '지우개', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.eraser-picker:popover-open')).toHaveCount(0);
-  await expect(page.locator('.eraser-cursor')).toBeVisible();
+  await expect(page.locator('.paper-surface .eraser-cursor')).toBeVisible();
   // Repeated zero-pressure samples must neither toggle back nor erase ink.
   await primaryMove(0, 1); await primaryMove(-1, 1);
   await expect(page.getByRole('button', { name: '지우개', exact: true })).toHaveAttribute('aria-pressed', 'true');
@@ -204,7 +204,7 @@ test('eraser circle follows its real size, zoom and temporary barrel mode withou
       (window as any).cursorEvents.push({ type, pointerType: e.pointerType, buttons: e.buttons, pressure: e.pressure });
     });
   });
-  const circle = page.locator('.eraser-cursor');
+  const circle = page.locator('.paper-surface .eraser-cursor');
   await page.getByRole('button', { name: '지우개', exact: true }).tap();
   await page.getByRole('button', { name: '버튼을 누르면 에어 커맨드가 열리나요?', exact: true }).tap();
   await expect(page.locator('#pen-button-guide')).toContainText('펜 버튼으로 에어 커맨드 열기');
@@ -227,7 +227,9 @@ test('eraser circle follows its real size, zoom and temporary barrel mode withou
     let sum = 0; for (let i = 3; i < data.length; i += 4) sum += data[i]; return sum;
   }));
   expect(alpha).toEqual([0, 0]);
-  await page.getByRole('button', { name: '축소', exact: true }).tap();
+  await page.getByRole('button', { name: '보기 옵션' }).tap();
+  await page.locator('#view-options-panel [data-action=zoom-out]').tap();
+  await page.getByRole('button', { name: '보기 옵션' }).tap();
   await pen(page, cdp, 'mouseMoved', 240, 210, 0, 0); await expect(circle).toBeVisible(); await checkSize();
   await page.screenshot({ path: '../MyNotes-eraser-circle.png' });
   await selectPen(page, '볼펜', true); await expect(circle).toBeHidden();

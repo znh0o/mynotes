@@ -2,7 +2,9 @@ import { test, expect } from '@playwright/test';
 
 test('browser mode shows only the install experience and never opens the notes database', async ({ page }) => {
   await page.goto('./');
-  await expect(page.getByRole('heading', { name: /생각이 머무는/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /필기와 자료가/ })).toBeVisible();
+  await expect(page.getByText('S펜으로 쓰고', { exact: true })).toBeVisible();
+  await expect(page.getByText('PDF에 표시하고', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Notelin 설치하기' })).toBeVisible();
   await expect(page.locator('#paper-live,.library-shell')).toHaveCount(0);
   expect(await page.evaluate(() => indexedDB.databases().then(rows => rows.some(row => row.name === 'mynotes-v1')))).toBe(false);

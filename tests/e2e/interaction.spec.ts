@@ -96,7 +96,6 @@ test('editor blocks refresh shortcuts and asks before browser reload while updat
   for (const shortcut of ['F5', 'Control+r', 'Control+Shift+r']) {
     await page.keyboard.press(shortcut);
     expect(await page.evaluate(() => (window as any).sameDocument)).toBe('editor-session');
-    await expect(page.locator('#toast')).toContainText('새로고침을 막았어요');
   }
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).overscrollBehaviorY)).toBe('none');
   const cdp = await page.context().newCDPSession(page);

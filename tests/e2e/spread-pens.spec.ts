@@ -1,4 +1,5 @@
 import { test, expect, type Page } from './standalone-test';
+import { PDFDocument, rgb } from 'pdf-lib';
 
 async function newNote(page: Page, title: string) {
   await page.getByRole('button', { name: '새 노트', exact: true }).click();
@@ -17,33 +18,47 @@ async function records(page: Page, store: string) {
   }, store);
 }
 
-test('two-page view displays pairs, switches the editable page, and remembers the view', async ({ page }) => {
+test('two-page view lets both sheets take ink immediately and remembers the view', async ({ page }) => {
   await page.goto('./'); await newNote(page, '두 페이지 확인');
+  const noteId = (await records(page, 'notes')).filter(row => row.title === '두 페이지 확인').sort((a, b) => b.created - a.created)[0].id;
+  const inkedPages = async () => (await records(page, 'pages')).filter(row => row.noteId === noteId && row.items.some((item: any) => item.kind === 'stroke')).length;
   for (let number = 2; number <= 4; number++) {
     await page.getByRole('button', { name: '페이지 추가', exact: true }).last().click();
     await expect(page.locator('.page-position')).toHaveText(`${number} / ${number}`);
   }
   await page.getByRole('button', { name: '1페이지', exact: true }).click();
-  await page.getByRole('button', { name: '두 페이지 보기' }).click();
+  await expect(page.locator('.editor-footer')).toHaveCount(0);
+  await page.getByRole('button', { name: '보기 옵션' }).click();
+  await expect(page.locator('#view-options-panel')).toBeVisible();
+  await page.locator('#view-options-panel [data-action=two-page]').click();
+  await page.getByRole('button', { name: '보기 옵션' }).click();
   await expect(page.locator('.paper-stage')).toHaveClass(/two-page/);
   await expect(page.locator('.page-position')).toHaveText('1–2 / 4');
-  const companion = page.getByRole('button', { name: '2페이지 선택하여 필기' });
+  const companion = page.locator('.spread-companion');
   await expect(companion).toBeVisible();
   const left = (await page.locator('.paper-sizing').boundingBox())!, right = (await companion.boundingBox())!;
   expect(left.x + left.width).toBeLessThan(right.x);
 
-  await companion.click();
-  await expect(page.locator('.paper-sizing .spread-page-number')).toHaveText('2');
-  const canvas = page.locator('#paper-live'), box = (await canvas.boundingBox())!;
-  await page.mouse.move(box.x + 65, box.y + 75); await page.mouse.down();
-  await page.mouse.move(box.x + 160, box.y + 95, { steps: 12 }); await page.mouse.up();
-  await page.getByRole('button', { name: '1페이지 선택하여 필기' }).click();
+  const draw = async (canvas: string) => {
+    const box = (await page.locator(canvas).boundingBox())!;
+    await page.mouse.move(box.x + 55, box.y + 65); await page.mouse.down();
+    await page.mouse.move(box.x + 145, box.y + 87, { steps: 10 }); await page.mouse.up();
+  };
+  await draw('#paper-live');
+  await draw('.spread-live');
+  await expect(page.locator('.paper-sizing .spread-page-number')).toHaveText('1');
+  await expect.poll(inkedPages).toBe(2);
   await expect.poll(() => page.locator('.spread-ink').evaluate(canvas => {
     const element = canvas as HTMLCanvasElement, ctx = element.getContext('2d')!;
     const pixels = ctx.getImageData(0, 0, element.width, element.height).data;
     for (let index = 3; index < pixels.length; index += 4) if (pixels[index]) return true;
     return false;
   })).toBe(true);
+  await page.screenshot({ path: '../Notelin-editor-two-page.png' });
+  await page.getByRole('button', { name: '실행 취소 (Ctrl+Z)' }).click();
+  await expect.poll(inkedPages).toBe(1);
+  await draw('.spread-live');
+  await expect.poll(inkedPages).toBe(2);
   await page.getByRole('button', { name: '다음 페이지' }).click();
   await expect(page.locator('.page-position')).toHaveText('3–4 / 4');
   await page.getByRole('button', { name: '이전 페이지' }).click();
@@ -51,8 +66,42 @@ test('two-page view displays pairs, switches the editable page, and remembers th
   await page.getByRole('button', { name: '서재로 돌아가기' }).click();
   await page.getByRole('button', { name: '두 페이지 확인 열기' }).click();
   await expect(page.locator('.paper-stage')).toHaveClass(/two-page/);
-  await page.getByRole('button', { name: '한 페이지 보기' }).click();
+  await page.getByRole('button', { name: '보기 옵션' }).click();
+  await page.locator('#view-options-panel [data-action=two-page]').click();
   await expect(page.locator('.paper-stage')).not.toHaveClass(/two-page/);
+});
+
+test('the second page of an imported PDF accepts ink without switching pages', async ({ page }) => {
+  await page.goto('./');
+  const pdf = await PDFDocument.create();
+  pdf.addPage([600, 800]).drawRectangle({ x: 80, y: 250, width: 440, height: 300, color: rgb(.88, .95, 1) });
+  pdf.addPage([600, 800]).drawRectangle({ x: 80, y: 250, width: 440, height: 300, color: rgb(1, .93, .84) });
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'PDF 가져오기', exact: true }).click();
+  await (await chooser).setFiles({ name: '두 페이지 PDF.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await pdf.save()) });
+  await expect(page.locator('.page-loading')).toBeHidden();
+  await page.getByRole('button', { name: '보기 옵션' }).click();
+  await page.locator('#view-options-panel [data-action=two-page]').click();
+  await page.getByRole('button', { name: '보기 옵션' }).click();
+  await expect(page.locator('.spread-companion')).toBeVisible();
+  await expect.poll(() => page.locator('.spread-background').evaluate(canvas => {
+    const element = canvas as HTMLCanvasElement;
+    const color = element.getContext('2d')!.getImageData(element.width / 2, element.height / 2, 1, 1).data;
+    return color[0] > 240 && color[2] < 230;
+  })).toBe(true);
+  const box = (await page.locator('.spread-live').boundingBox())!;
+  await page.mouse.move(box.x + 70, box.y + 80); await page.mouse.down();
+  await page.mouse.move(box.x + 180, box.y + 100, { steps: 12 }); await page.mouse.up();
+  const note = (await records(page, 'notes')).find(row => row.title === '두 페이지 PDF');
+  await expect.poll(async () => (await records(page, 'pages')).find(row => row.noteId === note.id && row.pdfIndex === 2)?.items.length).toBe(1);
+  await page.getByRole('button', { name: '서재로 돌아가기' }).click();
+  await page.getByRole('button', { name: '두 페이지 PDF 열기' }).click();
+  await expect(page.locator('.spread-companion')).toBeVisible();
+  await expect.poll(() => page.locator('.spread-ink').evaluate(canvas => {
+    const element = canvas as HTMLCanvasElement, data = element.getContext('2d')!.getImageData(0, 0, element.width, element.height).data;
+    for (let index = 3; index < data.length; index += 4) if (data[index]) return true;
+    return false;
+  })).toBe(true);
 });
 
 test('custom palette and combined pen presets stay separate for each note', async ({ page }) => {

@@ -3,7 +3,6 @@ import { newPage, paperNames, uid, type Item, type Note, type Page, type Paper, 
 import { documentFrame, splitDocument, textFont } from '../engine/text';
 import { background, exportPDF, loadImages, thumbnail } from '../data/pdf';
 import { InkEngine } from '../engine/InkEngine';
-import { drawItems } from '../engine/render';
 import { button, contextMenu, escape, icon, modal, pickFile, report, run, toast, confirmAction } from './common';
 import { isAppReloadApproved } from '../pwa/navigation';
 import { PagePreviews } from './page-previews';
@@ -25,11 +24,14 @@ const shapeIcon = (shape: Shape, size: number) => `<svg aria-hidden="true" width
 
 export class EditorView {
   private engine!: InkEngine;
+  private companionEngine!: InkEngine;
+  private editingEngine!: InkEngine;
   private page!: Page;
   private index = 0;
   private scale = .8;
   private queue: SaveQueue;
   private thumbTimer: ReturnType<typeof setTimeout> | undefined;
+  private companionThumbTimer: ReturnType<typeof setTimeout> | undefined;
   private resizeObserver!: ResizeObserver;
   private abort = new AbortController();
   private generation = 0;
@@ -81,18 +83,24 @@ export class EditorView {
     if (Array.isArray(paletteSetting?.value) && paletteSetting.value.length === 5 && paletteSetting.value.every((color: unknown) => typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color))) this.palette = paletteSetting.value;
     document.title = `${this.note.title} · Notelin`;
     this.root.innerHTML = `<div class="editor-shell">
-      <header class="editor-header"><button class="editor-home" data-action="home" aria-label="서재로 돌아가기">${icon('ChevronLeft', 19)}<span class="brand-mark small">${icon('PenLine', 18)}</span><span>서재</span></button><div class="open-tabs">${this.tabs.map(t => `<div class="note-tab ${t.id === this.note.id ? 'active' : ''}"><button data-action="tab" data-id="${t.id}">${icon('BookOpen', 15)}<span>${escape(t.title)}</span></button><button data-action="close-tab" data-id="${t.id}" aria-label="${escape(t.title)} 탭 닫기">${icon('X', 13)}</button></div>`).join('')}</div><div class="editor-header-actions"><button class="save-indicator" id="save-status" data-action="save" title="지금 저장">${icon('Check', 13)} 모든 변경사항 저장됨</button>${button('Search', '노트 내 텍스트 검색', 'search')}${button('Download', 'PDF 내보내기', 'export')}${button('Maximize', '전체 화면', 'fullscreen')}${button('MoreHorizontal', '노트 설정', 'settings')}</div></header>
+      <header class="editor-header"><button class="editor-home" data-action="home" aria-label="서재로 돌아가기">${icon('ChevronLeft', 19)}<span class="brand-mark small">${icon('PenLine', 18)}</span><span>서재</span></button><div class="open-tabs">${this.tabs.map(t => `<div class="note-tab ${t.id === this.note.id ? 'active' : ''}"><button data-action="tab" data-id="${t.id}">${icon('BookOpen', 15)}<span>${escape(t.title)}</span></button><button data-action="close-tab" data-id="${t.id}" aria-label="${escape(t.title)} 탭 닫기">${icon('X', 13)}</button></div>`).join('')}</div><div class="editor-page-controls">${button('ChevronLeft', '이전 페이지', 'prev-page')}<button class="page-position" data-action="goto-page">1 / ${this.note.pageIds.length}</button>${button('ChevronRight', '다음 페이지', 'next-page')}</div><div class="editor-header-actions"><button class="save-indicator" id="save-status" data-action="save" title="지금 저장">${icon('Check', 13)} 모든 변경사항 저장됨</button>${button('Search', '노트 내 텍스트 검색', 'search')}${button('Download', 'PDF 내보내기', 'export')}${button('Maximize', '전체 화면', 'fullscreen')}${button('BookOpen', '보기 옵션', 'view-options', 'aria-haspopup="true" aria-expanded="false" aria-controls="view-options-panel"')}${button('MoreHorizontal', '노트 설정', 'settings')}</div><div class="view-options-panel" id="view-options-panel" hidden><div class="view-panel-heading">페이지 보기</div><button class="view-layout-button" type="button" data-action="two-page" aria-pressed="false">${icon('BookOpen', 19)}<span><strong>두 페이지</strong><small>양쪽 페이지에 바로 필기</small></span><span class="view-layout-check">${icon('Check', 15)}</span></button><div class="view-panel-divider"></div><div class="view-panel-heading">배율</div><div class="view-zoom-controls">${button('Minus', '축소', 'zoom-out')}<button id="zoom-value" data-action="fit">80%</button>${button('Plus', '확대', 'zoom-in')}</div><button class="view-fit-button" data-action="fit">화면에 맞춤</button><div class="view-panel-paper" id="paper-description">A4 · 줄노트</div></div></header>
       <div class="ink-toolbar" role="toolbar" aria-label="필기 도구"><div class="toolbar-tools"><div class="tool-group editor-utility">${button('PanelLeft', '페이지 목록', 'sidebar')}<span class="toolbar-separator"></span>${button('Undo2', '실행 취소 (Ctrl+Z)', 'undo', 'disabled')}${button('Redo2', '다시 실행 (Ctrl+Shift+Z)', 'redo', 'disabled')}</div><div class="tool-group drawing-tools"><button class="tool-button pen-tool active" data-action="pen-menu" aria-label="펜" aria-haspopup="dialog" aria-expanded="false" aria-pressed="true" title="펜">${icon('PenLine', 22)}<span>펜</span></button>${([['highlighter', 'Highlighter', '형광펜'], ['eraser', 'Eraser', '지우개'], ['lasso', 'Lasso', '올가미'], ['shape', 'Shapes', '도형'], ['text', 'Type', '텍스트'], ['image', 'Image', '이미지'], ['hand', 'Hand', '이동']] as const).map(([tool, i, label]) => `<button class="tool-button" data-action="tool" data-id="${tool}" aria-label="${label}" aria-pressed="false" title="${label}">${icon(i, 22)}<span>${label}</span></button>`).join('')}</div></div><div class="ink-style-controls"><div class="color-palette">${this.palette.map((c, n) => `<button class="color-swatch ${c === this.engine?.options.color || !this.engine && n === 0 ? 'active' : ''}" style="--color:${c}" data-action="color" data-id="${c}" title="기본 색상 ${n + 1}" aria-label="기본 색상 ${n + 1}"></button>`).join('')}<button class="palette-edit" type="button" data-action="palette-edit" aria-label="기본 색상 편집" title="기본 색상 편집">${icon('Pencil', 14)}</button><button class="custom-color" type="button" data-action="custom-color" title="색상 선택" aria-label="색상 선택">${icon('Plus', 15)}</button></div><div class="pen-width-control"><label id="width-label" for="ink-width">굵기</label><div class="pencil-mode-picker" hidden><button type="button" id="ink-adjustment" class="pencil-mode-trigger" data-action="pencil-mode-menu" aria-label="연필 조절 항목: 굵기" aria-expanded="false" aria-controls="pencil-mode-menu"><span>굵기</span>${icon('ChevronDown', 13)}</button><div class="pencil-mode-menu" id="pencil-mode-menu" role="group" aria-label="연필 조절 항목" hidden><span class="pencil-mode-heading">연필 조절</span><button type="button" data-action="pencil-mode" data-id="width" aria-pressed="true"><span><strong>굵기</strong><small>선의 두께</small></span>${icon('Check', 15)}</button><button type="button" data-action="pencil-mode" data-id="darkness" aria-pressed="false"><span><strong>진하기</strong><small>흑연의 농도</small></span>${icon('Check', 15)}</button></div></div><span id="width-preview" aria-hidden="true"></span><button type="button" data-action="pen-thinner" aria-label="펜 굵기 줄이기" title="펜 굵기 줄이기">${icon('Minus', 15)}</button><input id="ink-width" type="range" min="0.5" max="20" step="0.5" value="3" aria-label="펜 굵기" /><button type="button" data-action="pen-thicker" aria-label="펜 굵기 늘리기" title="펜 굵기 늘리기">${icon('Plus', 15)}</button><output id="width-value" for="ink-width">3.0</output></div></div><div class="editor-options">${button('Settings2', '필기 옵션', 'writing-options', 'aria-haspopup="dialog" aria-expanded="false" aria-controls="writing-options-panel"')}</div></div>
       <div class="editor-body"><aside class="page-sidebar"><div class="page-sidebar-heading"><strong>페이지</strong><span>${this.note.pageIds.length}</span>${button('Plus', '페이지 추가', 'add-page')}</div><div id="page-thumbnails"></div><button class="add-page-button" data-action="add-page">${icon('Plus', 17)} 페이지 추가</button></aside>
-        <main class="paper-viewport" aria-label="필기 작업 공간"><div class="paper-stage"><div class="paper-sizing"><div class="paper-surface"><canvas id="paper-background" aria-hidden="true"></canvas><canvas id="paper-ink" aria-hidden="true"></canvas><canvas id="paper-live" aria-label="필기 캔버스"></canvas></div><span class="spread-page-number" hidden></span></div><button class="spread-companion" type="button" data-action="spread-page" hidden><canvas class="spread-background" aria-hidden="true"></canvas><canvas class="spread-ink" aria-hidden="true"></canvas><span class="spread-page-number"></span></button><button class="spread-empty" type="button" data-action="add-page" hidden>${icon('Plus', 22)}<span>페이지 추가</span></button></div><div class="page-loading" hidden>페이지를 불러오는 중…</div></main>
-      </div><footer class="editor-footer"><div><span class="status-dot"></span><span id="paper-description">A4 · 줄노트</span><span class="footer-divider"></span><span>S펜 필압 지원</span></div><div class="page-navigation">${button('BookOpen', '두 페이지 보기', 'two-page', 'aria-pressed="false"')}${button('ChevronLeft', '이전 페이지', 'prev-page')}<button class="page-position" data-action="goto-page">1 / ${this.note.pageIds.length}</button>${button('ChevronRight', '다음 페이지', 'next-page')}</div><div class="zoom-controls">${button('Minus', '축소', 'zoom-out')}<button id="zoom-value" data-action="fit">80%</button>${button('Plus', '확대', 'zoom-in')}<button class="text-button" data-action="fit">화면에 맞춤</button></div></footer>
+        <main class="paper-viewport" aria-label="필기 작업 공간"><div class="paper-stage"><div class="paper-sizing"><div class="paper-surface"><canvas id="paper-background" aria-hidden="true"></canvas><canvas id="paper-ink" aria-hidden="true"></canvas><canvas id="paper-live" aria-label="필기 캔버스"></canvas></div><span class="spread-page-number" hidden></span></div><div class="spread-companion" role="group" aria-label="인접 페이지" hidden><canvas class="spread-background" aria-hidden="true"></canvas><canvas class="spread-ink" aria-hidden="true"></canvas><canvas class="spread-live" aria-label="인접 페이지 필기 캔버스"></canvas><span class="spread-page-number"></span></div><button class="spread-empty" type="button" data-action="add-page" hidden>${icon('Plus', 22)}<span>페이지 추가</span></button></div><div class="page-loading" hidden>페이지를 불러오는 중…</div></main>
+      </div>
       <div class="selection-toolbar" hidden><span id="selection-count"></span>${button('Copy', '선택 복사', 'selection-copy')}${button('Plus', '선택 확대', 'selection-grow')}${button('Minus', '선택 축소', 'selection-shrink')}${button('Trash2', '선택 삭제', 'selection-delete')}${button('X', '선택 해제', 'deselect')}</div>
     </div>`;
     this.viewport = this.root.querySelector('.paper-viewport')!;
-    this.engine = new InkEngine(this.root.querySelector('#paper-ink')!, this.root.querySelector('#paper-live')!, () => this.changed(), count => {
-      this.root.querySelector<HTMLElement>('.selection-toolbar')!.hidden = !count;
-      this.root.querySelector('#selection-count')!.textContent = `${count}개 선택 · 드래그로 이동`;
-    }, (p, tool) => this.insert(p, tool), () => toast('직선으로 정리했어요. 펜을 댄 채 끝점을 움직일 수 있어요.'), () => this.togglePenEraser());
+    this.engine = new InkEngine(this.root.querySelector('#paper-ink')!, this.root.querySelector('#paper-live')!, () => this.changed(), count => this.showSelection(count, this.engine),
+      (p, tool) => this.insert(p, tool), () => toast('직선으로 정리했어요. 펜을 댄 채 끝점을 움직일 수 있어요.'), () => this.togglePenEraser());
+    this.companionEngine = new InkEngine(this.root.querySelector('.spread-ink')!, this.root.querySelector('.spread-live')!,
+      () => this.changed(this.companionEngine.page), count => this.showSelection(count, this.companionEngine),
+      (p, tool) => run(async () => { const index = this.companionIndex(); await this.showPage(index); if (this.index === index) this.insert(p, tool); }),
+      () => toast('직선으로 정리했어요. 펜을 댄 채 끝점을 움직일 수 있어요.'), () => this.togglePenEraser());
+    this.companionEngine.options = this.engine.options;
+    this.editingEngine = this.engine;
+    this.root.querySelector('.paper-sizing')!.addEventListener('pointerdown', () => this.focusEngine(this.engine), { capture: true, signal: this.abort.signal });
+    this.root.querySelector('.spread-companion')!.addEventListener('pointerdown', () => this.focusEngine(this.companionEngine), { capture: true, signal: this.abort.signal });
     this.engine.options.samsungButtonToggle = typeof penButtonSetting?.value === 'boolean'
       ? penButtonSetting.value : /SamsungBrowser\//.test(navigator.userAgent);
     if (shapeChoices.some(choice => choice.id === shapeSetting?.value)) this.engine.options.shape = shapeSetting!.value as Shape;
@@ -110,7 +118,7 @@ export class EditorView {
     imageButton.setAttribute('aria-haspopup', 'dialog'); imageButton.setAttribute('aria-expanded', 'false'); imageButton.setAttribute('aria-controls', 'image-picker');
     this.syncShapeButton();
     this.previews = new PagePreviews(this.root.querySelector('#page-thumbnails')!, this.root.querySelector('.page-sidebar')!,
-      () => this.engine.activePointer !== null || this.viewport.classList.contains('zoom-preview'),
+      () => this.engine.activePointer !== null || this.companionEngine.activePointer !== null || this.viewport.classList.contains('zoom-preview'),
       (id, preview, revision) => { if (this.page?.id === id && this.page.revision === revision) this.page.thumbnail = preview; });
     this.selectTool(this.selectedPen().tool);
     const widthSlider = this.root.querySelector<HTMLInputElement>('#ink-width')!;
@@ -138,6 +146,10 @@ export class EditorView {
     widthSlider.addEventListener('pointercancel', () => this.widthPointer = null, { signal: this.abort.signal });
     widthSlider.addEventListener('lostpointercapture', () => this.widthPointer = null, { signal: this.abort.signal });
     this.root.addEventListener('click', e => this.click(e), { signal: this.abort.signal });
+    document.addEventListener('pointerdown', event => {
+      const panel = this.root.querySelector<HTMLElement>('#view-options-panel')!;
+      if (!panel.hidden && !panel.contains(event.target as Node) && !this.root.querySelector('[data-action=view-options]')!.contains(event.target as Node)) this.closeViewOptions();
+    }, { capture: true, signal: this.abort.signal });
     this.root.addEventListener('input', e => this.input(e), { signal: this.abort.signal });
     this.root.addEventListener('change', e => {
       const id = (e.target as HTMLElement).id;
@@ -173,7 +185,7 @@ export class EditorView {
     let failed = false;
     loading.classList.remove('page-load-error'); loading.textContent = '페이지를 불러오는 중…';
     try {
-      if (this.page) { this.engine.cancel(); await this.flush(); }
+      if (this.page) { this.engine.cancel(); this.companionEngine.cancel(); await this.flush(); }
       const companionId = this.twoPage ? this.note.pageIds[this.companionIndex(index)] : undefined;
       const [page, companion] = await Promise.all([db.pages.get(this.note.pageIds[index]), companionId ? db.pages.get(companionId) : undefined]);
       if (!page) throw new Error('페이지를 찾을 수 없어요.');
@@ -191,6 +203,7 @@ export class EditorView {
   private displayPage(page: Page, index: number) {
     this.index = index; this.page = page; this.engine.load(page);
     this.syncSpreadLayout();
+    this.focusEngine(this.engine);
     this.setScale(this.fit ? this.fitScale() : this.scale, this.fit); this.viewport.scrollTo({ left: 0, top: 0 });
     this.updatePageNavigation();
     this.root.querySelector('#paper-description')!.textContent = page.pdfAssetId ? 'PDF · 원본 위에 필기' : `${Math.round(page.width)} × ${Math.round(page.height)} · ${paperNames[page.paper]}`;
@@ -205,18 +218,19 @@ export class EditorView {
   }
   private syncSpreadLayout() {
     const stage = this.root.querySelector<HTMLElement>('.paper-stage')!;
-    const companion = this.root.querySelector<HTMLButtonElement>('.spread-companion')!;
+    const companion = this.root.querySelector<HTMLElement>('.spread-companion')!;
     const empty = this.root.querySelector<HTMLButtonElement>('.spread-empty')!;
     const active = this.root.querySelector<HTMLElement>('.paper-sizing')!;
     const otherIndex = this.companionIndex();
     stage.classList.toggle('two-page', this.twoPage);
     companion.hidden = !this.twoPage || !this.spreadPage;
     empty.hidden = !this.twoPage || !!this.spreadPage;
+    if (this.twoPage && this.spreadPage && this.companionEngine.page !== this.spreadPage) this.companionEngine.load(this.spreadPage);
     active.style.order = this.twoPage && this.index % 2 ? '2' : '0';
     companion.style.order = this.twoPage && this.index % 2 ? '0' : '2';
     empty.style.order = '2';
-    companion.setAttribute('aria-label', `${otherIndex + 1}페이지 선택하여 필기`);
-    companion.dataset.id = String(otherIndex);
+    companion.setAttribute('aria-label', `${otherIndex + 1}페이지`);
+    companion.querySelector('.spread-live')!.setAttribute('aria-label', `${otherIndex + 1}페이지 필기 캔버스`);
     companion.querySelector('.spread-page-number')!.textContent = String(otherIndex + 1);
     const badge = active.querySelector<HTMLElement>('.spread-page-number')!;
     badge.hidden = !this.twoPage; badge.textContent = String(this.index + 1);
@@ -226,13 +240,14 @@ export class EditorView {
     toggle.title = this.twoPage ? '한 페이지 보기' : '두 페이지 보기';
   }
   private async toggleTwoPage() {
-    this.engine.cancel(); this.twoPage = !this.twoPage;
+    this.engine.cancel(); this.companionEngine.cancel(); this.twoPage = !this.twoPage;
     const activeId = this.page.id;
     const enabled = this.twoPage, companionId = enabled ? this.note.pageIds[this.companionIndex()] : undefined;
     this.spreadGeneration++;
     const companion = companionId ? await db.pages.get(companionId) : undefined;
     if (this.twoPage !== enabled || this.page.id !== activeId) return;
     this.spreadPage = companion;
+    if (!this.twoPage) this.focusEngine(this.engine);
     this.syncSpreadLayout(); this.updatePageNavigation();
     this.setScale(this.fit ? this.fitScale() : this.scale, this.fit);
     void db.settings.put({ key: 'two-page-view', value: this.twoPage }).catch(report);
@@ -241,19 +256,16 @@ export class EditorView {
   private async renderSpread() {
     const generation = ++this.spreadGeneration, page = this.spreadPage;
     if (!this.twoPage || !page) return;
-    const companion = this.root.querySelector<HTMLButtonElement>('.spread-companion')!;
+    const companion = this.root.querySelector<HTMLElement>('.spread-companion')!;
     try {
       await loadImages(page);
       const ratio = Math.min(Math.max(1, this.scale * devicePixelRatio), Math.sqrt(8000000 / (page.width * page.height)));
       const backgroundCanvas = document.createElement('canvas'); await background(backgroundCanvas, page, ratio);
       if (generation !== this.spreadGeneration || this.abort.signal.aborted) return;
-      const inkCanvas = document.createElement('canvas'); inkCanvas.width = backgroundCanvas.width; inkCanvas.height = backgroundCanvas.height;
-      const ctx = inkCanvas.getContext('2d')!; ctx.setTransform(ratio, 0, 0, ratio, 0, 0); drawItems(ctx, page.items);
-      if (generation !== this.spreadGeneration || this.abort.signal.aborted) return;
-      for (const [selector, source] of [['.spread-background', backgroundCanvas], ['.spread-ink', inkCanvas]] as const) {
-        const canvas = companion.querySelector<HTMLCanvasElement>(selector)!;
-        canvas.width = source.width; canvas.height = source.height; canvas.getContext('2d')!.drawImage(source, 0, 0);
-      }
+      const canvas = companion.querySelector<HTMLCanvasElement>('.spread-background')!;
+      canvas.width = backgroundCanvas.width; canvas.height = backgroundCanvas.height;
+      canvas.getContext('2d')!.drawImage(backgroundCanvas, 0, 0);
+      this.companionEngine.resize();
       companion.classList.remove('spread-error');
     } catch (error) {
       if (generation === this.spreadGeneration) companion.classList.add('spread-error');
@@ -302,35 +314,57 @@ export class EditorView {
     this.root.querySelector('.page-sidebar-heading > span')!.textContent = String(this.note.pageIds.length);
     this.previews.observe(rows);
   }
-  private changed() {
+  private showSelection(count: number, engine: InkEngine) {
+    if (this.editingEngine !== engine) return;
+    this.root.querySelector<HTMLElement>('.selection-toolbar')!.hidden = !count;
+    this.root.querySelector('#selection-count')!.textContent = `${count}개 선택 · 드래그로 이동`;
+  }
+  private focusEngine(engine: InkEngine) {
+    if (this.editingEngine !== engine) {
+      this.editingEngine?.clearSelection();
+      this.editingEngine = engine;
+      this.showSelection(engine.selected.size, engine);
+    }
     this.updateHistory();
-    const page = this.page;
+  }
+  private changed(page = this.page) {
+    this.updateHistory();
     page.thumbnail = undefined;
     void this.queue.saveImmutable(page).catch(report);
-    clearTimeout(this.thumbTimer);
-    this.thumbTimer = setTimeout(() => run(() => this.saveThumbnail(page)), 1400);
+    if (page.id === this.page.id) {
+      clearTimeout(this.thumbTimer);
+      this.thumbTimer = setTimeout(() => run(() => this.saveThumbnail(page)), 1400);
+    } else {
+      clearTimeout(this.companionThumbTimer);
+      this.companionThumbTimer = setTimeout(() => run(() => this.saveThumbnail(page)), 1400);
+    }
   }
   private async saveThumbnail(page: Page) {
-    if (this.engine.activePointer !== null || this.viewport.classList.contains('zoom-preview')) {
-      this.thumbTimer = setTimeout(() => run(() => this.saveThumbnail(page)), 500); return;
+    if (this.engine.activePointer !== null || this.companionEngine.activePointer !== null || this.viewport.classList.contains('zoom-preview')) {
+      const timer = setTimeout(() => run(() => this.saveThumbnail(page)), 500);
+      if (page.id === this.page.id) this.thumbTimer = timer; else this.companionThumbTimer = timer;
+      return;
     }
     const revision = page.revision, snapshot = { ...page, items: page.items.slice() }, thumb = await thumbnail(snapshot);
     if (page.revision !== revision) return;
     page.thumbnail = thumb; await this.queue.saveImmutable(page, thumb);
-    if (page.id === this.page.id && !this.abort.signal.aborted) await this.renderThumbnails();
+    if (this.note.pageIds.includes(page.id) && !this.abort.signal.aborted) await this.renderThumbnails();
   }
   async flush() {
     this.textEditor?.finish();
     clearTimeout(this.thumbTimer);
+    clearTimeout(this.companionThumbTimer);
     // Navigation and PWA updates depend only on durable data. PDF rendering is
     // optional presentation work and must never prevent leaving the editor.
-    if (this.page) { await this.queue.saveImmutable(this.page); await this.queue.flush(); }
+    if (this.page) await this.queue.saveImmutable(this.page);
+    if (this.twoPage && this.spreadPage) await this.queue.saveImmutable(this.spreadPage);
+    await this.queue.flush();
     await this.brushWrites; await this.persistBrushes();
     await this.penWrites; await this.persistPens();
   }
   private updateHistory() {
-    this.root.querySelector<HTMLButtonElement>('[data-action=undo]')!.disabled = !this.engine.canUndo;
-    this.root.querySelector<HTMLButtonElement>('[data-action=redo]')!.disabled = !this.engine.canRedo;
+    this.root.querySelector<HTMLButtonElement>('[data-action=undo]')!.disabled = !this.editingEngine.canUndo;
+    this.root.querySelector<HTMLButtonElement>('[data-action=redo]')!.disabled = !this.editingEngine.canRedo;
   }
   private setScale(scale: number, fit = false, rasterize = true) {
     this.scale = Math.max(this.twoPage ? .16 : .2, Math.min(4, scale)); this.fit = fit;
@@ -343,11 +377,15 @@ export class EditorView {
     empty.style.width = `${this.page.width * this.scale}px`; empty.style.height = `${this.page.height * this.scale}px`;
     this.textEditor.setScale(this.scale);
     this.root.querySelector('#zoom-value')!.textContent = `${Math.round(this.scale * 100)}%`;
-    if (rasterize) this.engine.resize();
+    if (rasterize) { this.engine.resize(); if (this.twoPage && this.spreadPage) this.companionEngine.resize(); }
   }
   private zoom(scale: number) {
     this.cancelViewportUpdate();
-    this.engine.cancel(); this.setScale(scale); run(() => this.renderBackground()); void this.renderSpread();
+    this.engine.cancel(); this.companionEngine.cancel(); this.setScale(scale); run(() => this.renderBackground()); void this.renderSpread();
+  }
+  private closeViewOptions() {
+    this.root.querySelector<HTMLElement>('#view-options-panel')!.hidden = true;
+    this.root.querySelector('[data-action=view-options]')!.setAttribute('aria-expanded', 'false');
   }
   private queueViewportUpdate(update: () => void) {
     this.viewportUpdate = update;
@@ -365,7 +403,7 @@ export class EditorView {
     clearTimeout(this.zoomTimer); this.zoomTimer = undefined;
     cancelAnimationFrame(this.viewportFrame); this.viewportFrame = 0;
     const latest = this.viewportUpdate; this.viewportUpdate = null; latest?.(); this.pendingScale = null;
-    this.engine.resize(); this.viewport.classList.remove('zoom-preview');
+    this.engine.resize(); if (this.twoPage && this.spreadPage) this.companionEngine.resize(); this.viewport.classList.remove('zoom-preview');
     run(() => this.renderBackground()); void this.renderSpread();
   }
   private click(e: Event) {
@@ -470,14 +508,18 @@ export class EditorView {
       if (this.adjustingDarkness) this.persistPencilDarkness();
       if (this.engine.options.tool === 'text') this.textEditor.focus();
     }
-    if (action === 'undo') this.engine.undo();
-    if (action === 'redo') this.engine.redo();
+    if (action === 'undo') this.editingEngine.undo();
+    if (action === 'redo') this.editingEngine.redo();
     if (action === 'sidebar') { this.root.querySelector('.page-sidebar')!.classList.toggle('collapsed'); if (this.fit) this.setScale(this.fitScale(), true); }
     if (action === 'zoom-in') this.zoom(this.scale * 1.2);
     if (action === 'zoom-out') this.zoom(this.scale / 1.2);
     if (action === 'fit') { this.setScale(this.fitScale(), true); run(() => this.renderBackground()); void this.renderSpread(); }
+    if (action === 'view-options') {
+      const panel = this.root.querySelector<HTMLElement>('#view-options-panel')!;
+      panel.hidden = !panel.hidden;
+      target.setAttribute('aria-expanded', String(!panel.hidden));
+    }
     if (action === 'two-page') run(() => this.toggleTwoPage());
-    if (action === 'spread-page') run(() => this.showPage(Number(id)));
     if (action === 'page') run(() => this.showPage(Number(id)));
     if (action === 'prev-page') run(() => this.showPage(this.twoPage ? this.spreadStart() - 2 : this.index - 1));
     if (action === 'next-page') run(() => this.showPage(this.twoPage ? this.spreadStart() + 2 : this.index + 1));
@@ -514,8 +556,8 @@ export class EditorView {
       try { toast('PDF 내보내기를 준비하고 있어요…'); await exportPDF(this.note, (n, total) => toast(`PDF 생성 중 ${n} / ${total}`)); toast('PDF를 내보냈어요.'); }
       finally { target.removeAttribute('disabled'); }
     });
-    if (action?.startsWith('selection-')) { this.engine.selectionAction(action.slice(10)); if (action === 'selection-copy') toast('선택을 복사했어요. Ctrl+V로 붙여넣으세요.'); }
-    if (action === 'deselect') this.engine.clearSelection();
+    if (action?.startsWith('selection-')) { this.editingEngine.selectionAction(action.slice(10)); if (action === 'selection-copy') toast('선택을 복사했어요. Ctrl+V로 붙여넣으세요.'); }
+    if (action === 'deselect') this.editingEngine.clearSelection();
   }
   private input(e: Event) {
     const el = e.target as HTMLInputElement;
@@ -823,7 +865,7 @@ export class EditorView {
     if (tool !== 'image') this.root.querySelector<HTMLElement>('.image-picker:popover-open')?.hidePopover();
     if (!isPenKind(tool)) this.root.querySelector<HTMLElement>('.pen-picker:popover-open')?.hidePopover();
     this.textEditor.finish();
-    this.engine.cancel(); this.engine.clearSelection(); this.engine.options.tool = tool;
+    this.engine.cancel(); this.companionEngine.cancel(); this.engine.clearSelection(); this.companionEngine.clearSelection(); this.engine.options.tool = tool;
     if (isPenKind(tool) && this.selectedPen().tool !== tool) {
       const matching = this.pens.presets.find(preset => preset.tool === tool);
       if (matching) this.pens.selectedId = matching.id;
@@ -929,6 +971,9 @@ export class EditorView {
     dialog.querySelector<HTMLInputElement>('[name=query]')!.placeholder = '입력한 텍스트 검색';
   }
   private keyboard(e: KeyboardEvent) {
+    if (e.key === 'Escape' && !this.root.querySelector<HTMLElement>('#view-options-panel')?.hidden) {
+      e.preventDefault(); this.closeViewOptions(); this.root.querySelector<HTMLButtonElement>('[data-action=view-options]')?.focus({ preventScroll: true }); return;
+    }
     if (e.key === 'Escape' && !this.root.querySelector<HTMLElement>('#pencil-mode-menu')?.hidden) {
       e.preventDefault(); this.closePencilMode(); this.root.querySelector<HTMLButtonElement>('#ink-adjustment')?.focus({ preventScroll: true }); return;
     }
@@ -937,13 +982,13 @@ export class EditorView {
     }
     if ((e.target as Element).matches('input,textarea,select,[contenteditable]') || document.querySelector('dialog[open]')) return;
     const mod = e.ctrlKey || e.metaKey;
-    if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? this.engine.redo() : this.engine.undo(); }
-    if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); this.engine.redo(); }
+    if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? this.editingEngine.redo() : this.editingEngine.undo(); }
+    if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); this.editingEngine.redo(); }
     if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); run(() => this.flush()); }
-    if (mod && e.key.toLowerCase() === 'c' && this.engine.selected.size) { e.preventDefault(); this.engine.selectionAction('copy'); toast('선택을 복사했어요.'); }
-    if (mod && e.key.toLowerCase() === 'v') { e.preventDefault(); this.engine.selectionAction('paste'); }
-    if (e.key === 'Delete' || e.key === 'Backspace') this.engine.selectionAction('delete');
-    if (e.key === 'Escape') this.engine.clearSelection();
+    if (mod && e.key.toLowerCase() === 'c' && this.editingEngine.selected.size) { e.preventDefault(); this.editingEngine.selectionAction('copy'); toast('선택을 복사했어요.'); }
+    if (mod && e.key.toLowerCase() === 'v') { e.preventDefault(); this.editingEngine.selectionAction('paste'); }
+    if (e.key === 'Delete' || e.key === 'Backspace') this.editingEngine.selectionAction('delete');
+    if (e.key === 'Escape') this.editingEngine.clearSelection();
     if (!mod && e.key.toLowerCase() === 'p') this.selectTool('pen');
     if (!mod && e.key.toLowerCase() === 'e') this.selectTool('eraser');
     if (!mod && e.key.toLowerCase() === 'h') this.selectTool('hand');
@@ -951,24 +996,24 @@ export class EditorView {
   private setupGestures() {
     const signal = this.abort.signal;
     this.viewport.addEventListener('pointerdown', e => {
-      if (e.defaultPrevented && this.engine.activePointer !== null) return;
-      const onSpreadButton = !!(e.target as Element).closest('.spread-companion,.spread-empty');
+      if (e.defaultPrevented && (this.engine.activePointer !== null || this.companionEngine.activePointer !== null)) return;
+      const onSpreadButton = !!(e.target as Element).closest('.spread-empty');
       const inText = !!(e.target as Element).closest('.inline-text-box');
       if (inText && e.pointerType !== 'touch' || this.engine.options.tool === 'text' && e.defaultPrevented) return;
       if (e.pointerType === 'pen' && this.engine.options.tool !== 'hand') return;
       if (e.pointerType === 'touch') {
-        if (this.engine.activePointer !== null && !this.engine.options.fingerDrawing) return;
+        if ((this.engine.activePointer !== null || this.companionEngine.activePointer !== null) && !this.engine.options.fingerDrawing) return;
         this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
         if (this.touches.size === 2) {
           this.cancelViewportUpdate(); this.viewport.classList.add('zoom-preview');
-          this.engine.cancel(); const [a, b] = [...this.touches.values()], r = this.viewport.getBoundingClientRect();
+          this.engine.cancel(); this.companionEngine.cancel(); const [a, b] = [...this.touches.values()], r = this.viewport.getBoundingClientRect();
           this.pinch = { distance: Math.hypot(b.x - a.x, b.y - a.y), scale: this.scale, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2,
             scrollX: this.viewport.scrollLeft, scrollY: this.viewport.scrollTop, centerX: (a.x + b.x) / 2 - r.left, centerY: (a.y + b.y) / 2 - r.top };
           this.pan = null;
         }
         // A deliberate two-finger pinch is allowed after lifting the pen;
         // one-finger palm contacts during the brief pen hover window stay ignored.
-        if (this.touches.size === 1 && this.engine.lastPen > 0 && performance.now() - this.engine.lastPen < 800) return;
+        if (this.touches.size === 1 && Math.max(this.engine.lastPen, this.companionEngine.lastPen) > 0 && performance.now() - Math.max(this.engine.lastPen, this.companionEngine.lastPen) < 800) return;
       }
       if (inText && this.touches.size < 2) return;
       if ((e.pointerType === 'touch' && !this.engine.options.fingerDrawing && this.touches.size === 1) || this.engine.options.tool === 'hand') {
@@ -1000,7 +1045,7 @@ export class EditorView {
     this.viewport.addEventListener('wheel', e => {
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
-        if (!this.viewport.classList.contains('zoom-preview')) this.engine.cancel();
+        if (!this.viewport.classList.contains('zoom-preview')) { this.engine.cancel(); this.companionEngine.cancel(); }
         this.viewport.classList.add('zoom-preview');
         this.pendingScale = Math.max(.2, Math.min(4, (this.pendingScale ?? this.scale) * Math.exp(-e.deltaY * .002)));
         const target = this.pendingScale;
@@ -1014,5 +1059,5 @@ export class EditorView {
       }
     }, { signal, passive: false });
   }
-  destroy() { this.textEditor?.destroy(); this.previews?.destroy(); this.cancelViewportUpdate(); clearTimeout(this.thumbTimer); clearTimeout(this.brushTimer); clearTimeout(this.penTimer); this.generation++; this.spreadGeneration++; this.engine?.destroy(); this.abort.abort(); this.resizeObserver?.disconnect(); }
+  destroy() { this.textEditor?.destroy(); this.previews?.destroy(); this.cancelViewportUpdate(); clearTimeout(this.thumbTimer); clearTimeout(this.companionThumbTimer); clearTimeout(this.brushTimer); clearTimeout(this.penTimer); this.generation++; this.spreadGeneration++; this.engine?.destroy(); this.companionEngine?.destroy(); this.abort.abort(); this.resizeObserver?.disconnect(); }
 }
