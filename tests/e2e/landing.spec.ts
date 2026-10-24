@@ -8,6 +8,7 @@ test('browser mode shows only the install experience and never opens the notes d
   expect(await page.evaluate(() => indexedDB.databases().then(rows => rows.some(row => row.name === 'mynotes-v1')))).toBe(false);
   const manifest = await page.evaluate(async () => (await fetch(new URL('manifest.webmanifest', location.href))).json());
   expect(manifest).toMatchObject({ id: '/mynotes/', start_url: '/mynotes/', scope: '/mynotes/', display: 'standalone' });
+  await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', '/mynotes/manifest.webmanifest');
   await page.screenshot({ path: '../Notelin-install-landing.png', fullPage: true });
   await page.evaluate(async () => {
     const request = indexedDB.open('mynotes-v1', 1);
@@ -20,6 +21,26 @@ test('browser mode shows only the install experience and never opens the notes d
   await page.reload();
   await expect(page.getByRole('button', { name: 'Notelin 설치하기' })).toBeVisible();
   expect(await page.evaluate(() => indexedDB.databases().then(rows => rows.some(row => row.name === 'mynotes-v1')))).toBe(true);
+});
+
+test('Samsung Internet receives an install manifest without the POST file share target', async ({ browser }) => {
+  const context = await browser.newContext({
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:4173/mynotes/',
+    userAgent: 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/30.0 Chrome/143.0.0.0 Safari/537.36',
+  });
+  try {
+    const page = await context.newPage();
+    await page.goto('./');
+    await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', '/mynotes/manifest-samsung.webmanifest');
+    const manifest = await page.evaluate(async () => (await fetch(document.querySelector<HTMLLinkElement>('link[rel="manifest"]')!.href)).json());
+    expect(manifest).toMatchObject({ id: '/mynotes/', start_url: '/mynotes/', scope: '/mynotes/', display: 'standalone' });
+    expect(manifest).not.toHaveProperty('share_target');
+    expect(manifest.icons).toHaveLength(3);
+    const cdp = await context.newCDPSession(page);
+    await expect.poll(async () => (await cdp.send('Page.getAppManifest')).url).toBe(new URL('/mynotes/manifest-samsung.webmanifest', page.url()).href);
+    expect((await cdp.send('Page.getAppManifest')).errors).toEqual([]);
+    await cdp.detach();
+  } finally { await context.close(); }
 });
 
 test('install button uses the browser prompt when available and otherwise explains manual installation', async ({ page }) => {
