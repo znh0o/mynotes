@@ -26,7 +26,15 @@ test('opening an existing note in browser mode shows installation and preserves 
       return await new Promise<any[]>((resolve, reject) => { get.onsuccess = () => resolve(get.result); get.onerror = () => reject(get.error); });
     } finally { db.close(); }
   });
-  expect(after).toEqual(before);
+  // The editor may finish generating a cover thumbnail while the page reloads.
+  // Compare saved note data, while allowing this derived image cache to appear.
+  const withoutThumbnail = (notes: any[]) => notes.map(note => {
+    const copy = { ...note }; delete copy.thumbnail; return copy;
+  });
+  expect(withoutThumbnail(after)).toEqual(withoutThumbnail(before));
+  before.forEach((note, index) => {
+    if (note.thumbnail) expect(after[index].thumbnail).toBe(note.thumbnail);
+  });
   await page.evaluate(() => sessionStorage.removeItem('notelin-e2e-browser'));
   await page.reload();
   await expect(page.getByRole('button', { name: '기존 필기 보존 열기' })).toBeVisible();
