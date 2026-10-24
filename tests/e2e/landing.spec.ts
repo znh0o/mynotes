@@ -6,7 +6,7 @@ test('browser mode shows only the install experience and never opens the notes d
   await expect(page.getByText('S펜에 맞춘 필기', { exact: true })).toBeVisible();
   await expect(page.getByText('PDF 위에 바로 기록', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Notelin 설치하기' })).toBeVisible();
-  await expect.poll(() => page.locator('.install-device img').evaluate(image => (image as HTMLImageElement).naturalWidth)).toBe(1440);
+  await expect.poll(() => page.locator('.install-device img').first().evaluate(image => (image as HTMLImageElement).naturalWidth)).toBe(1440);
   await expect(page.locator('#paper-live,.library-shell')).toHaveCount(0);
   expect(await page.evaluate(() => indexedDB.databases().then(rows => rows.some(row => row.name === 'mynotes-v1')))).toBe(false);
   const manifest = await page.evaluate(async () => (await fetch(new URL('manifest.webmanifest', location.href))).json());
@@ -68,6 +68,7 @@ test('install button uses the browser prompt when available and otherwise explai
 });
 
 test('install page fits desktop, tablet and phone screens without horizontal scrolling', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   for (const size of [{ width: 1440, height: 900 }, { width: 800, height: 1280 }, { width: 390, height: 844 }]) {
     await page.setViewportSize(size);
     await page.goto('./');
@@ -85,4 +86,7 @@ test('GitHub Pages install route remains available offline after service worker 
   await page.reload();
   await expect(page.getByRole('button', { name: 'Notelin 설치하기' })).toBeVisible();
   await expect(page.locator('.library-shell')).toHaveCount(0);
+  await expect.poll(() => page.locator('#preview-write-panel img').evaluate(image => (image as HTMLImageElement).naturalWidth)).toBe(1440);
+  await page.getByRole('tab', { name: '나만의 서재' }).click();
+  await expect.poll(() => page.locator('#preview-library-panel img').evaluate(image => (image as HTMLImageElement).naturalWidth)).toBe(1440);
 });

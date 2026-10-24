@@ -23,7 +23,7 @@ export default defineConfig({
       importScripts: ['share-target-sw.js'],
       // Keep Korean PDF CMaps offline; fetch other language maps only when a PDF needs them.
       // Avoid hundreds of requests in the service worker's first install event.
-      globPatterns: ['**/*.{js,mjs,css,html,png,svg,woff2,wasm,pfb,ttf,webmanifest}', 'pdf/cmaps/UniKS-*.bcmap', 'pdf/cmaps/Adobe-Korea1-*.bcmap'],
+      globPatterns: ['**/*.{js,mjs,css,html,png,webp,svg,woff2,wasm,pfb,ttf,webmanifest}', 'pdf/cmaps/UniKS-*.bcmap', 'pdf/cmaps/Adobe-Korea1-*.bcmap'],
       runtimeCaching: [{
         urlPattern: /\/mynotes\/pdf\/cmaps\/.*\.bcmap$/,
         handler: 'CacheFirst',
