@@ -112,7 +112,7 @@ test('mobile library and folder management', async ({ page }) => {
   await page.screenshot({ path: '../MyNotes-mobile.png', fullPage: true });
 });
 
-test('shape, lasso move/resize/copy/delete, partial eraser and zoom coordinates', async ({ page }) => {
+test('shape, lasso move/resize/duplicate/delete, partial eraser and zoom coordinates', async ({ page }) => {
   await page.goto('./'); await page.getByRole('button', { name: '새 노트', exact: true }).click();
   await page.locator('[name=title]').fill('도구 검증'); await page.getByRole('button', { name: '노트 만들기', exact: true }).click();
   await expect(page.locator('.page-loading')).toBeHidden();
@@ -141,8 +141,10 @@ test('shape, lasso move/resize/copy/delete, partial eraser and zoom coordinates'
   await page.getByRole('button', { name: '다시 실행 (Ctrl+Shift+Z)', exact: true }).click();
   await expect.poll(async () => (await current()).items[0]).toEqual(enlarged);
   await select();
-  await page.getByRole('button', { name: '선택 복사', exact: true }).click(); await page.keyboard.press('Control+v');
+  await page.getByRole('button', { name: '선택 복제', exact: true }).click();
   await expect.poll(async () => (await current()).items.length).toBe(2);
+  expect((await current()).items[1].id).not.toBe(enlarged.id);
+  expect((await current()).items[1].x).toBeGreaterThan(enlarged.x);
   await page.getByRole('button', { name: '선택 삭제', exact: true }).click();
   await expect.poll(async () => (await current()).items.length).toBe(1);
   await selectPen(page, '볼펜'); await pen(page, 120, 380);
@@ -158,7 +160,7 @@ test('shape, lasso move/resize/copy/delete, partial eraser and zoom coordinates'
   expect(last.x).toBeCloseTo(100 * (await current()).width / zoomRect!.width, 0);
   await page.getByRole('button', { name: '지우개', exact: true }).click();
   await page.getByRole('button', { name: '필기 옵션', exact: true }).click(); await page.locator('#eraser-mode').selectOption('partial');
-  await page.locator('#eraser-size').fill('25');
+  await page.locator('#writing-options-panel #eraser-size').fill('25');
   await page.getByRole('button', { name: '필기 옵션 닫기', exact: true }).click();
   const before = (await current()).items.filter((i: any) => i.kind === 'stroke')[0];
   const r = await page.locator('#paper-live').boundingBox(), scale = r!.width / (await current()).width;

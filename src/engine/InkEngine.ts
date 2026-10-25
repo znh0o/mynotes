@@ -198,9 +198,17 @@ export class InkEngine {
   selectionAction(action: string) {
     const items = this.page.items.filter(i => this.selected.has(i.id));
     if (action === 'copy') { this.clipboard = structuredClone(items); return; }
-    if (action === 'paste') {
-      if (!this.clipboard.length) return;
-      this.mutate(() => { const copies = structuredClone(this.clipboard); copies.forEach(i => i.id = uid()); transform(copies, 24, 24); this.page.items.push(...copies); this.selected = new Set(copies.map(i => i.id)); });
+    if (action === 'paste' || action === 'duplicate') {
+      const source = action === 'paste' ? this.clipboard : items;
+      if (!source.length) return;
+      this.mutate(() => {
+        const copies = structuredClone(source);
+        copies.forEach(i => i.id = uid());
+        const box = bounds(copies);
+        const offset = (start: number, end: number, limit: number) => end + 24 <= limit ? 24 : start >= 24 ? -24 : 0;
+        transform(copies, offset(box.x, box.x + box.w, this.page.width), offset(box.y, box.y + box.h, this.page.height));
+        this.page.items.push(...copies); this.selected = new Set(copies.map(i => i.id));
+      });
     } else if (items.length) {
       this.mutate(() => {
         if (action === 'delete') { this.page.items = this.page.items.filter(i => !this.selected.has(i.id)); this.selected.clear(); }

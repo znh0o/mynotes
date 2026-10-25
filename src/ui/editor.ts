@@ -91,7 +91,7 @@ export class EditorView {
         <main class="paper-viewport" aria-label="필기 작업 공간"><div class="paper-stage"><div class="paper-sizing"><div class="paper-surface"><canvas id="paper-background" aria-hidden="true"></canvas><canvas id="paper-ink" aria-hidden="true"></canvas><canvas id="paper-live" aria-label="필기 캔버스"></canvas></div><span class="spread-page-number" hidden></span></div><div class="spread-companion" role="group" aria-label="인접 페이지" hidden><canvas class="spread-background" aria-hidden="true"></canvas><canvas class="spread-ink" aria-hidden="true"></canvas><canvas class="spread-live" aria-label="인접 페이지 필기 캔버스"></canvas><span class="spread-page-number"></span></div><button class="spread-empty" type="button" data-action="add-page" hidden>${icon('Plus', 22)}<span>페이지 추가</span></button></div><div class="page-loading" hidden>페이지를 불러오는 중…</div></main>
       </div>
       <div class="phone-document-panel" id="phone-document-panel" role="dialog" aria-label="문서 메뉴" popover="auto"><div class="phone-document-heading">문서 메뉴</div><div class="phone-document-primary"></div><div class="phone-document-secondary"></div></div>
-      <div class="selection-toolbar" hidden><span id="selection-count"></span>${button('Copy', '선택 복사', 'selection-copy')}${button('Plus', '선택 확대', 'selection-grow')}${button('Minus', '선택 축소', 'selection-shrink')}${button('Trash2', '선택 삭제', 'selection-delete')}${button('X', '선택 해제', 'deselect')}</div>
+      <div class="selection-toolbar" hidden><span id="selection-count"></span>${button('CopyPlus', '선택 복제', 'selection-duplicate')}${button('Plus', '선택 확대', 'selection-grow')}${button('Minus', '선택 축소', 'selection-shrink')}${button('Trash2', '선택 삭제', 'selection-delete')}${button('X', '선택 해제', 'deselect')}</div>
     </div>`;
     bindPhoneEditor(this.root, this.abort.signal);
     this.viewport = this.root.querySelector('.paper-viewport')!;
@@ -558,7 +558,7 @@ export class EditorView {
       try { toast('PDF 내보내기를 준비하고 있어요…'); await exportPDF(this.note, (n, total) => toast(`PDF 생성 중 ${n} / ${total}`)); toast('PDF를 내보냈어요.'); }
       finally { target.removeAttribute('disabled'); }
     });
-    if (action?.startsWith('selection-')) { this.editingEngine.selectionAction(action.slice(10)); if (action === 'selection-copy') toast('선택을 복사했어요. Ctrl+V로 붙여넣으세요.'); }
+    if (action?.startsWith('selection-')) { this.editingEngine.selectionAction(action.slice(10)); if (action === 'selection-duplicate') toast('선택한 내용을 복제했어요.'); }
     if (action === 'deselect') this.editingEngine.clearSelection();
   }
   private input(e: Event) {
