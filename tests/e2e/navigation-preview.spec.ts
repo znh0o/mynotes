@@ -64,7 +64,7 @@ test('editor returns to the library with a slide and Back works after switching 
   expect(saved).toHaveLength(1);
 });
 
-test('imported PDF automatically shows distinct real page thumbnails in the sidebar', async ({ page }) => {
+test('imported PDF opens with the sidebar closed and shows real previews when requested', async ({ page }) => {
   await page.goto('./'); const doc = await PDFDocument.create(), font = await doc.embedFont(StandardFonts.Helvetica);
   const colors = [rgb(.86, .22, .3), rgb(.18, .36, .87), rgb(.17, .64, .45)];
   for (let i = 0; i < 3; i++) {
@@ -74,6 +74,8 @@ test('imported PDF automatically shows distinct real page thumbnails in the side
   const chooser = page.waitForEvent('filechooser'); await page.getByRole('button', { name: 'PDF 가져오기', exact: true }).click();
   await (await chooser).setFiles({ name: '미리보기 검증.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await doc.save()) });
   await expect(page.locator('#app .page-loading')).toBeHidden();
+  await expect(page.locator('.page-sidebar')).toBeHidden();
+  await page.getByRole('button', { name: '페이지 목록', exact: true }).click();
   await expect(page.locator('#page-thumbnails img')).toHaveCount(3, { timeout: 15000 });
   const previews = await page.locator('#page-thumbnails img').evaluateAll((images: HTMLImageElement[]) => images.map(i => ({ src: i.src, width: i.naturalWidth })));
   expect(new Set(previews.map(p => p.src)).size).toBe(3); expect(previews.every(p => p.width > 0)).toBe(true);

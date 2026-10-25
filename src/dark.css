@@ -1,0 +1,88 @@
+.appearance-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px}
+.appearance-options button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;min-height:76px;padding:12px 8px;border:1px solid var(--border);border-radius:10px;background:#f7f9fe;color:#647b9b;font-size:12px}
+.appearance-options button[aria-pressed=true]{border-color:#7fa4f0;background:#eaf1ff;color:#285cc6;box-shadow:inset 0 0 0 1px #7fa4f0}
+.page-sidebar:not([hidden]){display:block}
+@media(max-width:480px){.page-sidebar:not([hidden]){position:absolute;z-index:15;height:100%;box-shadow:5px 0 20px #334e6c21}}
+
+/* Dark chrome uses ink-blue surfaces. Document paper and artwork retain their colors. */
+:root[data-theme=dark]{color:#e2eaf7;background:#0e1624;--blue:#668fff;--blue-dark:#7fa3ff;--blue-light:#223758;--muted:#9aaec9;--border:#2b3a51;--night-surface:#151f30;--night-raised:#1c293d;--night-soft:#111b2b;--night-text:#e2eaf7;--night-muted:#9aaec9;--night-accent:#98b9ff}
+:root[data-theme=dark] :is(.library-shell,.editor-shell){color:var(--night-text);background:#0e1624}
+:root[data-theme=dark] :is(.library-sidebar,.editor-header,.ink-toolbar,.page-sidebar,.editor-footer){background:var(--night-surface);border-color:var(--border)}
+:root[data-theme=dark] .library-topbar{background:#151f30e8;border-color:var(--border)}
+:root[data-theme=dark] :is(.brand-wordmark,.install-brand img,.install-footer img){filter:invert(1) hue-rotate(180deg);mix-blend-mode:screen}
+:root[data-theme=dark] :is(.muted,.page-heading p,.workspace-label,.sidebar-empty,.add-folder,.text-button,.local-badge,.breadcrumb,.nav-item,.nav-item>small,.device-note,.device-note div span,.note-info span,.recent-note span,.sort-field select,.collection-tab,.note-density,.page-sidebar-heading,.page-sidebar-heading>span,.page-thumb,.page-navigation,.editor-page-controls,.page-position,.tool-button,.ink-toolbar .pen-width-control,.editor-header-actions,.profile-details dt,.profile-form label,.pen-picker-help,.pen-edit-label,.pen-edit-range,.color-picker-hue-label,.color-picker-bottom label,.writing-options-panel .muted,.image-picker p,.image-picker-actions small,.view-panel-paper,.settings-version,.settings-footnote){color:var(--night-muted)}
+:root[data-theme=dark] :is(.page-heading h1,.section-heading h2,.recent-note strong,.note-info strong,.breadcrumb strong,.profile-summary,.profile-popover h2,.pen-picker-heading strong,.writing-options-heading,.settings-section h3,.modal header h2,.profile-details dd,.view-options-panel,.shape-picker,.image-picker-actions strong){color:var(--night-text)}
+:root[data-theme=dark] :is(.eyebrow,.sidebar-section-title,.heading-dot,.banner-link,.banner-label,.section-heading h2 svg,.page-sidebar-heading strong,.collection-tab.active,.view-toggle .icon-button.active,.view-options-panel .icon-button,.add-page-button){color:var(--night-accent)}
+:root[data-theme=dark] :is(.button.secondary,.recent-note,.new-note-tile,.list-view .note-card,.view-toggle,.search-field,.note-density select,.tool-options select,.appearance-options button,.pen-edit-kind,.pen-edit-color,.pen-arrange-row,.eraser-modes button,.shape-picker-grid button,.image-picker-actions button,.view-layout-button,.view-zoom-controls #zoom-value){background:var(--night-raised);color:#c4d4ec;border-color:var(--border)}
+:root[data-theme=dark] :is(.icon-button:hover,.button.secondary:hover,.nav-item:hover,.recent-note:hover,.new-note-tile:hover,.tool-button:hover,.pen-arrange-row>button:hover:not(:disabled),.context-menu button:hover,.pencil-mode-menu button:hover,.image-picker-actions button:hover,.shape-picker-grid button:hover){background:#263952;color:var(--night-text)}
+:root[data-theme=dark] :is(.nav-item.active,.tool-button.active,.tool-button.active:hover,.icon-button.active,.editor-options>.icon-button[aria-expanded=true],.view-layout-button[aria-pressed=true],.shape-picker-grid button[aria-pressed=true],.eraser-modes button[aria-pressed=true],.pen-edit-kind[aria-pressed=true],.pencil-mode-menu button[aria-pressed=true],.appearance-options button[aria-pressed=true]){background:#284a80;color:#ecf3ff;border-color:#5a80bb;box-shadow:none}
+:root[data-theme=dark] .button.primary{color:#0b1730;box-shadow:0 3px 10px #0002}
+:root[data-theme=dark] .button.primary:hover{background:#83a6ff}
+:root[data-theme=dark] :is(.nav-item.active small,.collection-tab>span,.new-note-tile>span){background:#2a4267;color:#bad1ff}
+:root[data-theme=dark] .avatar{border-color:var(--night-surface);box-shadow:0 0 0 1px #425a7c}
+:root[data-theme=dark] .note-title{color:#d4e1f5}
+:root[data-theme=dark] .note-tab{color:#9aaec9}
+:root[data-theme=dark] .editor-header .note-tab.active{background:#263750;color:#bbd0ff;border-color:#435b80}
+:root[data-theme=dark] .color-swatch{border-color:#151f30;box-shadow:0 0 0 1px #53637c}
+:root[data-theme=dark] :is(.device-note,.collection-toolbar,.settings-section,.modal footer,.profile-summary,.pen-picker-actions,.pen-arrange-row,.writing-options-panel .finger-switch,.view-panel-paper,.view-panel-divider,.toolbar-separator){border-color:var(--border)}
+:root[data-theme=dark] .toolbar-separator{background:var(--border)}
+:root[data-theme=dark] .welcome-banner{background:linear-gradient(115deg,#1c3053,#2a2e50 65%,#20364e);border-color:#354b6d}
+:root[data-theme=dark] .welcome-banner h2{color:#dce9ff}
+:root[data-theme=dark] .welcome-banner p{color:#acbfdc}
+:root[data-theme=dark] .welcome-banner.update-banner{background:linear-gradient(115deg,#223e61,#283958);border-color:#44638c}
+:root[data-theme=dark] .update-banner-art{background:#1a2c49;color:#9ebefa}
+:root[data-theme=dark] :is(.art-notebook.front,.art-notebook.back){box-shadow:4px 7px 16px #0004}
+:root[data-theme=dark] .notebook-cover{box-shadow:3px 6px 15px #0004}
+:root[data-theme=dark] .search-field input{color:var(--night-text)}
+:root[data-theme=dark] .search-field input::placeholder{color:#8498b6}
+:root[data-theme=dark] :is(.modal,.context-menu,.profile-popover,.pen-picker,.color-picker-dialog,.pencil-mode-menu,.writing-options-panel,.eraser-picker,.shape-picker,.image-picker,.view-options-panel,.selection-toolbar,.inline-text-toolbar,.editor-shell.focus-fullscreen .editor-header-actions){background:var(--night-surface);color:var(--night-text);border-color:#3a4e6c;box-shadow:0 18px 55px #0006}
+:root[data-theme=dark] :is(.modal,.color-picker-dialog)::backdrop{background:#040a14ac;backdrop-filter:blur(5px)}
+:root[data-theme=dark] :is(.context-menu button,.pencil-mode-menu button,.pen-arrange-row>button,.pen-preset-row,.pen-edit-name,.pen-edit-name input,.profile-form input,.image-picker-actions button,.inline-text-toolbar label){color:#c4d4ec}
+:root[data-theme=dark] :is(.modal,.profile-popover,.pen-picker,.writing-options-panel,.inline-text-toolbar,.color-picker-dialog) :is(input:not([type=color]):not([type=range]):not([type=checkbox]),select,textarea){background:var(--night-soft);color:var(--night-text);border-color:#3a4e6c}
+:root[data-theme=dark] :is(.paper-options label,.cover-options label){border-color:var(--border)}
+:root[data-theme=dark] .paper-options label:has(:checked){background:#263b5e;border-color:#688fd4}
+:root[data-theme=dark] .pen-picker-hero{background:linear-gradient(115deg,#202e44,#293c58)}
+:root[data-theme=dark] .pen-preset-art{background:#202d40;border-color:#354660}
+:root[data-theme=dark] .pen-preset-row[aria-pressed=true] .pen-preset-art{background:#263f65;border-color:#7ba4ee;box-shadow:inset 0 0 0 1px #5d87d2}
+:root[data-theme=dark] .pen-preset-name{color:#c8d7ed}
+:root[data-theme=dark] .pen-edit-color-swatch{border-color:#647c9f}
+:root[data-theme=dark] .ink-toolbar .pen-tool:after{border-color:#151f30;box-shadow:0 0 0 1px #596c89}
+:root[data-theme=dark] :is(.ink-toolbar .palette-edit,.ink-toolbar .custom-color,.pen-width-control>button,.pencil-mode-trigger,.inline-text-toolbar button){background:#253750;color:#a9c6ff;border-color:#506c98}
+:root[data-theme=dark] .pencil-mode-trigger[aria-expanded=true]{background:#2a456d;color:#d1e1ff}
+:root[data-theme=dark] .ink-toolbar .pen-width-control input::-webkit-slider-runnable-track{background:linear-gradient(to right,#7da3ff 0%,#7da3ff var(--width-progress),#3c506e var(--width-progress),#3c506e 100%)}
+:root[data-theme=dark] .ink-toolbar .pen-width-control input::-webkit-slider-thumb{background:#7da3ff;border-color:#d8e6ff;box-shadow:0 1px 4px #0005}
+:root[data-theme=dark] .ink-toolbar .pen-width-control input::-moz-range-track{background:#3c506e}
+:root[data-theme=dark] .ink-toolbar .pen-width-control input::-moz-range-progress{background:#7da3ff}
+:root[data-theme=dark] .finger-switch span{background:#3a4b64}
+:root[data-theme=dark] .finger-switch input:checked+span{background:#668fff}
+:root[data-theme=dark] :is(.paper-viewport,.page-loading){background:#0b1220;color:#a8bbd8}
+:root[data-theme=dark] .paper-surface{box-shadow:0 8px 32px #0005}
+:root[data-theme=dark] .page-thumb-paper{border-color:#536b91}
+:root[data-theme=dark] .add-page-button{border-color:#486186}
+:root[data-theme=dark] .spread-empty{background:#172438;border-color:#4a6183;color:#b4c9eb}
+:root[data-theme=dark] .pen-check-pad{background:#172438;border-color:#5d80b6;color:#c4d4ec}
+:root[data-theme=dark] :is(.pen-check-status,.eraser-picker .pen-button-guide){color:#a7bddb}
+:root[data-theme=dark] #toast{background:#243752;color:#e8f1ff;border:1px solid #4d668c;box-shadow:0 6px 25px #0005}
+:root[data-theme=dark] #toast.error{background:#512c38;color:#ffe3e9;border-color:#946070}
+:root[data-theme=dark]:fullscreen{background:#0b1220}
+
+:root[data-theme=dark] .install-page{--install-ink:#e4ecfa;--install-blue:#91b2ff;--install-muted:#a6b8d0;background:#0e1624}
+:root[data-theme=dark] .install-header{background:#111c2cea;border-color:#2c3d56}
+:root[data-theme=dark] .install-hero{background:linear-gradient(180deg,#0e1624 40%,#14233b)}
+:root[data-theme=dark] .install-hero h1 em{color:#91b2ff}
+:root[data-theme=dark] .install-ink-line{color:#46689f}
+:root[data-theme=dark] :is(.install-description,.install-nav a,.install-caption,.install-capabilities p,.install-section-heading>span,.install-workflow-step p,.install-footer span,.install-product-showcase figcaption){color:#a5b7d1}
+:root[data-theme=dark] :is(.install-overline,.install-header-link,.install-hero-actions>a,.install-capabilities span,.install-section-heading p,.install-footer a){color:#a1bdf0}
+:root[data-theme=dark] .install-header-link{border-color:#3b5378}
+:root[data-theme=dark] .install-header-link:hover{background:#243959}
+:root[data-theme=dark] .install-preview-tabs{background:#1b2a42;border-color:#354b6a}
+:root[data-theme=dark] .install-preview-tabs button{color:#a6b8d2}
+:root[data-theme=dark] .install-preview-tabs button[aria-selected=true]{background:#354e73;color:#edf4ff;box-shadow:none}
+:root[data-theme=dark] .install-device{border-color:#536581;background:#26334a;box-shadow:0 32px 55px -25px #000a}
+:root[data-theme=dark] .install-capabilities>div+div:before{background:#2a3a52}
+:root[data-theme=dark] .install-feature-art{color:#8eace2}
+:root[data-theme=dark] .install-workflow{background:#111c2c}
+:root[data-theme=dark] :is(.install-library-shot,.install-window-bar){background:#1c2b42;border-color:#354b68}
+:root[data-theme=dark] .install-workflow-step{border-color:#30435e}
+:root[data-theme=dark] .install-workflow-step>span{border-color:#415b7f;color:#adc7f6}
+:root[data-theme=dark] .install-guide{background:#182b48}

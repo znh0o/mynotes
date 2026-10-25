@@ -1,15 +1,18 @@
 import './style.css';
 import './theme.css';
 import './landing.css';
+import './dark.css';
 import { registerSW } from 'virtual:pwa-register';
 import { installFastTaps } from './ui/tool-taps';
 import { initInstallExperience } from './ui/install-experience';
+import { initAppearance } from './ui/appearance';
 
 type InstallPrompt = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 };
 const root = document.querySelector<HTMLElement>('#app')!;
+initAppearance();
 const standaloneMode = window.matchMedia('(display-mode: standalone)');
 installFastTaps();
 // Display mode chooses the UI only. It is not proof of installation or an auth boundary.

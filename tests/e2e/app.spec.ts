@@ -42,6 +42,7 @@ test('notebook creation, pressure ink, undo, reload, page management, trash reco
   await page.getByRole('button', { name: 'S펜 학습 노트 열기', exact: true }).click();
   await expect(page.locator('.page-loading')).toBeHidden();
   expect((await records(page, 'pages')).some(p => p.items.some((i: any) => i.id === ink.id))).toBe(true);
+  await page.getByRole('button', { name: '페이지 목록', exact: true }).click();
   await page.getByRole('button', { name: '페이지 추가', exact: true }).last().click();
   await expect(page.locator('.page-position')).toHaveText('2 / 2');
   await page.getByRole('button', { name: '텍스트', exact: true }).click();

@@ -9,6 +9,13 @@
     <link rel="apple-touch-icon" href="%BASE_URL%notelin-flat-icon-192.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <script>
+      // Resolve the saved appearance before styles and the app are loaded.
+      let appearance = 'system';
+      try { appearance = localStorage.getItem('notelin-appearance') || 'system'; } catch {}
+      const dark = appearance === 'dark' || appearance !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+      document.documentElement.style.backgroundColor = dark ? '#0e1624' : '#f4f7ff';
       const manifestLink = document.createElement('link');
       manifestLink.rel = 'manifest';
       manifestLink.href = '%BASE_URL%' + (/SamsungBrowser\//.test(navigator.userAgent) ? 'manifest-samsung.webmanifest' : 'manifest.webmanifest');

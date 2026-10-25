@@ -23,6 +23,7 @@ test('two-page view lets both sheets take ink immediately and remembers the view
   const noteId = (await records(page, 'notes')).filter(row => row.title === '두 페이지 확인').sort((a, b) => b.created - a.created)[0].id;
   const inkedPages = async () => (await records(page, 'pages')).filter(row => row.noteId === noteId && row.items.some((item: any) => item.kind === 'stroke')).length;
   for (let number = 2; number <= 4; number++) {
+    if (await page.locator('.page-sidebar').isHidden()) await page.getByRole('button', { name: '페이지 목록', exact: true }).click();
     await page.getByRole('button', { name: '페이지 추가', exact: true }).last().click();
     await expect(page.locator('.page-position')).toHaveText(`${number} / ${number}`);
   }
