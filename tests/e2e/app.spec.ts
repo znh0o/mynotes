@@ -175,6 +175,7 @@ test('pen width stays reachable in split view and pen dragging changes new strok
   const slider = page.getByRole('slider', { name: '펜 굵기', exact: true });
   for (const width of [1440, 1024, 834, 600, 390]) {
     await page.setViewportSize({ width, height: 1000 });
+    await expect(page.locator('html')).toHaveAttribute('data-device-ui', width <= 600 ? 'phone' : 'tablet');
     await expect(slider).toBeVisible();
     const r = await slider.boundingBox();
     expect(r!.height).toBeGreaterThanOrEqual(36);
