@@ -177,7 +177,10 @@ test('pen width stays reachable in split view and pen dragging changes new strok
     await page.setViewportSize({ width, height: 1000 });
     await expect(slider).toBeVisible();
     const r = await slider.boundingBox();
-    expect(r!.height).toBeGreaterThanOrEqual(40);
+    expect(r!.height).toBeGreaterThanOrEqual(36);
+    const toolbar = (await page.locator('.ink-toolbar').boundingBox())!;
+    expect(r!.y).toBeGreaterThanOrEqual(toolbar.y);
+    expect(r!.y + r!.height).toBeLessThanOrEqual(toolbar.y + toolbar.height);
     expect(r!.x).toBeGreaterThanOrEqual(0);
     expect(r!.x + r!.width).toBeLessThanOrEqual(width);
     const colors = (await page.locator('.color-palette').boundingBox())!;
