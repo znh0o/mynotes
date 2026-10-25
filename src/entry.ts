@@ -2,10 +2,11 @@ import './style.css';
 import './theme.css';
 import './landing.css';
 import './dark.css';
+import './phone.css';
 import { registerSW } from 'virtual:pwa-register';
 import { installFastTaps } from './ui/tool-taps';
 import { initInstallExperience } from './ui/install-experience';
-import { initAppearance } from './ui/appearance';
+import { getAppearance, initAppearance, setAppearance, type Appearance } from './ui/appearance';
 
 type InstallPrompt = Event & {
   prompt: () => Promise<void>;
@@ -13,10 +14,10 @@ type InstallPrompt = Event & {
 };
 const root = document.querySelector<HTMLElement>('#app')!;
 initAppearance();
-const standaloneMode = window.matchMedia('(display-mode: standalone)');
+const appMode = window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches;
 installFastTaps();
 // Display mode chooses the UI only. It is not proof of installation or an auth boundary.
-if (standaloneMode.matches) {
+if (appMode) {
   void import('./main').catch(error => {
     console.error('Notelin failed to start', error);
     root.innerHTML = '<div class="boot-error"><h1>Notelin을 열지 못했어요.</h1><p>앱을 다시 실행해 주세요.</p></div>';
@@ -43,6 +44,7 @@ function showInstallPage() {
     <header class="install-header" id="top">
       <a class="install-brand" href="#top" aria-label="Notelin 처음으로"><img src="${logo}" alt="Notelin" width="154" height="58" /></a>
       <nav class="install-nav" aria-label="설치 페이지 탐색"><a href="#features">주요 기능</a><a href="#install-guide">설치 방법</a></nav>
+      <div class="install-appearance"><button class="install-appearance-toggle" type="button" aria-label="화면 모드" aria-expanded="false" aria-controls="install-appearance-menu"><svg class="install-theme-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="install-theme-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20.5 14A8.5 8.5 0 0 1 10 3.5 8.5 8.5 0 1 0 20.5 14Z"/></svg></button><div class="install-appearance-menu" id="install-appearance-menu" role="group" aria-label="화면 모드 선택" hidden><button type="button" data-appearance="light">밝게</button><button type="button" data-appearance="dark">어둡게</button><button type="button" data-appearance="system">기기 설정</button></div></div>
       <button class="install-header-link" type="button" data-install>앱 설치 <span aria-hidden="true">↗</span></button>
     </header>
     <main>
@@ -74,6 +76,21 @@ function showInstallPage() {
     <footer class="install-footer"><img src="${logo}" alt="Notelin" width="124" height="46" /><span>생각을 쓰고, 오래 간직하는 공간.</span><a href="#top">맨 위로 ↑</a></footer>
   </div>`;
   initInstallExperience(root);
+  const appearanceToggle = root.querySelector<HTMLButtonElement>('.install-appearance-toggle')!;
+  const appearanceMenu = root.querySelector<HTMLElement>('.install-appearance-menu')!;
+  const closeAppearance = () => { appearanceMenu.hidden = true; appearanceToggle.setAttribute('aria-expanded', 'false'); };
+  root.querySelectorAll<HTMLButtonElement>('[data-appearance]').forEach(button => {
+    button.setAttribute('aria-pressed', String(button.dataset.appearance === getAppearance()));
+    button.addEventListener('click', () => { setAppearance(button.dataset.appearance as Appearance); closeAppearance(); appearanceToggle.focus(); });
+  });
+  appearanceToggle.addEventListener('click', () => {
+    appearanceMenu.hidden = !appearanceMenu.hidden;
+    appearanceToggle.setAttribute('aria-expanded', String(!appearanceMenu.hidden));
+  });
+  document.addEventListener('pointerdown', event => {
+    if (!root.querySelector('.install-appearance')?.contains(event.target as Node)) closeAppearance();
+  });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') closeAppearance(); });
   let deferredPrompt: InstallPrompt | undefined;
   const guide = root.querySelector<HTMLElement>('#install-manual')!;
   const showGuide = () => {

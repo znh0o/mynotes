@@ -35,7 +35,7 @@
 :root[data-theme=dark] .notebook-cover{box-shadow:3px 6px 15px #0004}
 :root[data-theme=dark] .search-field input{color:var(--night-text)}
 :root[data-theme=dark] .search-field input::placeholder{color:#8498b6}
-:root[data-theme=dark] :is(.modal,.context-menu,.profile-popover,.pen-picker,.color-picker-dialog,.pencil-mode-menu,.writing-options-panel,.eraser-picker,.shape-picker,.image-picker,.view-options-panel,.selection-toolbar,.inline-text-toolbar,.editor-shell.focus-fullscreen .editor-header-actions){background:var(--night-surface);color:var(--night-text);border-color:#3a4e6c;box-shadow:0 18px 55px #0006}
+:root[data-theme=dark] :is(.modal,.context-menu,.profile-popover,.pen-picker,.color-picker-dialog,.pencil-mode-menu,.writing-options-panel,.eraser-picker,.shape-picker,.image-picker,.view-options-panel,.selection-toolbar,.inline-text-toolbar){background:var(--night-surface);color:var(--night-text);border-color:#3a4e6c;box-shadow:0 18px 55px #0006}
 :root[data-theme=dark] :is(.modal,.color-picker-dialog)::backdrop{background:#040a14ac;backdrop-filter:blur(5px)}
 :root[data-theme=dark] :is(.context-menu button,.pencil-mode-menu button,.pen-arrange-row>button,.pen-preset-row,.pen-edit-name,.pen-edit-name input,.profile-form input,.image-picker-actions button,.inline-text-toolbar label){color:#c4d4ec}
 :root[data-theme=dark] :is(.modal,.profile-popover,.pen-picker,.writing-options-panel,.inline-text-toolbar,.color-picker-dialog) :is(input:not([type=color]):not([type=range]):not([type=checkbox]),select,textarea){background:var(--night-soft);color:var(--night-text);border-color:#3a4e6c}
@@ -68,6 +68,12 @@
 
 :root[data-theme=dark] .install-page{--install-ink:#e4ecfa;--install-blue:#91b2ff;--install-muted:#a6b8d0;background:#0e1624}
 :root[data-theme=dark] .install-header{background:#111c2cea;border-color:#2c3d56}
+:root[data-theme=dark] .install-appearance-toggle{background:#1b2b43;border-color:#3b5378;color:#c7d9f8}
+:root[data-theme=dark] .install-appearance-toggle:hover,:root[data-theme=dark] .install-appearance-toggle[aria-expanded=true]{background:#273d5e;border-color:#7090bc}
+:root[data-theme=dark] .install-appearance-menu:not([hidden]){background:#1b2b43;border-color:#3b5378;box-shadow:0 14px 34px #0008}
+:root[data-theme=dark] .install-appearance-menu button{color:#c0d0e8}
+:root[data-theme=dark] .install-appearance-menu button:hover{background:#304966}
+:root[data-theme=dark] .install-appearance-menu button[aria-pressed=true]{background:#355a90;color:#fff}
 :root[data-theme=dark] .install-hero{background:linear-gradient(180deg,#0e1624 40%,#14233b)}
 :root[data-theme=dark] .install-hero h1 em{color:#91b2ff}
 :root[data-theme=dark] .install-ink-line{color:#46689f}
@@ -80,6 +86,7 @@
 :root[data-theme=dark] .install-preview-tabs button[aria-selected=true]{background:#354e73;color:#edf4ff;box-shadow:none}
 :root[data-theme=dark] .install-device{border-color:#536581;background:#26334a;box-shadow:0 32px 55px -25px #000a}
 :root[data-theme=dark] .install-capabilities>div+div:before{background:#2a3a52}
+:root[data-theme=dark] .install-capabilities>div+div{border-color:#2a3a52}
 :root[data-theme=dark] .install-feature-art{color:#8eace2}
 :root[data-theme=dark] .install-workflow{background:#111c2c}
 :root[data-theme=dark] :is(.install-library-shot,.install-window-bar){background:#1c2b42;border-color:#354b68}
@@ -90,7 +97,6 @@
 :root[data-theme=dark] .editor-header{background:#284b79;border-color:#3d6090}
 :root[data-theme=dark] .editor-header :is(.editor-home,.note-tab,.editor-page-controls,.page-position,.editor-header-actions,.save-indicator){color:#e8f1ff}
 :root[data-theme=dark] .editor-header .note-tab.active{background:#ffffff16;border-color:#7995bb;color:#fff}
-:root[data-theme=dark] .editor-shell.focus-fullscreen .editor-header-actions{background:#284b79;border-color:#617fa8}
 :root[data-theme=dark] .ink-toolbar :is(.tool-button,.tool-group>.icon-button,.editor-options>.icon-button,.pen-width-control>button,.palette-edit,.custom-color,.pencil-mode-trigger){color:#d7e0ee}
 :root[data-theme=dark] .ink-toolbar .tool-button.active,:root[data-theme=dark] .ink-toolbar .tool-button.active:hover{background:#34475f;color:#fff}
 :root[data-theme=dark] .ink-toolbar .pen-width-control,:root[data-theme=dark] .ink-toolbar .pen-width-control>label,:root[data-theme=dark] .ink-toolbar .pen-width-control>output{color:#c2d0e5}

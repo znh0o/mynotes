@@ -70,7 +70,7 @@ test('installable PWA, offline PDF annotation, export and backup restore', async
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
   const manifest = await page.evaluate(async () => (await fetch('manifest.webmanifest')).json());
   expect(manifest.name).toBe('Notelin — 생각이 머무는 곳'); expect(manifest.short_name).toBe('Notelin');
-  expect(manifest.display).toBe('standalone'); expect(manifest.scope).toBe('/mynotes/');
+  expect(manifest.display).toBe('fullscreen'); expect(manifest.scope).toBe('/mynotes/');
   expect(manifest.icons).toContainEqual({ src: 'notelin-flat-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' });
   expect(manifest.icons).toContainEqual({ src: 'notelin-flat-icon-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' });
   await context.setOffline(true); await page.reload(); await expect(page.locator('h1')).toContainText('나의 서재');
@@ -187,16 +187,22 @@ test('pen width stays reachable in split view and pen dragging changes new strok
     const writing = (await page.locator('.paper-viewport').boundingBox())!;
     expect(Math.abs(r!.y + r!.height / 2 - colors.y - colors.height / 2)).toBeLessThan(2);
     expect(r!.x).toBeGreaterThan(colors.x + colors.width);
-    expect(toolbar.height).toBeLessThanOrEqual(68);
-    expect(writing.y).toBeCloseTo(toolbar.y + toolbar.height, 0);
+    if (width <= 600) {
+      expect(toolbar.height).toBeLessThanOrEqual(110);
+      expect(writing.y + writing.height).toBeCloseTo(toolbar.y, 0);
+    } else {
+      expect(toolbar.height).toBeLessThanOrEqual(68);
+      expect(writing.y).toBeCloseTo(toolbar.y + toolbar.height, 0);
+    }
   }
   await page.setViewportSize({ width: 834, height: 1000 });
   const cdp = await page.context().newCDPSession(page);
   const dragWidth = async (value: number) => {
     const r = (await slider.boundingBox())!;
     const x = r.x + 10 + (r.width - 20) * (value - .5) / 19.5, y = r.y + r.height / 2;
-    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', pointerType: 'pen', buttons: 0, x: r.x + 10, y, force: 0 });
-    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', pointerType: 'pen', button: 'left', buttons: 1, x: r.x + 10, y, force: .5, clickCount: 1 });
+    const startX = value < 10 ? r.x + r.width - 10 : r.x + 10;
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', pointerType: 'pen', buttons: 0, x: startX, y, force: 0 });
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', pointerType: 'pen', button: 'left', buttons: 1, x: startX, y, force: .5, clickCount: 1 });
     await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', pointerType: 'pen', button: 'left', buttons: 1, x, y, force: .5 });
     await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', pointerType: 'pen', button: 'left', buttons: 0, x, y, force: 0, clickCount: 1 });
     await expect(slider).toHaveValue(String(value));

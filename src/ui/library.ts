@@ -2,6 +2,7 @@ import { db, persistNew, deletePermanently } from '../data/store';
 import { covers, createNote, paperNames, uid, type Folder, type Note, type Paper } from '../data/model';
 import { importPDF, thumbnail } from '../data/pdf';
 import { icon, button, escape, safeColor, modal, toast, run, pickFile, contextMenu, confirmAction, formatDate } from './common';
+import { bindPhoneLibrary } from './phone-chrome';
 export interface LibraryState { filter: string; query: string; sort: string; list: boolean }
 interface Profile { name: string; school: string; grade: string; classroom: string }
 const emptyProfile = (): Profile => ({ name: '', school: '', grade: '', classroom: '' });
@@ -26,6 +27,7 @@ export class LibraryView {
   private updateAvailable = false;
   private updateApplying = false;
   private profile = emptyProfile();
+  private phoneCleanup?: () => void;
   constructor(private root: HTMLElement, private openNote: (id: string) => Promise<void>, private settings: () => void,
     private navigateFilter: (filter: string) => Promise<void> = async filter => this.setFilter(filter), initial?: LibraryState,
     private applyUpdate: () => Promise<void> = async () => {}) {
@@ -91,10 +93,11 @@ export class LibraryView {
   snapshot(): LibraryState { return { filter: this.filter, query: this.query, sort: this.sort, list: this.list }; }
   setFilter(filter: string) { this.filter = filter; this.renderResults(); }
   private render() {
+    this.phoneCleanup?.();
     document.title = 'Notelin · 나의 서재';
     const active = this.notes.filter(n => !n.deleted);
     this.root.innerHTML = `<div class="library-shell">
-      <aside class="library-sidebar">
+      <aside class="library-sidebar" id="phone-library-sidebar">
         <button class="brand brand-logo" data-action="filter" data-id="all" aria-label="Notelin 홈"><img class="brand-wordmark" src="${import.meta.env.BASE_URL}notelin-wordmark-lockup.png" alt="" aria-hidden="true" /></button>
         <nav aria-label="서재 탐색">
           ${this.nav('all', 'Library', '모든 노트', active.length)}
@@ -110,7 +113,7 @@ export class LibraryView {
         </div>
       </aside>
       <div class="library-main">
-        <header class="library-topbar"><div class="breadcrumb">${button('Menu', '메뉴 열기', 'mobile-menu')}<span>나의 공간</span>${icon('ChevronRight', 13)}<strong id="breadcrumb-title">나의 서재</strong></div><div class="topbar-right"><div class="profile-anchor"><button class="avatar" type="button" data-action="profile" aria-label="프로필" aria-expanded="false" aria-controls="profile-popover">${escape(this.profileInitial())}</button><div class="profile-popover" id="profile-popover" role="dialog" aria-label="프로필" hidden></div></div></div></header>
+        <header class="library-topbar"><div class="breadcrumb">${button('Menu', '메뉴 열기', 'mobile-menu')}<span>나의 공간</span>${icon('ChevronRight', 13)}<img class="phone-wordmark" src="${import.meta.env.BASE_URL}notelin-wordmark-lockup.png" alt="Notelin" /><strong id="breadcrumb-title">나의 서재</strong></div><div class="topbar-right"><div class="profile-anchor"><button class="avatar" type="button" data-action="profile" aria-label="프로필" aria-expanded="false" aria-controls="profile-popover">${escape(this.profileInitial())}</button><div class="profile-popover" id="profile-popover" role="dialog" aria-label="프로필" hidden></div></div></div></header>
         <main class="library-content">
           <div class="page-heading"><div><h1 id="library-title">나의 서재<span class="heading-dot">.</span></h1><p id="library-subtitle" hidden></p></div><div class="heading-actions"><button class="button secondary" data-action="import">${icon('Upload', 18)} PDF 가져오기</button><button class="button primary" data-action="new">${icon('Plus', 19)} 새 노트</button></div></div>
           <section class="welcome-banner ${this.updateAvailable ? 'update-banner' : ''}">${this.bannerContent()}</section>
@@ -118,9 +121,17 @@ export class LibraryView {
           <section class="notes-section"><div class="collection-toolbar"><div class="collection-tabs"><button class="collection-tab active" data-action="filter" data-id="all">모든 노트 <span>${active.length}</span></button><button class="collection-tab" data-action="filter" data-id="favorites">즐겨찾기 ${icon('Star', 14)}</button></div><div class="collection-controls"><label class="search-field">${icon('Search', 17)}<input id="library-search" type="search" placeholder="노트 검색" aria-label="노트 검색" value="${escape(this.query)}" /></label><label class="sort-field"><select id="sort" aria-label="노트 정렬"><option value="updated">최근 수정순</option><option value="name">이름순</option><option value="created">최근 생성순</option></select>${icon('ChevronDown', 13)}</label><label class="note-density">한 줄<select id="note-columns" aria-label="한 줄 노트 개수"><option value="auto">자동</option><option value="4">4개</option><option value="5">5개</option><option value="6">6개</option></select></label><div class="view-toggle">${button('Grid2X2', '그리드 보기', 'grid')}${button('List', '목록 보기', 'list')}</div></div></div><div id="note-results"></div></section>
         </main>
       </div>
+      <button class="phone-navigation-backdrop" type="button" data-action="close-phone-navigation" aria-label="메뉴 닫기" hidden></button>
+      <nav class="phone-bottom-nav" aria-label="휴대폰 서재 탐색">
+        <button type="button" data-action="filter" data-id="all" aria-label="전체 노트">${icon('Library', 21)}<span>노트</span></button>
+        <button type="button" data-action="filter" data-id="recent" aria-label="최근 기록">${icon('Clock', 21)}<span>최근</span></button>
+        <button type="button" data-action="filter" data-id="favorites" aria-label="즐겨찾는 노트">${icon('Star', 21)}<span>즐겨찾기</span></button>
+        <button type="button" data-action="mobile-menu" aria-label="폴더 열기" aria-controls="phone-library-sidebar" aria-expanded="false">${icon('Folder', 21)}<span>폴더</span></button>
+      </nav>
     </div>`;
     this.root.querySelector<HTMLSelectElement>('#sort')!.value = this.sort;
     this.renderResults();
+    this.phoneCleanup = bindPhoneLibrary(this.root);
   }
   private nav(id: string, name: Parameters<typeof icon>[0], label: string, count?: number, color?: string) {
     return `<button class="nav-item ${this.filter === id ? 'active' : ''}" data-action="filter" data-id="${id}"><span ${color ? `style="color:${safeColor(color)}"` : ''}>${icon(name)}</span><span>${escape(label)}</span>${count !== undefined ? `<small>${count}</small>` : ''}</button>`;
@@ -188,6 +199,10 @@ export class LibraryView {
     this.root.querySelector<HTMLElement>('.heading-actions')!.hidden = this.filter === 'trash';
     this.root.querySelectorAll<HTMLElement>('.welcome-banner,.recent-section').forEach(e => e.hidden = this.filter !== 'all' || !!this.query);
     this.root.querySelectorAll('.nav-item[data-id],.collection-tab').forEach(e => e.classList.toggle('active', (e as HTMLElement).dataset.id === this.filter));
+    this.root.querySelectorAll<HTMLElement>('.phone-bottom-nav [data-action=filter]').forEach(button => {
+      const active = button.dataset.id === this.filter;
+      button.classList.toggle('active', active); button.setAttribute('aria-current', active ? 'page' : 'false');
+    });
     const recent = [...active].sort((a, b) => b.opened - a.opened).slice(0, 3);
     this.root.querySelector('#recent-notes')!.innerHTML = recent.map(n => `<button class="recent-note" data-action="open" data-id="${n.id}"><div class="recent-cover" style="--cover:${safeColor(n.cover)}">${icon('BookOpen', 23)}</div><div><strong>${escape(n.title)}</strong><span>${formatDate(n.opened)}에 열었어요</span></div>${icon('ChevronRight', 16)}</button>`).join('') || '<p class="muted">최근 사용한 노트가 없어요.</p>';
     const cards = notes.map(n => this.card(n)).join('');
@@ -218,6 +233,7 @@ export class LibraryView {
       const note = await importPDF(file, this.folderId()); await this.openNote(note.id);
     });
     if (action === 'mobile-menu') this.root.querySelector('.library-sidebar')?.classList.toggle('mobile-open');
+    if (action === 'close-phone-navigation') this.root.querySelector('.library-sidebar')?.classList.remove('mobile-open');
   }
   private folderId() { return this.folders.some(f => f.id === this.filter) ? this.filter : null; }
   newNote() {
@@ -258,5 +274,5 @@ export class LibraryView {
       { label: '휴지통으로 이동', icon: 'Trash2', danger: true, action: () => confirmAction('휴지통으로 이동할까요?', '휴지통에서 언제든 다시 복구할 수 있어요.', '이동', async () => { await db.notes.update(id, { deleted: Date.now() }); await this.show(); }) }
     ]);
   }
-  destroy() { this.abort.abort(); }
+  destroy() { this.phoneCleanup?.(); this.abort.abort(); }
 }

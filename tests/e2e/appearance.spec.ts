@@ -47,12 +47,14 @@ test('page list starts closed on every entry and opens on request at desktop and
   await page.locator('[name=title]').fill('페이지 목록 검증');
   await page.getByRole('button', { name: '노트 만들기', exact: true }).click();
   await expect(page.locator('.page-loading')).toBeHidden();
-  const button = page.getByRole('button', { name: '페이지 목록', exact: true });
+  const button = page.locator('[data-action=sidebar]');
   const sidebar = page.locator('.page-sidebar');
   for (const width of [1440, 430]) {
     await page.setViewportSize({ width, height: 1080 });
+    if (width === 430) await page.getByRole('button', { name: '문서 메뉴' }).click();
     await expect(sidebar).toBeHidden(); await expect(button).toHaveAttribute('aria-expanded', 'false');
     await button.click(); await expect(sidebar).toBeVisible(); await expect(button).toHaveAttribute('aria-expanded', 'true');
+    if (width === 430) await page.getByRole('button', { name: '문서 메뉴' }).click();
     await button.click(); await expect(sidebar).toBeHidden();
   }
   await page.setViewportSize({ width: 1440, height: 1080 });

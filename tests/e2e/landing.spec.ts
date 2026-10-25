@@ -1,5 +1,40 @@
 import { test, expect } from '@playwright/test';
 
+test('install site follows system dark mode and allows a saved appearance choice', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+  await page.goto('./');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.getByRole('button', { name: 'Notelin 설치하기' })).toBeVisible();
+  await page.getByRole('button', { name: '화면 모드' }).click();
+  await expect(page.getByRole('button', { name: '기기 설정' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: '밝게' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await page.getByRole('button', { name: '화면 모드' }).click();
+  await page.getByRole('button', { name: '어둡게' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await page.screenshot({ path: '../Notelin-install-dark.png', fullPage: true });
+  await page.emulateMedia({ colorScheme: 'light' });
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await page.getByRole('button', { name: '화면 모드' }).click();
+  await page.getByRole('button', { name: '기기 설정' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await expect(page.locator('#paper-live,.library-shell')).toHaveCount(0);
+});
+
+test('fullscreen launch opens the notebook library and is still a valid install mode', async ({ page }) => {
+  await page.addInitScript(() => {
+    const native = window.matchMedia.bind(window);
+    window.matchMedia = query => query === '(display-mode: fullscreen)'
+      ? { ...native(query), matches: true } as MediaQueryList
+      : native(query);
+  });
+  await page.goto('./');
+  await expect(page.locator('#library-title')).toContainText('나의 서재');
+  await expect(page.locator('.install-page')).toHaveCount(0);
+});
+
 test('browser mode shows only the install experience and never opens the notes database', async ({ page }) => {
   await page.goto('./');
   await expect(page.getByRole('heading', { name: /생각이 쌓이는/ })).toBeVisible();
@@ -10,7 +45,7 @@ test('browser mode shows only the install experience and never opens the notes d
   await expect(page.locator('#paper-live,.library-shell')).toHaveCount(0);
   expect(await page.evaluate(() => indexedDB.databases().then(rows => rows.some(row => row.name === 'mynotes-v1')))).toBe(false);
   const manifest = await page.evaluate(async () => (await fetch(new URL('manifest.webmanifest', location.href))).json());
-  expect(manifest).toMatchObject({ id: '/mynotes/', start_url: '/mynotes/', scope: '/mynotes/', display: 'standalone' });
+  expect(manifest).toMatchObject({ id: '/mynotes/', start_url: '/mynotes/', scope: '/mynotes/', display: 'fullscreen' });
   await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', '/mynotes/manifest.webmanifest');
   await page.screenshot({ path: '../Notelin-install-landing.png', fullPage: true });
   await page.evaluate(async () => {
@@ -36,7 +71,7 @@ test('Samsung Internet receives an install manifest without the POST file share 
     await page.goto('./');
     await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', '/mynotes/manifest-samsung.webmanifest');
     const manifest = await page.evaluate(async () => (await fetch(document.querySelector<HTMLLinkElement>('link[rel="manifest"]')!.href)).json());
-    expect(manifest).toMatchObject({ id: '/mynotes/', start_url: '/mynotes/', scope: '/mynotes/', display: 'standalone' });
+    expect(manifest).toMatchObject({ id: '/mynotes/', start_url: '/mynotes/', scope: '/mynotes/', display: 'fullscreen' });
     expect(manifest).not.toHaveProperty('share_target');
     expect(manifest.icons).toHaveLength(3);
     const cdp = await context.newCDPSession(page);
@@ -44,6 +79,30 @@ test('Samsung Internet receives an install manifest without the POST file share 
     expect((await cdp.send('Page.getAppManifest')).errors).toEqual([]);
     await cdp.detach();
   } finally { await context.close(); }
+});
+
+test('phone installation uses standalone manifests in Chrome and Samsung Internet', async ({ browser }) => {
+  for (const [browserName, userAgent, file] of [
+    ['Chrome', 'Mozilla/5.0 (Linux; Android 15; Mobile) AppleWebKit/537.36 Chrome/143.0.0.0 Mobile Safari/537.36', 'manifest-phone.webmanifest'],
+    ['Samsung Internet', 'Mozilla/5.0 (Linux; Android 15; Mobile) AppleWebKit/537.36 SamsungBrowser/30.0 Chrome/143.0.0.0 Mobile Safari/537.36', 'manifest-phone-samsung.webmanifest'],
+  ]) {
+    const context = await browser.newContext({
+      baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:4173/mynotes/',
+      userAgent, viewport: { width: 390, height: 844 },
+    });
+    try {
+      const page = await context.newPage();
+      await page.goto('./');
+      await expect(page.locator('link[rel=manifest]')).toHaveAttribute('href', '/mynotes/' + file);
+      const manifest = await page.evaluate(async () => (await fetch(document.querySelector<HTMLLinkElement>('link[rel=manifest]')!.href)).json());
+      expect(manifest.display, browserName).toBe('standalone');
+      if (browserName === 'Samsung Internet') expect(manifest).not.toHaveProperty('share_target');
+      else expect(manifest).toHaveProperty('share_target');
+      await expect(page.locator('.install-page')).toBeVisible();
+    } finally {
+      await context.close();
+    }
+  }
 });
 
 test('install button uses the browser prompt when available and otherwise explains manual installation', async ({ page }) => {

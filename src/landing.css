@@ -21,6 +21,17 @@
 }
 .install-brand{display:inline-flex;align-items:center;flex:none}
 .install-brand img{display:block;width:144px;height:54px;object-fit:contain;mix-blend-mode:multiply}
+.install-appearance{position:relative;flex:none;margin-left:0}
+.install-appearance-toggle{display:grid;place-items:center;width:40px;height:40px;border:1px solid #dce4ef;border-radius:9px;color:#345987;background:#fff;transition:background .2s,border-color .2s}
+.install-appearance-toggle:hover,.install-appearance-toggle[aria-expanded=true]{background:#edf3ff;border-color:#adc5ed}
+.install-appearance-toggle svg{width:18px;height:18px}
+.install-theme-moon{display:none}
+:root[data-theme=dark] .install-theme-sun{display:none}
+:root[data-theme=dark] .install-theme-moon{display:block}
+.install-appearance-menu:not([hidden]){position:absolute;top:calc(100% + 9px);right:0;z-index:30;display:grid;gap:2px;width:132px;padding:6px;border:1px solid #d8e2f0;border-radius:11px;background:#fff;box-shadow:0 14px 34px #15376227}
+.install-appearance-menu button{min-height:38px;padding:0 10px;text-align:left;border-radius:7px;color:#526782;font-size:12px}
+.install-appearance-menu button:hover{background:#eef3fb}
+.install-appearance-menu button[aria-pressed=true]{background:#e8f0ff;color:#2e61c8;font-weight:700}
 .install-nav{display:flex;align-items:center;gap:32px;margin-left:auto}
 .install-nav a{font-size:13px;font-weight:600;color:#67768c;white-space:nowrap;transition:color .2s}
 .install-nav a:hover{color:var(--install-blue)}
@@ -142,10 +153,12 @@
   .install-guide{column-gap:55px}
 }
 @media(max-width:700px){
-  .install-header{height:68px;padding:0 22px;gap:18px}
+  .install-header{height:68px;padding:0 18px;gap:10px}
   .install-brand img{width:128px;height:48px}
   .install-nav{display:none}
-  .install-header-link{margin-left:auto;min-height:36px;font-size:11px;padding:0 13px;gap:14px}
+  .install-appearance{margin-left:auto}
+  .install-appearance-toggle{width:36px;height:36px}
+  .install-header-link{margin-left:0;min-height:36px;font-size:11px;padding:0 11px;gap:8px}
   .install-hero{padding:55px 20px 36px}
   .install-hero h1{font-size:clamp(43px,9vw,60px)}
   .install-overline{font-size:8px;letter-spacing:.15em}

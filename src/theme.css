@@ -227,7 +227,7 @@ html,body,#app,.library-shell,.library-main,.library-content,.modal,.modal-body{
 @media(max-width:760px){.ink-toolbar{height:60px;min-height:60px;padding:4px 8px;gap:6px}.toolbar-tools{gap:8px}.toolbar-tools .drawing-tools{order:-1}.ink-style-controls{gap:6px}.ink-style-controls .color-palette{gap:3px}.ink-toolbar .pen-width-control input[type=range]{width:64px}.ink-toolbar .pen-width-control>button{width:26px}.ink-toolbar .tool-button{height:48px}.writing-options-panel .finger-switch{font-size:12px}}
 
 /* Compact editor chrome; tool names remain in titles and accessible labels. */
-.editor-header{height:34px;min-height:34px;align-items:center;padding:0 10px;gap:10px}
+.editor-header{height:38px;min-height:38px;align-items:center;padding:0 10px;gap:10px}
 .editor-header .editor-home{width:32px;height:30px;justify-content:center;padding:0;flex:none}
 .editor-header .editor-home>span{display:none}
 .editor-header .editor-home>svg{display:block;width:18px;height:18px}
@@ -278,7 +278,7 @@ html,body,#app,.library-shell,.library-main,.library-content,.modal,.modal-body{
 .editor-page-controls .icon-button svg{width:16px;height:16px}
 .editor-page-controls .page-position{min-width:49px;padding:4px 2px;color:#415f8b;font-size:11px;font-variant-numeric:tabular-nums}
 .editor-header-actions [data-action=view-options][aria-expanded=true]{color:#275fcf;background:#e4ecff}
-.view-options-panel{position:fixed;z-index:30;inset:43px 11px auto auto;margin:0;width:240px;max-width:calc(100vw - 22px);padding:15px;border:1px solid #d8e3f5;border-radius:12px;background:#fff;color:#314b70;box-shadow:0 16px 42px #25466e25;font-size:12px}
+.view-options-panel{position:fixed;z-index:30;inset:47px 11px auto auto;margin:0;width:240px;max-width:calc(100vw - 22px);padding:15px;border:1px solid #d8e3f5;border-radius:12px;background:#fff;color:#314b70;box-shadow:0 16px 42px #25466e25;font-size:12px}
 .view-panel-heading{font-size:10px;font-weight:700;letter-spacing:.07em;color:#7187a7;margin-bottom:10px}
 .view-layout-button{display:flex;align-items:center;width:100%;gap:11px;padding:9px;border:1px solid #e3e9f2;border-radius:9px;text-align:left;background:#fafbfd}
 .view-layout-button>svg{color:#6787b8}
@@ -297,13 +297,6 @@ html,body,#app,.library-shell,.library-main,.library-content,.modal,.modal-body{
 .spread-companion .spread-live{pointer-events:auto;touch-action:none;cursor:crosshair}
 .hand-mode .spread-companion .spread-live{cursor:grab}
 @media(max-width:760px){.editor-header{gap:5px}.editor-page-controls .icon-button{width:24px}.editor-page-controls .page-position{min-width:43px;font-size:10px}.editor-header .note-tab>button:first-child{max-width:84px}.editor-header .note-tab>button:first-child span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
-html:fullscreen{background:#f4f6f9}
-.editor-shell.focus-fullscreen .editor-header{height:0;min-height:0;padding:0;border:0;z-index:20;overflow:visible}
-.editor-shell.focus-fullscreen .editor-header>:not(.editor-header-actions){display:none}
-.editor-shell.focus-fullscreen .editor-header-actions{position:fixed;top:10px;right:10px;z-index:20;padding:3px;border:1px solid #dce6f4;border-radius:10px;background:#fff;box-shadow:0 4px 18px #27466e24}
-.editor-shell.focus-fullscreen .editor-header-actions>:not([data-action=fullscreen]){display:none}
-.editor-shell.focus-fullscreen .editor-header-actions [data-action=fullscreen]{display:inline-flex}
-.editor-shell.focus-fullscreen .page-sidebar{display:none}
 
 /* Compact blue document bar and neutral drawing controls. */
 .editor-header{background:#3d6dae;border-bottom-color:#315e99;color:#f4f8ff}
@@ -313,7 +306,6 @@ html:fullscreen{background:#f4f6f9}
 .editor-header .icon-button:hover,.editor-header .editor-page-controls .icon-button:hover,.editor-header .editor-header-actions [data-action=view-options][aria-expanded=true]{background:#ffffff22;color:#fff}
 .editor-header button:focus-visible{outline-color:#d4e6ff}
 .editor-header .save-indicator.save-error{color:#ffe0a9}
-.editor-shell.focus-fullscreen .editor-header-actions{background:#3d6dae;border-color:#7295c5}
 .ink-toolbar .tool-button{color:#20262e}
 .ink-toolbar .tool-button.active,.ink-toolbar .tool-button.active:hover{background:#e2e9f2;color:#161c23;box-shadow:none}
 .ink-toolbar :is(.tool-group>.icon-button,.editor-options>.icon-button,.pen-width-control>button,.palette-edit,.custom-color,.pencil-mode-trigger){color:#20262e}

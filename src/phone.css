@@ -1,0 +1,122 @@
+/* Phone chrome is opt-in. Tablet layout keeps the existing rules above it. */
+.phone-wordmark,.phone-bottom-nav,[data-action=phone-document-menu]{display:none}
+.phone-document-panel:not(:popover-open){display:none}
+
+:root[data-device-ui=phone] .library-shell{min-height:100dvh;background:#f5f7fb}
+:root[data-device-ui=phone] .library-main{margin-left:0;width:100%;min-width:0}
+:root[data-device-ui=phone] .library-sidebar{width:min(82vw,320px);transform:translateX(-100%);z-index:62;padding:28px 17px 18px;box-shadow:14px 0 40px #132b4a30;transition:transform .22s ease}
+:root[data-device-ui=phone] .library-sidebar.mobile-open{transform:translateX(0)}
+:root[data-device-ui=phone] .phone-navigation-backdrop:not([hidden]){display:block;position:fixed;inset:0;z-index:61;background:#12254166;touch-action:none}
+:root[data-device-ui=phone] .library-topbar{height:58px;position:sticky;top:0;z-index:24;padding:0 18px;background:#fff;border-bottom:1px solid #e7ecf4}
+:root[data-device-ui=phone] .breadcrumb{gap:13px;min-width:0}
+:root[data-device-ui=phone] .breadcrumb .icon-button{display:grid;place-items:center;width:38px;height:40px;margin-left:-5px;color:#314b6c}
+:root[data-device-ui=phone] .breadcrumb>span,:root[data-device-ui=phone] .breadcrumb>svg,:root[data-device-ui=phone] #breadcrumb-title{display:none}
+:root[data-device-ui=phone] .phone-wordmark{display:block;width:100px;height:36px;object-fit:contain;mix-blend-mode:multiply}
+:root[data-device-ui=phone] .topbar-right{gap:8px}
+:root[data-device-ui=phone] .avatar{height:33px;width:33px}
+:root[data-device-ui=phone] .library-content{padding:21px 18px calc(112px + env(safe-area-inset-bottom));max-width:680px}
+:root[data-device-ui=phone] .page-heading{display:flex;flex-wrap:nowrap;align-items:center;gap:12px;margin-bottom:19px}
+:root[data-device-ui=phone] .page-heading h1{font-size:24px;line-height:1.25;letter-spacing:-1px;margin:0}
+:root[data-device-ui=phone] .page-heading>.heading-actions{display:flex;margin:0 0 0 auto}
+:root[data-device-ui=phone] .heading-actions [data-action=import]{height:38px;padding:0 11px;gap:5px;font-size:10px;white-space:nowrap}
+:root[data-device-ui=phone] .heading-actions [data-action=import] svg{width:15px;height:15px}
+:root[data-device-ui=phone] .heading-actions [data-action=new]{position:fixed;right:20px;bottom:calc(82px + env(safe-area-inset-bottom));z-index:30;width:52px;height:52px;display:grid;place-items:center;padding:0;border-radius:17px;box-shadow:0 7px 20px #245bc04d;font-size:0}
+:root[data-device-ui=phone] .heading-actions [data-action=new] svg{width:25px;height:25px}
+:root[data-device-ui=phone] .heading-actions[hidden]{display:none}
+:root[data-device-ui=phone] .welcome-banner:not(.update-banner){display:none}
+:root[data-device-ui=phone] .welcome-banner.update-banner{min-height:0;height:auto;margin:0 0 18px;padding:18px;border-radius:12px}
+:root[data-device-ui=phone] .update-banner>div:first-child{width:100%}
+:root[data-device-ui=phone] .update-banner-art{display:none}
+:root[data-device-ui=phone] .recent-section{margin:0 0 25px}
+:root[data-device-ui=phone] .section-heading h2{font-size:14px}
+:root[data-device-ui=phone] .section-heading .text-button{font-size:11px}
+:root[data-device-ui=phone] .recent-grid{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;scroll-snap-type:x proximity;margin-right:-18px;padding:0 18px 5px 0}
+:root[data-device-ui=phone] .recent-grid::-webkit-scrollbar{display:none}
+:root[data-device-ui=phone] .recent-note,:root[data-device-ui=phone] .recent-note:nth-child(2),:root[data-device-ui=phone] .recent-note:nth-child(3){display:flex;flex:0 0 min(76vw,270px);min-width:0;padding:11px;scroll-snap-align:start}
+:root[data-device-ui=phone] .collection-toolbar{margin-bottom:13px}
+:root[data-device-ui=phone] .collection-tabs{display:none}
+:root[data-device-ui=phone] .collection-controls{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:9px;width:100%;margin:0;padding:0}
+:root[data-device-ui=phone] .search-field{grid-column:1/-1;width:100%;min-width:0;min-height:44px;flex:auto;border-radius:11px}
+:root[data-device-ui=phone] .search-field input{width:100%;font-size:16px}
+:root[data-device-ui=phone] .sort-field{min-width:0}
+:root[data-device-ui=phone] .sort-field select{height:34px;max-width:100%;font-size:11px}
+:root[data-device-ui=phone] .note-density{white-space:nowrap;font-size:10px}
+:root[data-device-ui=phone] .note-density select{height:34px}
+:root[data-device-ui=phone] .view-toggle{display:flex}
+:root[data-device-ui=phone] .notes-grid:not([data-columns]):not(.list-view){grid-template-columns:repeat(2,minmax(0,1fr))}
+:root[data-device-ui=phone] .notes-grid{gap:18px 13px}
+:root[data-device-ui=phone] .notebook-cover{max-height:none}
+:root[data-device-ui=phone] .note-title{font-size:12px}
+:root[data-device-ui=phone] .phone-bottom-nav{position:fixed;inset:auto 0 0;z-index:25;display:grid;grid-template-columns:repeat(4,1fr);height:calc(65px + env(safe-area-inset-bottom));padding:4px 8px env(safe-area-inset-bottom);background:#fff;border-top:1px solid #e1e8f2;box-shadow:0 -7px 24px #183b6110}
+:root[data-device-ui=phone] .phone-bottom-nav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0;color:#8291a7;font-size:10px;font-weight:600;border-radius:10px}
+:root[data-device-ui=phone] .phone-bottom-nav button.active,:root[data-device-ui=phone] .phone-bottom-nav button[aria-expanded=true]{color:#2e67d1;background:#edf3ff}
+:root[data-device-ui=phone] .phone-bottom-nav svg{width:20px;height:20px}
+
+:root[data-device-ui=phone] .editor-header{order:0;height:48px;min-height:48px;gap:7px;padding:0 10px}
+:root[data-device-ui=phone] .editor-header .editor-home{display:grid;place-items:center;width:36px;height:42px;padding:0}
+:root[data-device-ui=phone] .editor-header .editor-home>svg{display:block;width:21px;height:21px}
+:root[data-device-ui=phone] .open-tabs{display:flex;flex:1;overflow:hidden;min-width:0;padding:0;align-items:center}
+:root[data-device-ui=phone] .open-tabs .note-tab:not(.active){display:none}
+:root[data-device-ui=phone] .open-tabs .note-tab.active{max-width:100%;min-width:0;border:0;background:transparent}
+:root[data-device-ui=phone] .open-tabs .note-tab.active>button:first-child{max-width:100%;padding:4px 2px;font-size:14px;font-weight:600;color:#fff}
+:root[data-device-ui=phone] .open-tabs .note-tab.active>button:first-child>svg,:root[data-device-ui=phone] .open-tabs .note-tab.active>button:last-child{display:none}
+:root[data-device-ui=phone] .editor-header-actions{gap:3px;flex:none}
+:root[data-device-ui=phone] .editor-header-actions .icon-button{display:grid;place-items:center;width:37px;height:38px}
+:root[data-device-ui=phone] .editor-header-actions [data-action=phone-document-menu]{display:grid!important}
+:root[data-device-ui=phone] .editor-header-actions [data-action=phone-document-menu][aria-expanded=true]{background:#ffffff24}
+:root[data-device-ui=phone] .editor-header-actions [data-action=undo],:root[data-device-ui=phone] .editor-header-actions [data-action=redo]{width:32px}
+:root[data-device-ui=phone] .editor-header-actions [data-action=undo]:disabled,:root[data-device-ui=phone] .editor-header-actions [data-action=redo]:disabled{opacity:.4}
+:root[data-device-ui=phone] .editor-body{order:1}
+:root[data-device-ui=phone] .ink-toolbar{order:2;display:grid;grid-template-columns:minmax(0,1fr) 36px;grid-template-rows:44px 38px;grid-template-areas:'tools tools' 'styles options';align-items:center;justify-items:stretch;gap:2px 6px;height:calc(94px + env(safe-area-inset-bottom));min-height:calc(94px + env(safe-area-inset-bottom));padding:4px 8px calc(6px + env(safe-area-inset-bottom));border-top:1px solid #dce5f0;border-bottom:0;overflow:visible}
+:root[data-device-ui=phone] .toolbar-tools{grid-area:tools;display:block;max-width:100%;min-width:0;overflow-x:auto;touch-action:pan-x}
+:root[data-device-ui=phone] .toolbar-tools .editor-utility{display:none}
+:root[data-device-ui=phone] .drawing-tools{display:flex;gap:2px;min-width:max-content}
+:root[data-device-ui=phone] .ink-toolbar .tool-button{width:max(36px,calc((100vw - 20px)/8));max-width:48px;height:42px;border-radius:9px}
+:root[data-device-ui=phone] .ink-toolbar .tool-button svg{width:19px;height:19px}
+:root[data-device-ui=phone] .ink-style-controls{grid-area:styles;display:flex;justify-content:space-between;min-width:0;gap:5px}
+:root[data-device-ui=phone] .ink-style-controls .color-palette{gap:3px;min-width:0}
+:root[data-device-ui=phone] .color-swatch{width:18px;height:18px;flex:none}
+:root[data-device-ui=phone] .ink-toolbar .palette-edit,:root[data-device-ui=phone] .ink-toolbar .custom-color{width:22px;height:22px;flex:none}
+:root[data-device-ui=phone] .ink-toolbar .pen-width-control{gap:0;min-width:0;flex:none}
+:root[data-device-ui=phone] .ink-toolbar .pen-width-control>button{width:22px;height:36px;flex:none}
+:root[data-device-ui=phone] .ink-toolbar .pen-width-control input[type=range]{width:58px;height:36px}
+:root[data-device-ui=phone] .ink-toolbar .pen-width-control>output{min-width:21px;font-size:10px}
+:root[data-device-ui=phone] .pencil-mode-trigger{width:48px;height:31px;font-size:9px}
+:root[data-device-ui=phone] .pencil-mode-trigger svg{width:10px}
+:root[data-device-ui=phone] .ink-toolbar .pen-width-control.pencil-controls input[type=range]{width:40px}
+:root[data-device-ui=phone] .editor-options{grid-area:options;display:grid;place-items:center}
+:root[data-device-ui=phone] .editor-options>.icon-button{width:36px;height:36px}
+:root[data-device-ui=phone] .paper-stage{padding:20px 12px 30px}
+:root[data-device-ui=phone] .page-sidebar:not([hidden]){display:block;position:absolute;z-index:15;height:100%;width:138px;padding:10px 12px;box-shadow:5px 0 20px #334e6c21}
+:root[data-device-ui=phone] .page-thumb-paper{width:94px}
+:root[data-device-ui=phone] .selection-toolbar{bottom:calc(106px + env(safe-area-inset-bottom))}
+:root[data-device-ui=phone] .phone-document-panel:popover-open{position:fixed;inset:56px 10px auto auto;margin:0;width:min(290px,calc(100vw - 20px));max-height:calc(100dvh - 70px);overflow:auto;padding:9px;border:1px solid #d7e2f2;border-radius:15px;background:#fff;color:#2c4363;box-shadow:0 18px 48px #163a6536;z-index:80}
+:root[data-device-ui=phone] .phone-document-heading{padding:9px 11px 12px;font-size:12px;font-weight:700}
+:root[data-device-ui=phone] .phone-document-primary{display:flex;align-items:center;justify-content:center;padding:7px 0 12px;border-bottom:1px solid #e5ebf3}
+:root[data-device-ui=phone] .phone-document-primary .editor-page-controls{display:flex;gap:16px;color:#334d72}
+:root[data-device-ui=phone] .phone-document-primary .page-position{font-size:13px;color:#334d72}
+:root[data-device-ui=phone] .phone-document-secondary{display:grid;gap:2px;padding-top:7px}
+:root[data-device-ui=phone] .phone-document-secondary>button{display:flex;align-items:center;gap:12px;width:100%;height:43px;padding:0 11px;border-radius:9px;color:#334d72;text-align:left;font-size:12px}
+:root[data-device-ui=phone] .phone-document-secondary>button:hover{background:#eef4fd}
+:root[data-device-ui=phone] .phone-document-secondary>button svg{width:18px;height:18px;flex:none}
+:root[data-device-ui=phone] .phone-document-secondary>.icon-button::after{content:attr(aria-label)}
+:root[data-device-ui=phone] .phone-document-secondary>.save-indicator{margin:0;font-size:11px;white-space:normal}
+:root[data-device-ui=phone] .view-options-panel{top:56px}
+:root[data-device-ui=phone] :is(.pen-picker,.eraser-picker,.shape-picker,.image-picker,.writing-options-panel,.color-picker-dialog){top:auto!important;bottom:calc(104px + env(safe-area-inset-bottom))!important;max-height:calc(100dvh - 165px - env(safe-area-inset-bottom));overflow:auto;max-width:calc(100vw - 20px)}
+:root[data-device-ui=phone] .pencil-mode-menu{top:auto;bottom:calc(100% + 8px);left:auto;right:0}
+
+:root[data-theme=dark][data-device-ui=phone] .library-shell{background:#0e1624}
+:root[data-theme=dark][data-device-ui=phone] .library-topbar,:root[data-theme=dark][data-device-ui=phone] .phone-bottom-nav{background:#151f30;border-color:#2b3a51}
+:root[data-theme=dark][data-device-ui=phone] .phone-wordmark{filter:invert(1) hue-rotate(180deg);mix-blend-mode:screen}
+:root[data-theme=dark][data-device-ui=phone] .phone-bottom-nav button{color:#9aaec9}
+:root[data-theme=dark][data-device-ui=phone] .phone-bottom-nav button.active,:root[data-theme=dark][data-device-ui=phone] .phone-bottom-nav button[aria-expanded=true]{color:#d8e6ff;background:#284a80}
+:root[data-theme=dark][data-device-ui=phone] .phone-document-panel:popover-open{background:#151f30;border-color:#3a4e6c;color:#e2eaf7}
+:root[data-theme=dark][data-device-ui=phone] .phone-document-primary{border-color:#34445f}
+:root[data-theme=dark][data-device-ui=phone] .phone-document-primary :is(.editor-page-controls,.page-position),:root[data-theme=dark][data-device-ui=phone] .phone-document-secondary>button{color:#d4e2f6}
+:root[data-theme=dark][data-device-ui=phone] .phone-document-secondary>button:hover{background:#263952}
+
+@media(max-width:360px){
+  :root[data-device-ui=phone] .ink-style-controls .color-swatch:nth-child(n+4){display:none}
+  :root[data-device-ui=phone] .ink-toolbar .pen-width-control input[type=range]{width:45px}
+  :root[data-device-ui=phone] .ink-toolbar .pen-width-control.pencil-controls input[type=range]{width:35px}
+}

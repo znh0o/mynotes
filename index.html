@@ -18,7 +18,13 @@
       document.documentElement.style.backgroundColor = dark ? '#0e1624' : '#f4f7ff';
       const manifestLink = document.createElement('link');
       manifestLink.rel = 'manifest';
-      manifestLink.href = '%BASE_URL%' + (/SamsungBrowser\//.test(navigator.userAgent) ? 'manifest-samsung.webmanifest' : 'manifest.webmanifest');
+      const ua = navigator.userAgent;
+      const tablet = /iPad|Tablet|SM-[TX]/i.test(ua) || /Macintosh/.test(ua) && navigator.maxTouchPoints > 1;
+      const phone = !tablet && (navigator.userAgentData?.mobile === true || /iPhone|iPod|Android.*Mobile/i.test(ua));
+      const samsung = /SamsungBrowser\//.test(ua);
+      manifestLink.href = '%BASE_URL%' + (phone
+        ? samsung ? 'manifest-phone-samsung.webmanifest' : 'manifest-phone.webmanifest'
+        : samsung ? 'manifest-samsung.webmanifest' : 'manifest.webmanifest');
       document.head.appendChild(manifestLink);
     </script>
     <title>Notelin · 나의 서재</title>

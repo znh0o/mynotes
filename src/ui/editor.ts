@@ -14,6 +14,7 @@ import { paintPenPreviews, penPreview } from './pen-preview';
 import { brushKey, brushProfile, inkTools, isInkTool, type BrushProfile, type InkTool } from '../data/brush-settings';
 import { defaultPenCollection, duplicatePen, isPenKind, penKinds, penNames, type PenCollection, type PenKind, type PenPreset } from '../data/pen-presets';
 import { loadSharedPens, sharedPensKey } from '../data/shared-pens';
+import { bindPhoneEditor } from './phone-chrome';
 
 const shapeChoices: { id: Shape; name: string; drawing: string }[] = [
   { id: 'rect', name: '사각형', drawing: '<rect x="8" y="11" width="40" height="30" rx="2" />' },
@@ -39,7 +40,6 @@ export class EditorView {
   private switching = false;
   private fit = true;
   private twoPage = false;
-  private focusFullscreen = false;
   private spreadPage?: Page;
   private spreadGeneration = 0;
   private palette = ['#30445e', '#5e85bd', '#cf7d85', '#83a58a', '#e5c360'];
@@ -85,13 +85,15 @@ export class EditorView {
     if (Array.isArray(paletteSetting?.value) && paletteSetting.value.length === 5 && paletteSetting.value.every((color: unknown) => typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color))) this.palette = paletteSetting.value;
     document.title = `${this.note.title} · Notelin`;
     this.root.innerHTML = `<div class="editor-shell">
-      <header class="editor-header"><button class="editor-home" data-action="home" aria-label="서재로 돌아가기">${icon('ChevronLeft', 19)}<span class="brand-mark small">${icon('PenLine', 18)}</span><span>서재</span></button><div class="open-tabs">${this.tabs.map(t => `<div class="note-tab ${t.id === this.note.id ? 'active' : ''}"><button data-action="tab" data-id="${t.id}">${icon('BookOpen', 15)}<span>${escape(t.title)}</span></button><button data-action="close-tab" data-id="${t.id}" aria-label="${escape(t.title)} 탭 닫기">${icon('X', 13)}</button></div>`).join('')}</div><div class="editor-page-controls">${button('ChevronLeft', '이전 페이지', 'prev-page')}<button class="page-position" data-action="goto-page">1 / ${this.note.pageIds.length}</button>${button('ChevronRight', '다음 페이지', 'next-page')}</div><div class="editor-header-actions"><button class="save-indicator" id="save-status" data-action="save" title="지금 저장">${icon('Check', 13)} 모든 변경사항 저장됨</button>${button('Search', '노트 내 텍스트 검색', 'search')}${button('Download', 'PDF 내보내기', 'export')}${button('Maximize', '전체 화면', 'fullscreen')}${button('BookOpen', '보기 옵션', 'view-options', 'aria-haspopup="true" aria-expanded="false" aria-controls="view-options-panel"')}${button('MoreHorizontal', '노트 설정', 'settings')}</div><div class="view-options-panel" id="view-options-panel" hidden><div class="view-panel-heading">페이지 보기</div><button class="view-layout-button" type="button" data-action="two-page" aria-pressed="false">${icon('BookOpen', 19)}<span><strong>두 페이지</strong><small>양쪽 페이지에 바로 필기</small></span><span class="view-layout-check">${icon('Check', 15)}</span></button><div class="view-panel-divider"></div><div class="view-panel-heading">배율</div><div class="view-zoom-controls">${button('Minus', '축소', 'zoom-out')}<button id="zoom-value" data-action="fit">80%</button>${button('Plus', '확대', 'zoom-in')}</div><button class="view-fit-button" data-action="fit">화면에 맞춤</button><div class="view-panel-paper" id="paper-description">A4 · 줄노트</div></div></header>
+      <header class="editor-header"><button class="editor-home" data-action="home" aria-label="서재로 돌아가기">${icon('ChevronLeft', 19)}<span class="brand-mark small">${icon('PenLine', 18)}</span><span>서재</span></button><div class="open-tabs">${this.tabs.map(t => `<div class="note-tab ${t.id === this.note.id ? 'active' : ''}"><button data-action="tab" data-id="${t.id}">${icon('BookOpen', 15)}<span>${escape(t.title)}</span></button><button data-action="close-tab" data-id="${t.id}" aria-label="${escape(t.title)} 탭 닫기">${icon('X', 13)}</button></div>`).join('')}</div><div class="editor-page-controls">${button('ChevronLeft', '이전 페이지', 'prev-page')}<button class="page-position" data-action="goto-page">1 / ${this.note.pageIds.length}</button>${button('ChevronRight', '다음 페이지', 'next-page')}</div><div class="editor-header-actions"><button class="save-indicator" id="save-status" data-action="save" title="지금 저장">${icon('Check', 13)} 모든 변경사항 저장됨</button>${button('Search', '노트 내 텍스트 검색', 'search')}${button('Download', 'PDF 내보내기', 'export')}${button('BookOpen', '보기 옵션', 'view-options', 'aria-haspopup="true" aria-expanded="false" aria-controls="view-options-panel"')}${button('MoreHorizontal', '문서 메뉴', 'phone-document-menu', 'aria-haspopup="dialog" aria-expanded="false" aria-controls="phone-document-panel"')}${button('MoreHorizontal', '노트 설정', 'settings')}</div><div class="view-options-panel" id="view-options-panel" hidden><div class="view-panel-heading">페이지 보기</div><button class="view-layout-button" type="button" data-action="two-page" aria-pressed="false">${icon('BookOpen', 19)}<span><strong>두 페이지</strong><small>양쪽 페이지에 바로 필기</small></span><span class="view-layout-check">${icon('Check', 15)}</span></button><div class="view-panel-divider"></div><div class="view-panel-heading">배율</div><div class="view-zoom-controls">${button('Minus', '축소', 'zoom-out')}<button id="zoom-value" data-action="fit">80%</button>${button('Plus', '확대', 'zoom-in')}</div><button class="view-fit-button" data-action="fit">화면에 맞춤</button><div class="view-panel-paper" id="paper-description">A4 · 줄노트</div></div></header>
       <div class="ink-toolbar" role="toolbar" aria-label="필기 도구"><div class="toolbar-tools"><div class="tool-group editor-utility">${button('PanelLeft', '페이지 목록', 'sidebar', 'aria-expanded="false" aria-controls="page-sidebar"')}<span class="toolbar-separator"></span>${button('Undo2', '실행 취소 (Ctrl+Z)', 'undo', 'disabled')}${button('Redo2', '다시 실행 (Ctrl+Shift+Z)', 'redo', 'disabled')}</div><div class="tool-group drawing-tools"><button class="tool-button pen-tool active" data-action="pen-menu" aria-label="펜" aria-haspopup="dialog" aria-expanded="false" aria-pressed="true" title="펜">${icon('PenLine', 22)}<span>펜</span></button>${([['highlighter', 'Highlighter', '형광펜'], ['eraser', 'Eraser', '지우개'], ['lasso', 'Lasso', '올가미'], ['shape', 'Shapes', '도형'], ['text', 'Type', '텍스트'], ['image', 'Image', '이미지'], ['hand', 'Hand', '이동']] as const).map(([tool, i, label]) => `<button class="tool-button" data-action="tool" data-id="${tool}" aria-label="${label}" aria-pressed="false" title="${label}">${icon(i, 22)}<span>${label}</span></button>`).join('')}</div></div><div class="ink-style-controls"><div class="color-palette">${this.palette.map((c, n) => `<button class="color-swatch ${c === this.engine?.options.color || !this.engine && n === 0 ? 'active' : ''}" style="--color:${c}" data-action="color" data-id="${c}" title="기본 색상 ${n + 1}" aria-label="기본 색상 ${n + 1}"></button>`).join('')}<button class="palette-edit" type="button" data-action="palette-edit" aria-label="기본 색상 편집" title="기본 색상 편집">${icon('Pencil', 14)}</button><button class="custom-color" type="button" data-action="custom-color" title="색상 선택" aria-label="색상 선택">${icon('Plus', 15)}</button></div><div class="pen-width-control"><label id="width-label" for="ink-width">굵기</label><div class="pencil-mode-picker" hidden><button type="button" id="ink-adjustment" class="pencil-mode-trigger" data-action="pencil-mode-menu" aria-label="연필 조절 항목: 굵기" aria-expanded="false" aria-controls="pencil-mode-menu"><span>굵기</span>${icon('ChevronDown', 13)}</button><div class="pencil-mode-menu" id="pencil-mode-menu" role="group" aria-label="연필 조절 항목" hidden><span class="pencil-mode-heading">연필 조절</span><button type="button" data-action="pencil-mode" data-id="width" aria-pressed="true"><span><strong>굵기</strong><small>선의 두께</small></span>${icon('Check', 15)}</button><button type="button" data-action="pencil-mode" data-id="darkness" aria-pressed="false"><span><strong>진하기</strong><small>흑연의 농도</small></span>${icon('Check', 15)}</button></div></div><span id="width-preview" aria-hidden="true"></span><button type="button" data-action="pen-thinner" aria-label="펜 굵기 줄이기" title="펜 굵기 줄이기">${icon('Minus', 15)}</button><input id="ink-width" type="range" min="0.5" max="20" step="0.5" value="3" aria-label="펜 굵기" /><button type="button" data-action="pen-thicker" aria-label="펜 굵기 늘리기" title="펜 굵기 늘리기">${icon('Plus', 15)}</button><output id="width-value" for="ink-width">3.0</output></div></div><div class="editor-options">${button('Settings2', '필기 옵션', 'writing-options', 'aria-haspopup="dialog" aria-expanded="false" aria-controls="writing-options-panel"')}</div></div>
       <div class="editor-body"><aside class="page-sidebar" id="page-sidebar" hidden><div class="page-sidebar-heading"><strong>페이지</strong><span>${this.note.pageIds.length}</span>${button('Plus', '페이지 추가', 'add-page')}</div><div id="page-thumbnails"></div><button class="add-page-button" data-action="add-page">${icon('Plus', 17)} 페이지 추가</button></aside>
         <main class="paper-viewport" aria-label="필기 작업 공간"><div class="paper-stage"><div class="paper-sizing"><div class="paper-surface"><canvas id="paper-background" aria-hidden="true"></canvas><canvas id="paper-ink" aria-hidden="true"></canvas><canvas id="paper-live" aria-label="필기 캔버스"></canvas></div><span class="spread-page-number" hidden></span></div><div class="spread-companion" role="group" aria-label="인접 페이지" hidden><canvas class="spread-background" aria-hidden="true"></canvas><canvas class="spread-ink" aria-hidden="true"></canvas><canvas class="spread-live" aria-label="인접 페이지 필기 캔버스"></canvas><span class="spread-page-number"></span></div><button class="spread-empty" type="button" data-action="add-page" hidden>${icon('Plus', 22)}<span>페이지 추가</span></button></div><div class="page-loading" hidden>페이지를 불러오는 중…</div></main>
       </div>
+      <div class="phone-document-panel" id="phone-document-panel" role="dialog" aria-label="문서 메뉴" popover="auto"><div class="phone-document-heading">문서 메뉴</div><div class="phone-document-primary"></div><div class="phone-document-secondary"></div></div>
       <div class="selection-toolbar" hidden><span id="selection-count"></span>${button('Copy', '선택 복사', 'selection-copy')}${button('Plus', '선택 확대', 'selection-grow')}${button('Minus', '선택 축소', 'selection-shrink')}${button('Trash2', '선택 삭제', 'selection-delete')}${button('X', '선택 해제', 'deselect')}</div>
     </div>`;
+    bindPhoneEditor(this.root, this.abort.signal);
     this.viewport = this.root.querySelector('.paper-viewport')!;
     this.engine = new InkEngine(this.root.querySelector('#paper-ink')!, this.root.querySelector('#paper-live')!, () => this.changed(), count => this.showSelection(count, this.engine),
       (p, tool) => this.insert(p, tool), () => toast('직선으로 정리했어요. 펜을 댄 채 끝점을 움직일 수 있어요.'), () => this.togglePenEraser());
@@ -162,43 +164,12 @@ export class EditorView {
       if (!this.root.querySelector('.pencil-mode-picker')?.contains(e.target as Node)) this.closePencilMode();
     }, { signal: this.abort.signal });
     document.addEventListener('keydown', e => this.keyboard(e), { signal: this.abort.signal });
-    document.addEventListener('fullscreenchange', () => this.syncFullscreenButton(), { signal: this.abort.signal });
     document.addEventListener('visibilitychange', () => { if (document.hidden) run(() => this.flush()); }, { signal: this.abort.signal });
     window.addEventListener('beforeunload', e => { if (!isAppReloadApproved()) { e.preventDefault(); e.returnValue = ''; } }, { signal: this.abort.signal });
     this.setupGestures();
     await this.showPage(0);
     this.resizeObserver = new ResizeObserver(() => { if (this.fit && this.page) { this.setScale(this.fitScale(), true); void this.renderBackground(); void this.renderSpread(); } });
     this.resizeObserver.observe(this.viewport);
-    this.syncFullscreenButton();
-  }
-  private syncFullscreenButton() {
-    const button = this.root.querySelector<HTMLButtonElement>('[data-action=fullscreen]');
-    if (!button) return;
-    const active = !!document.fullscreenElement || this.focusFullscreen;
-    const label = active ? '전체 화면 종료' : '전체 화면';
-    button.setAttribute('aria-label', label); button.setAttribute('aria-pressed', String(active)); button.title = label;
-    button.innerHTML = icon(active ? 'Minimize' : 'Maximize');
-    this.root.querySelector('.editor-shell')?.classList.toggle('focus-fullscreen', this.focusFullscreen);
-  }
-  private toggleFullscreen() {
-    if (this.focusFullscreen) { this.focusFullscreen = false; this.syncFullscreenButton(); return; }
-    if (document.fullscreenElement) { run(() => document.exitFullscreen()); return; }
-    const request = document.documentElement.requestFullscreen;
-    if (!request) { this.useFocusFullscreen(); return; }
-    // Keep the request in the button's user gesture; some tablet browsers
-    // reject a delayed fullscreen request.
-    try {
-      void Promise.resolve(request.call(document.documentElement)).catch(error => this.fullscreenFailed(error));
-    } catch (error) { this.fullscreenFailed(error); }
-  }
-  private fullscreenFailed(error: unknown) {
-    console.warn('Native fullscreen unavailable.', error);
-    this.useFocusFullscreen();
-  }
-  private useFocusFullscreen() {
-    if (this.abort.signal.aborted) return;
-    this.focusFullscreen = true; this.syncFullscreenButton();
-    toast('브라우저가 전체 화면을 허용하지 않아 작업 영역을 넓혔어요.');
   }
   private companionIndex(index = this.index) { return index % 2 ? index - 1 : index + 1; }
   private spreadStart() { return Math.floor(this.index / 2) * 2; }
@@ -578,7 +549,6 @@ export class EditorView {
       if (panel?.open) { panel.addEventListener('close', () => this.paperSettings(), { once: true }); panel.close(); }
       else this.paperSettings();
     }
-    if (action === 'fullscreen') this.toggleFullscreen();
     if (action === 'search') this.search();
     if (action === 'settings') this.settings();
     if (action === 'save') run(async () => { await this.flush(); await this.saveThumbnail(this.page); toast('저장했어요.'); });

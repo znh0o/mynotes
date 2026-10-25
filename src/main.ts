@@ -12,8 +12,10 @@ import { checkForUpdate, applyWaitingUpdate, hasWaitingUpdate, updateRepairUrl }
 import { version as appVersion } from '../package.json';
 import { installAppZoomGuard } from './ui/app-zoom';
 import { getAppearance, setAppearance, type Appearance } from './ui/appearance';
+import { installDeviceUI } from './ui/device-ui';
 
 installAppZoomGuard();
+installDeviceUI();
 
 const root = document.querySelector<HTMLElement>('#app')!;
 let library: LibraryView | undefined, editor: EditorView | undefined;
@@ -150,7 +152,7 @@ async function closeTab(id: string) {
 function settings() {
   run(async () => {
     const persisted = false, usage = '사용량 확인 중';
-    const standalone = matchMedia('(display-mode: standalone)').matches;
+    const standalone = matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches;
     const dialog = modal('Notelin 설정', `<p class="muted settings-version">버전 ${escape(appVersion)}</p><div class="settings-section"><h3>${icon('HardDrive', 18)} 저장 공간</h3><div class="storage-row"><span>이 기기에서 사용 중</span><strong>${usage}</strong></div><p class="muted">${persisted ? '브라우저 영구 저장이 허용되어 있어요.' : '브라우저 정리로 데이터가 지워질 수 있어요. 중요한 노트는 별도로 백업해 주세요.'}</p><button type="button" class="button secondary" data-setting="persist">${icon('ShieldCheck', 16)} 영구 저장 요청</button></div><div class="settings-section"><h3>${icon('Download', 18)} 백업 및 복원</h3><p class="muted">노트, 필기, PDF와 이미지를 하나의 파일에 담아요. 복원은 기존 노트를 유지하며 사본으로 추가합니다.</p><div class="settings-actions"><button class="button secondary" type="button" data-setting="backup">전체 백업</button><button class="button secondary" type="button" data-setting="restore">백업 파일 복원</button></div></div><div class="settings-section"><h3>${icon('BookOpen', 18)} 앱으로 사용하기</h3><p class="muted">${standalone ? '설치된 앱으로 사용하고 있어요.' : 'Chrome 또는 Samsung Internet 메뉴에서 “앱 설치” 또는 “홈 화면에 추가”를 선택해 주세요. 첫 방문 시 온라인 연결이 필요합니다.'}</p>${!standalone ? '<button class="button primary" type="button" data-setting="install">Notelin 설치</button>' : ''}</div><div class="settings-section"><h3>${icon('RefreshCw', 18)} 앱 업데이트</h3><p class="muted settings-update-status" id="update-status" role="status" aria-live="polite">${escape(updateMessage)}</p><div class="settings-actions"><button class="button secondary" type="button" data-setting="check-update">업데이트 확인</button><button class="button primary" type="button" data-setting="apply-update" hidden>저장 후 새 버전 적용</button><a class="button secondary" href="${escape(updateRepairUrl())}" target="_blank" rel="noopener">업데이트 복구</a></div></div><p class="muted settings-footnote">손글씨는 편집 가능한 획으로 저장됩니다. 손글씨 인식, 기기 간 동기화는 아직 지원하지 않습니다. 웹 팜 리젝션과 S펜 버튼 동작은 브라우저에 따라 다를 수 있습니다.</p>`, '완료', () => {});
     const appearanceSection = document.createElement('section');
     appearanceSection.className = 'settings-section appearance-section';

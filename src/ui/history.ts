@@ -91,10 +91,11 @@ export class AppHistory {
     const shape = document.querySelector<HTMLElement>('.shape-picker:popover-open');
     const image = document.querySelector<HTMLElement>('.image-picker:popover-open');
     const color = document.querySelector<HTMLElement>('.color-picker-dialog:popover-open');
+    const documentPanel = document.querySelector<HTMLElement>('.phone-document-panel:popover-open');
     const sidebar = document.querySelector('.library-sidebar.mobile-open');
     const profile = document.querySelector<HTMLElement>('.profile-popover:not([hidden])');
-    if ((menu || eraser || pen || shape || image || color || sidebar || profile) && !previous.overlay) {
-      menu?.remove(); eraser?.hidePopover(); shape?.hidePopover(); image?.hidePopover(); color?.hidePopover(); if (!color) pen?.hidePopover(); sidebar?.classList.remove('mobile-open');
+    if ((menu || eraser || pen || shape || image || color || documentPanel || sidebar || profile) && !previous.overlay) {
+      menu?.remove(); documentPanel?.hidePopover(); eraser?.hidePopover(); shape?.hidePopover(); image?.hidePopover(); color?.hidePopover(); if (!color) pen?.hidePopover(); sidebar?.classList.remove('mobile-open');
       if (profile) { profile.hidden = true; document.querySelector('.avatar')?.setAttribute('aria-expanded', 'false'); }
       this.entry = { ...previous, index: target.index + 1 }; history.pushState(this.entry, ''); return;
     }
