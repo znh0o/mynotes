@@ -308,6 +308,7 @@ html:fullscreen{background:#f4f6f9}
 /* Compact blue document bar and neutral drawing controls. */
 .editor-header{background:#3d6dae;border-bottom-color:#315e99;color:#f4f8ff}
 .editor-header :is(.editor-home,.note-tab,.editor-page-controls,.page-position,.editor-header-actions,.save-indicator){color:#edf4ff}
+.editor-header>.editor-header-actions .icon-button,.editor-header .editor-page-controls .icon-button{color:#edf4ff}
 .editor-header .note-tab.active{background:#ffffff20;border-color:#ffffff40;color:#fff}
 .editor-header .icon-button:hover,.editor-header .editor-page-controls .icon-button:hover,.editor-header .editor-header-actions [data-action=view-options][aria-expanded=true]{background:#ffffff22;color:#fff}
 .editor-header button:focus-visible{outline-color:#d4e6ff}
