@@ -184,7 +184,6 @@ test('pen width stays reachable in split view and pen dragging changes new strok
     expect(r!.x).toBeGreaterThanOrEqual(0);
     expect(r!.x + r!.width).toBeLessThanOrEqual(width);
     const colors = (await page.locator('.color-palette').boundingBox())!;
-    const toolbar = (await page.locator('.ink-toolbar').boundingBox())!;
     const writing = (await page.locator('.paper-viewport').boundingBox())!;
     expect(Math.abs(r!.y + r!.height / 2 - colors.y - colors.height / 2)).toBeLessThan(2);
     expect(r!.x).toBeGreaterThan(colors.x + colors.width);
