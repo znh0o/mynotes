@@ -304,3 +304,20 @@ html:fullscreen{background:#f4f6f9}
 .editor-shell.focus-fullscreen .editor-header-actions>:not([data-action=fullscreen]){display:none}
 .editor-shell.focus-fullscreen .editor-header-actions [data-action=fullscreen]{display:inline-flex}
 .editor-shell.focus-fullscreen .page-sidebar{display:none}
+
+/* Compact blue document bar and neutral drawing controls. */
+.editor-header{background:#3d6dae;border-bottom-color:#315e99;color:#f4f8ff}
+.editor-header :is(.editor-home,.note-tab,.editor-page-controls,.page-position,.editor-header-actions,.save-indicator){color:#edf4ff}
+.editor-header .note-tab.active{background:#ffffff20;border-color:#ffffff40;color:#fff}
+.editor-header .icon-button:hover,.editor-header .editor-page-controls .icon-button:hover,.editor-header .editor-header-actions [data-action=view-options][aria-expanded=true]{background:#ffffff22;color:#fff}
+.editor-header button:focus-visible{outline-color:#d4e6ff}
+.editor-header .save-indicator.save-error{color:#ffe0a9}
+.editor-shell.focus-fullscreen .editor-header-actions{background:#3d6dae;border-color:#7295c5}
+.ink-toolbar .tool-button{color:#20262e}
+.ink-toolbar .tool-button.active,.ink-toolbar .tool-button.active:hover{background:#e2e9f2;color:#161c23;box-shadow:none}
+.ink-toolbar :is(.tool-group>.icon-button,.editor-options>.icon-button,.pen-width-control>button,.palette-edit,.custom-color,.pencil-mode-trigger){color:#20262e}
+.ink-toolbar .pen-width-control,.ink-toolbar .pen-width-control>label,.ink-toolbar .pen-width-control>output{color:#2b323c}
+.ink-toolbar .pen-width-control input::-webkit-slider-runnable-track{background:linear-gradient(to right,#39424e 0%,#39424e var(--width-progress),#d7dfe9 var(--width-progress),#d7dfe9 100%)}
+.ink-toolbar .pen-width-control input::-webkit-slider-thumb{background:#39424e}
+.ink-toolbar .pen-width-control input::-moz-range-thumb{background:#39424e}
+.ink-toolbar .pen-width-control input::-moz-range-progress{background:#39424e}

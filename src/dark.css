@@ -86,3 +86,11 @@
 :root[data-theme=dark] .install-workflow-step{border-color:#30435e}
 :root[data-theme=dark] .install-workflow-step>span{border-color:#415b7f;color:#adc7f6}
 :root[data-theme=dark] .install-guide{background:#182b48}
+
+:root[data-theme=dark] .editor-header{background:#284b79;border-color:#3d6090}
+:root[data-theme=dark] .editor-header :is(.editor-home,.note-tab,.editor-page-controls,.page-position,.editor-header-actions,.save-indicator){color:#e8f1ff}
+:root[data-theme=dark] .editor-header .note-tab.active{background:#ffffff16;border-color:#7995bb;color:#fff}
+:root[data-theme=dark] .editor-shell.focus-fullscreen .editor-header-actions{background:#284b79;border-color:#617fa8}
+:root[data-theme=dark] .ink-toolbar :is(.tool-button,.tool-group>.icon-button,.editor-options>.icon-button,.pen-width-control>button,.palette-edit,.custom-color,.pencil-mode-trigger){color:#d7e0ee}
+:root[data-theme=dark] .ink-toolbar .tool-button.active,:root[data-theme=dark] .ink-toolbar .tool-button.active:hover{background:#34475f;color:#fff}
+:root[data-theme=dark] .ink-toolbar .pen-width-control,:root[data-theme=dark] .ink-toolbar .pen-width-control>label,:root[data-theme=dark] .ink-toolbar .pen-width-control>output{color:#c2d0e5}
