@@ -3,6 +3,10 @@ import { approveAppReload } from './navigation';
 export type UpdateResult = 'available' | 'latest';
 declare const __NOTELIN_RELEASE__: string;
 
+// A double leading path slash is served by Pages but lies outside the installed
+// /mynotes/ worker's scope. Even an older cached app cannot intercept this page.
+export const updateRepairUrl = () => `${location.origin}/${import.meta.env.BASE_URL}repair.html`;
+
 function workerRevision(worker: ServiceWorker): Promise<string | undefined> {
   return new Promise(resolve => {
     const channel = new MessageChannel();
@@ -58,23 +62,38 @@ function installed(worker: ServiceWorker): Promise<void> {
   });
 }
 
-export async function checkForUpdate(registration?: ServiceWorkerRegistration): Promise<UpdateResult> {
+let checking: Promise<UpdateResult> | undefined;
+export function checkForUpdate(registration?: ServiceWorkerRegistration): Promise<UpdateResult> {
+  return checking ??= performUpdateCheck(registration).finally(() => { checking = undefined; });
+}
+
+async function performUpdateCheck(registration?: ServiceWorkerRegistration): Promise<UpdateResult> {
   if (!('serviceWorker' in navigator)) throw new Error('이 브라우저는 앱 업데이트를 지원하지 않아요.');
   if (!navigator.onLine) throw new Error('오프라인이에요. 인터넷에 연결한 뒤 업데이트를 확인해 주세요.');
-  let current = registration ?? await navigator.serviceWorker.getRegistration(import.meta.env.BASE_URL);
+  let current = await navigator.serviceWorker.getRegistration(import.meta.env.BASE_URL) ?? registration;
   if (!current) throw new Error('앱 등록을 준비하고 있어요. 잠시 후 다시 확인해 주세요.');
   if (await pendingWorker(current)) return 'available';
   const revision = await deployedRevision();
   const activeRevision = current.active ? await workerRevision(current.active) : undefined;
-  if (revision && revision !== __NOTELIN_RELEASE__ && revision !== activeRevision) {
-    // A versioned URL bypasses the hosting CDN's cached sw.js response.
+  const registerFresh = (retry = false) => {
     const workerUrl = new URL(`${import.meta.env.BASE_URL}sw.js`, location.origin);
-    workerUrl.searchParams.set('revision', revision);
-    current = await navigator.serviceWorker.register(workerUrl, {
+    workerUrl.searchParams.set('revision', revision || __NOTELIN_RELEASE__);
+    if (retry) workerUrl.searchParams.set('retry', String(Date.now()));
+    return navigator.serviceWorker.register(workerUrl, {
       scope: import.meta.env.BASE_URL, updateViaCache: 'none'
     });
-  } else {
-    await current.update();
+  };
+  try {
+    if (revision && revision !== __NOTELIN_RELEASE__ && revision !== activeRevision) current = await registerFresh();
+    else await current.update();
+  } catch (originalError) {
+    // Recover a failed script fetch without unregistering the working app or
+    // deleting any of its storage. A fresh URL also bypasses a stale CDN entry.
+    try { current = await registerFresh(true); }
+    catch (error) {
+      console.warn('Service worker refresh failed', originalError, error);
+      throw new Error('업데이트 파일을 받지 못했어요. 인터넷 연결을 확인하고 다시 시도하거나 업데이트 복구를 열어 주세요.');
+    }
   }
   const worker = current.installing;
   if (worker) await installed(worker);

@@ -13,6 +13,7 @@ async function workerRelease(page: Page) {
 test('settings can check, download and apply a real worker update without losing ink', async ({ page, context }) => {
   let release = 1;
   let duplicate = 0;
+  let failPlainWorker = false, failEveryWorker = false, failedWorkerRequests = 0;
   const dist = resolve('dist');
   const builtRevision = JSON.parse(await readFile(resolve(dist, 'release.json'), 'utf8')).revision;
   const server = createServer(async (req, res) => {
@@ -20,7 +21,11 @@ test('settings can check, download and apply a real worker update without losing
       const url = new URL(req.url!, 'http://localhost'), relative = decodeURIComponent(url.pathname).replace(/^\/mynotes\//, '') || 'index.html';
       const path = resolve(dist, relative);
       if (!url.pathname.startsWith('/mynotes/') || !path.startsWith(dist + sep)) { res.writeHead(404).end(); return; }
+      if (relative === 'sw.js' && (failEveryWorker || failPlainWorker && !url.search)) {
+        failedWorkerRequests++; res.writeHead(503).end('temporary script fetch failure'); return;
+      }
       let body = await readFile(path);
+      if (relative === 'sw.js' && release > 1) body = Buffer.from(body.toString().replaceAll(builtRevision, `test-release-${release}`));
       if (relative === 'sw.js') body = Buffer.from(`${body.toString()}\nself.addEventListener('message', e => { if(e.data?.type === 'TEST_RELEASE') e.ports[0].postMessage(${release}); });\n// test release ${release}, registration ${duplicate}`);
       if (relative === 'release-worker.js' && release > 1) body = Buffer.from(body.toString().replace(JSON.stringify(builtRevision), JSON.stringify(`test-release-${release}`)));
       if (relative === 'release.json' && release > 1) body = Buffer.from(JSON.stringify({ revision: `test-release-${release}` }));
@@ -47,6 +52,20 @@ test('settings can check, download and apply a real worker update without losing
     await expect(page.locator('#update-status')).toHaveText('최신 버전을 사용하고 있어요.');
     await expect(page.getByRole('button', { name: '저장 후 새 버전 적용', exact: true })).toBeHidden();
     await expect(page.getByRole('button', { name: '지금 업데이트', exact: true })).toHaveCount(0);
+    // Reproduce a failed canonical script fetch, then recover with a fresh URL.
+    failPlainWorker = true;
+    await check.click(); await expect(check).toBeEnabled();
+    await expect(page.locator('#update-status')).toHaveText('최신 버전을 사용하고 있어요.');
+    expect(failedWorkerRequests).toBeGreaterThan(0);
+    expect(await page.evaluate(async () => {
+      const registration = await navigator.serviceWorker.getRegistration();
+      return new URL(registration!.waiting!.scriptURL).searchParams.has('retry');
+    })).toBe(true);
+    failEveryWorker = true;
+    await check.click();
+    await expect(page.locator('#update-status')).toContainText('업데이트 파일을 받지 못했어요');
+    await expect(page.locator('#update-status')).not.toContainText('Failed to update');
+    failEveryWorker = false; failPlainWorker = false;
     await context.setOffline(true); await check.click();
     await expect(page.locator('#update-status')).toContainText('오프라인'); await expect(check).toBeEnabled();
     await context.setOffline(false); await page.getByRole('button', { name: '완료', exact: true }).click();
