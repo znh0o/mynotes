@@ -8,7 +8,10 @@ test('tablet PWA starts fullscreen without an editor toggle, while phone chrome 
   await page.getByRole('button', { name: '노트 만들기', exact: true }).click();
   await expect(page.locator('.page-loading')).toBeHidden();
   await expect(page.locator('[data-action=fullscreen]')).toHaveCount(0);
-  expect((await page.locator('.editor-header').boundingBox())!.height).toBe(38);
+  const editorHeader = (await page.locator('.editor-header').boundingBox())!;
+  const activeTab = (await page.locator('.editor-header .note-tab.active').boundingBox())!;
+  expect(editorHeader.height).toBe(40);
+  expect(Math.round(activeTab.y - editorHeader.y)).toBe(8);
   await page.getByRole('button', { name: '보기 옵션' }).click();
   await expect(page.locator('#view-options-panel')).toBeVisible();
   await page.getByRole('button', { name: '보기 옵션' }).click();

@@ -227,11 +227,11 @@ html,body,#app,.library-shell,.library-main,.library-content,.modal,.modal-body{
 @media(max-width:760px){.ink-toolbar{height:60px;min-height:60px;padding:4px 8px;gap:6px}.toolbar-tools{gap:8px}.toolbar-tools .drawing-tools{order:-1}.ink-style-controls{gap:6px}.ink-style-controls .color-palette{gap:3px}.ink-toolbar .pen-width-control input[type=range]{width:64px}.ink-toolbar .pen-width-control>button{width:26px}.ink-toolbar .tool-button{height:48px}.writing-options-panel .finger-switch{font-size:12px}}
 
 /* Compact editor chrome; tool names remain in titles and accessible labels. */
-.editor-header{height:38px;min-height:38px;align-items:center;padding:0 10px;gap:10px}
+.editor-header{height:40px;min-height:40px;align-items:center;padding:0 10px;gap:10px}
 .editor-header .editor-home{width:32px;height:30px;justify-content:center;padding:0;flex:none}
 .editor-header .editor-home>span{display:none}
 .editor-header .editor-home>svg{display:block;width:18px;height:18px}
-.editor-header .open-tabs{height:100%;padding-top:0;align-items:center;gap:4px}
+.editor-header .open-tabs{height:100%;padding-top:4px;align-items:center;gap:4px}
 .editor-header .note-tab{height:28px;border-radius:6px;border-bottom:1px solid transparent}
 .editor-header .note-tab.active{border-bottom-color:#d5e1f6}
 .editor-header .note-tab>button:first-child{padding:4px 8px;gap:6px}
@@ -278,7 +278,7 @@ html,body,#app,.library-shell,.library-main,.library-content,.modal,.modal-body{
 .editor-page-controls .icon-button svg{width:16px;height:16px}
 .editor-page-controls .page-position{min-width:49px;padding:4px 2px;color:#415f8b;font-size:11px;font-variant-numeric:tabular-nums}
 .editor-header-actions [data-action=view-options][aria-expanded=true]{color:#275fcf;background:#e4ecff}
-.view-options-panel{position:fixed;z-index:30;inset:47px 11px auto auto;margin:0;width:240px;max-width:calc(100vw - 22px);padding:15px;border:1px solid #d8e3f5;border-radius:12px;background:#fff;color:#314b70;box-shadow:0 16px 42px #25466e25;font-size:12px}
+.view-options-panel{position:fixed;z-index:30;inset:49px 11px auto auto;margin:0;width:240px;max-width:calc(100vw - 22px);padding:15px;border:1px solid #d8e3f5;border-radius:12px;background:#fff;color:#314b70;box-shadow:0 16px 42px #25466e25;font-size:12px}
 .view-panel-heading{font-size:10px;font-weight:700;letter-spacing:.07em;color:#7187a7;margin-bottom:10px}
 .view-layout-button{display:flex;align-items:center;width:100%;gap:11px;padding:9px;border:1px solid #e3e9f2;border-radius:9px;text-align:left;background:#fafbfd}
 .view-layout-button>svg{color:#6787b8}
