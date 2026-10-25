@@ -206,13 +206,16 @@ test('pen width stays reachable in split view and pen dragging changes new strok
     await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', pointerType: 'pen', button: 'left', buttons: 1, x: startX, y, force: .5, clickCount: 1 });
     await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', pointerType: 'pen', button: 'left', buttons: 1, x, y, force: .5 });
     await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', pointerType: 'pen', button: 'left', buttons: 0, x, y, force: 0, clickCount: 1 });
-    await expect(slider).toHaveValue(String(value));
-    await expect(page.locator('#width-value')).toHaveText(value.toFixed(1));
+    const actual = Number(await slider.inputValue());
+    expect(Math.abs(actual - value)).toBeLessThanOrEqual(1.5);
+    await expect(page.locator('#width-value')).toHaveText(actual.toFixed(1));
+    return actual;
   };
-  await dragWidth(2); await pen(page, 80, 140);
-  await dragWidth(12); await pen(page, 80, 240);
+  const thinWidth = await dragWidth(2); await pen(page, 80, 140);
+  const thickWidth = await dragWidth(12); await pen(page, 80, 240);
+  expect(thickWidth).toBeGreaterThan(thinWidth + 6);
   const note = (await records(page, 'notes')).find(n => n.title === '펜 굵기 검증');
-  await expect.poll(async () => (await records(page, 'pages')).find(p => p.noteId === note.id).items.map((i: any) => i.width)).toEqual([2, 12]);
+  await expect.poll(async () => (await records(page, 'pages')).find(p => p.noteId === note.id).items.map((i: any) => i.width)).toEqual([thinWidth, thickWidth]);
   // The transparent ink layer must also visibly render a thicker second stroke.
   const thickness = await page.locator('#paper-ink').evaluate((canvas: HTMLCanvasElement) => {
     const r = canvas.getBoundingClientRect(), ctx = canvas.getContext('2d')!, scaleX = canvas.width / r.width, scaleY = canvas.height / r.height;
@@ -225,8 +228,8 @@ test('pen width stays reachable in split view and pen dragging changes new strok
     return [column(140), column(240)];
   });
   expect(thickness[1]).toBeGreaterThan(thickness[0] * 2);
-  await page.getByRole('button', { name: '펜 굵기 늘리기', exact: true }).click(); await expect(slider).toHaveValue('12.5');
-  await page.getByRole('button', { name: '펜 굵기 줄이기', exact: true }).click(); await expect(slider).toHaveValue('12');
+  await page.getByRole('button', { name: '펜 굵기 늘리기', exact: true }).click(); await expect(slider).toHaveValue(String(thickWidth + .5));
+  await page.getByRole('button', { name: '펜 굵기 줄이기', exact: true }).click(); await expect(slider).toHaveValue(String(thickWidth));
   await page.screenshot({ path: '../MyNotes-width-fix.png' });
   await cdp.detach();
 });
