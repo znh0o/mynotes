@@ -227,25 +227,25 @@ html,body,#app,.library-shell,.library-main,.library-content,.modal,.modal-body{
 @media(max-width:760px){.ink-toolbar{height:60px;min-height:60px;padding:4px 8px;gap:6px}.toolbar-tools{gap:8px}.toolbar-tools .drawing-tools{order:-1}.ink-style-controls{gap:6px}.ink-style-controls .color-palette{gap:3px}.ink-toolbar .pen-width-control input[type=range]{width:64px}.ink-toolbar .pen-width-control>button{width:26px}.ink-toolbar .tool-button{height:48px}.writing-options-panel .finger-switch{font-size:12px}}
 
 /* Compact editor chrome; tool names remain in titles and accessible labels. */
-.editor-header{height:38px;min-height:38px;align-items:center;padding:0 10px;gap:10px}
-.editor-header .editor-home{width:32px;height:34px;justify-content:center;padding:0;flex:none}
+.editor-header{height:34px;min-height:34px;align-items:center;padding:0 10px;gap:10px}
+.editor-header .editor-home{width:32px;height:30px;justify-content:center;padding:0;flex:none}
 .editor-header .editor-home>span{display:none}
 .editor-header .editor-home>svg{display:block;width:18px;height:18px}
 .editor-header .open-tabs{height:100%;padding-top:0;align-items:center;gap:4px}
-.editor-header .note-tab{height:30px;border-radius:6px;border-bottom:1px solid transparent}
+.editor-header .note-tab{height:28px;border-radius:6px;border-bottom:1px solid transparent}
 .editor-header .note-tab.active{border-bottom-color:#d5e1f6}
 .editor-header .note-tab>button:first-child{padding:4px 8px;gap:6px}
 .editor-header .note-tab>button:last-child{padding:4px 6px}
 .editor-header .editor-header-actions{gap:2px;align-items:center}
-.editor-header .editor-header-actions .icon-button{width:30px;height:30px}
+.editor-header .editor-header-actions .icon-button{width:30px;height:28px}
 .editor-header .editor-header-actions .icon-button svg{width:17px;height:17px}
-.editor-header .save-indicator{width:30px;height:30px;font-size:0;gap:0;justify-content:center;padding:0}
-.ink-toolbar{height:44px;min-height:44px;padding:1px 10px;gap:8px}
-.ink-toolbar .tool-button{width:38px;height:40px;gap:0;border-radius:7px}
+.editor-header .save-indicator{width:30px;height:28px;font-size:0;gap:0;justify-content:center;padding:0}
+.ink-toolbar{height:40px;min-height:40px;padding:1px 10px;gap:8px}
+.ink-toolbar .tool-button{width:38px;height:36px;gap:0;border-radius:7px}
 .ink-toolbar .tool-button svg{width:19px;height:19px}
 .ink-toolbar .tool-group>.icon-button svg,.ink-toolbar .editor-options>.icon-button svg{width:18px;height:18px}
-.ink-toolbar .pen-width-control{min-height:40px}
-.ink-toolbar .pen-width-control input[type=range]{height:40px}
+.ink-toolbar .pen-width-control{min-height:36px}
+.ink-toolbar .pen-width-control>button,.ink-toolbar .pen-width-control input[type=range]{height:36px}
 .ink-toolbar .tool-button>span,.ink-toolbar #width-label{display:none}
 .eraser-picker{position:fixed;inset:auto;margin:0;width:280px;max-width:calc(100vw - 16px);max-height:calc(100dvh - 112px);overflow:auto;padding:12px;border:1px solid #c9daf7;border-radius:12px;background:#fff;color:#395478;box-shadow:0 10px 35px #24447830;font-size:12px}
 .shape-picker{position:fixed;inset:auto;margin:0;width:244px;max-width:calc(100vw - 16px);padding:9px;border:1px solid #c9daf7;border-radius:12px;background:#fff;color:#395478;box-shadow:0 10px 35px #24447830;touch-action:pan-y}
