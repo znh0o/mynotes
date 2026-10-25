@@ -65,6 +65,8 @@ test('fullscreen rejection opens a reversible wider writing area', async ({ page
   await page.goto('./');
   await page.getByRole('button', { name: '새 노트', exact: true }).click();
   await page.getByRole('button', { name: '노트 만들기', exact: true }).click();
+  await page.getByRole('button', { name: '페이지 목록', exact: true }).click();
+  await expect(page.locator('.page-sidebar')).toBeVisible();
   const before = (await page.locator('.paper-viewport').boundingBox())!;
   await page.getByRole('button', { name: '전체 화면', exact: true }).click();
   await expect(page.locator('.editor-shell')).toHaveClass(/focus-fullscreen/);
