@@ -10,7 +10,7 @@ export const updateRepairUrl = () => `${location.origin}/${import.meta.env.BASE_
 function workerRevision(worker: ServiceWorker): Promise<string | undefined> {
   return new Promise(resolve => {
     const channel = new MessageChannel();
-    const timer = setTimeout(() => finish(new URL(worker.scriptURL).searchParams.get('revision') || undefined), 800);
+    const timer = setTimeout(() => finish(new URL(worker.scriptURL).searchParams.get('revision') || undefined), 2500);
     function finish(revision?: string) {
       clearTimeout(timer); channel.port1.close(); channel.port2.close(); resolve(revision);
     }
@@ -20,31 +20,43 @@ function workerRevision(worker: ServiceWorker): Promise<string | undefined> {
   });
 }
 
-// A waiting worker can be a duplicate registration of the version already open.
-// Workbox's waiting event alone does not mean that new app code is available.
-async function pendingWorker(registration: ServiceWorkerRegistration) {
+// Only a worker whose own revision is known can be offered for installation.
+// The server marker cannot identify the contents of an unrelated waiting worker.
+async function pendingWorker(registration: ServiceWorkerRegistration, expectedRevision?: string) {
   const worker = registration.waiting;
   if (!worker || worker.state !== 'installed') return;
-  const revision = await workerRevision(worker) ?? await deployedRevision();
+  const revision = await workerRevision(worker);
   if (registration.waiting !== worker || worker.state !== 'installed') return;
-  return revision && revision !== __NOTELIN_RELEASE__ ? worker : undefined;
+  return revision && revision !== __NOTELIN_RELEASE__ && (!expectedRevision || revision === expectedRevision) ? worker : undefined;
 }
 
-export async function hasWaitingUpdate(registration: ServiceWorkerRegistration): Promise<boolean> {
-  return !!await pendingWorker(registration);
+async function activeRelease(registration: ServiceWorkerRegistration, expectedRevision: string) {
+  return expectedRevision !== __NOTELIN_RELEASE__ &&
+    !!registration.active && await workerRevision(registration.active) === expectedRevision;
 }
 
-async function deployedRevision(): Promise<string | undefined> {
+export async function hasReadyUpdate(registration: ServiceWorkerRegistration): Promise<boolean> {
+  const revision = await deployedRevision();
+  if (revision === __NOTELIN_RELEASE__) return false;
+  return !!await pendingWorker(registration, revision) || await activeRelease(registration, revision);
+}
+
+async function deployedRevision(): Promise<string> {
   const url = new URL(`${import.meta.env.BASE_URL}release.json`, location.origin);
   url.searchParams.set('checked', String(Date.now()));
+  const abort = new AbortController();
+  const timeout = setTimeout(() => abort.abort(), 10000);
   try {
-    const response = await fetch(url, { cache: 'no-store' });
-    if (!response.ok) return;
+    const response = await fetch(url, { cache: 'no-store', signal: abort.signal });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data: unknown = await response.json();
-    if (typeof data !== 'object' || data === null || !('revision' in data)) return;
+    if (typeof data !== 'object' || data === null || !('revision' in data)) throw new Error('Invalid release marker');
     const revision = data.revision;
-    return typeof revision === 'string' && /^[a-zA-Z0-9_-]{7,64}$/.test(revision) ? revision : undefined;
-  } catch { return; }
+    if (typeof revision !== 'string' || !/^[a-zA-Z0-9._-]{7,64}$/.test(revision)) throw new Error('Invalid release revision');
+    return revision;
+  } catch {
+    throw new Error('서버의 버전 정보를 확인하지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.');
+  } finally { clearTimeout(timeout); }
 }
 
 function installed(worker: ServiceWorker): Promise<void> {
@@ -72,20 +84,19 @@ async function performUpdateCheck(registration?: ServiceWorkerRegistration): Pro
   if (!navigator.onLine) throw new Error('오프라인이에요. 인터넷에 연결한 뒤 업데이트를 확인해 주세요.');
   let current = await navigator.serviceWorker.getRegistration(import.meta.env.BASE_URL) ?? registration;
   if (!current) throw new Error('앱 등록을 준비하고 있어요. 잠시 후 다시 확인해 주세요.');
-  if (await pendingWorker(current)) return 'available';
   const revision = await deployedRevision();
-  const activeRevision = current.active ? await workerRevision(current.active) : undefined;
+  if (revision === __NOTELIN_RELEASE__) return 'latest';
+  if (await pendingWorker(current, revision) || await activeRelease(current, revision)) return 'available';
   const registerFresh = (retry = false) => {
     const workerUrl = new URL(`${import.meta.env.BASE_URL}sw.js`, location.origin);
-    workerUrl.searchParams.set('revision', revision || __NOTELIN_RELEASE__);
+    workerUrl.searchParams.set('revision', revision);
     if (retry) workerUrl.searchParams.set('retry', String(Date.now()));
     return navigator.serviceWorker.register(workerUrl, {
       scope: import.meta.env.BASE_URL, updateViaCache: 'none'
     });
   };
   try {
-    if (revision && revision !== __NOTELIN_RELEASE__ && revision !== activeRevision) current = await registerFresh();
-    else await current.update();
+    current = await registerFresh();
   } catch (originalError) {
     // Recover a failed script fetch without unregistering the working app or
     // deleting any of its storage. A fresh URL also bypasses a stale CDN entry.
@@ -97,13 +108,29 @@ async function performUpdateCheck(registration?: ServiceWorkerRegistration): Pro
   }
   const worker = current.installing;
   if (worker) await installed(worker);
-  return await pendingWorker(current) ? 'available' : 'latest';
+  if (await pendingWorker(current, revision) || await activeRelease(current, revision)) return 'available';
+  throw new Error('새 버전을 아직 준비하지 못했어요. 잠시 후 다시 확인해 주세요.');
 }
 
 export async function applyWaitingUpdate(registration: ServiceWorkerRegistration | undefined, save: () => Promise<void>) {
-  const current = await navigator.serviceWorker.getRegistration(import.meta.env.BASE_URL) ?? registration;
-  const waiting = current && await pendingWorker(current);
-  if (!waiting) return 'latest' as const;
+  const deployed = navigator.onLine ? await deployedRevision().catch(() => undefined) : undefined;
+  if (deployed === __NOTELIN_RELEASE__) return 'latest' as const;
+  let current = await navigator.serviceWorker.getRegistration(import.meta.env.BASE_URL) ?? registration;
+  let waiting = current && await pendingWorker(current, deployed);
+  let activeRevision = current?.active && await workerRevision(current.active);
+  if (activeRevision && activeRevision !== __NOTELIN_RELEASE__ && (!deployed || activeRevision === deployed)) {
+    await save(); approveAppReload(); location.reload(); return;
+  }
+  if (!waiting && (!activeRevision || activeRevision === __NOTELIN_RELEASE__)) {
+    if (await checkForUpdate(current) === 'latest') return 'latest' as const;
+    current = await navigator.serviceWorker.getRegistration(import.meta.env.BASE_URL) ?? current;
+    waiting = current && await pendingWorker(current, deployed);
+    activeRevision = current?.active && await workerRevision(current.active);
+  }
+  if (!waiting) {
+    if (!activeRevision || activeRevision === __NOTELIN_RELEASE__) return 'latest' as const;
+    await save(); approveAppReload(); location.reload(); return;
+  }
   await save();
   if (waiting.state === 'activated') { approveAppReload(); location.reload(); return; }
   if (current?.waiting !== waiting || waiting.state !== 'installed') return 'latest' as const;

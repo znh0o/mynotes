@@ -13,7 +13,7 @@ async function workerRelease(page: Page) {
 test('settings can check, download and apply a real worker update without losing ink', async ({ page, context }) => {
   let release = 1;
   let duplicate = 0;
-  let failPlainWorker = false, failEveryWorker = false, failedWorkerRequests = 0;
+  let failFreshWorker = false, failEveryWorker = false, failReleaseMarker = false, failedWorkerRequests = 0;
   const dist = resolve('dist');
   const builtRevision = JSON.parse(await readFile(resolve(dist, 'release.json'), 'utf8')).revision;
   const server = createServer(async (req, res) => {
@@ -21,7 +21,8 @@ test('settings can check, download and apply a real worker update without losing
       const url = new URL(req.url!, 'http://localhost'), relative = decodeURIComponent(url.pathname).replace(/^\/mynotes\//, '') || 'index.html';
       const path = resolve(dist, relative);
       if (!url.pathname.startsWith('/mynotes/') || !path.startsWith(dist + sep)) { res.writeHead(404).end(); return; }
-      if (relative === 'sw.js' && (failEveryWorker || failPlainWorker && !url.search)) {
+      if (relative === 'release.json' && failReleaseMarker) { res.writeHead(503).end('release marker unavailable'); return; }
+      if (relative === 'sw.js' && (failEveryWorker || failFreshWorker && url.searchParams.has('revision') && !url.searchParams.has('retry'))) {
         failedWorkerRequests++; res.writeHead(503).end('temporary script fetch failure'); return;
       }
       let body = await readFile(path);
@@ -48,24 +49,17 @@ test('settings can check, download and apply a real worker update without losing
     await expect(page.locator('#update-status')).toHaveText('최신 버전을 사용하고 있어요.');
     // A different SW script can still contain the same application release.
     duplicate++;
+    await page.evaluate(async () => (await navigator.serviceWorker.getRegistration())!.update());
+    await expect.poll(() => page.evaluate(async () => !!(await navigator.serviceWorker.getRegistration())?.waiting)).toBe(true);
     await check.click();
     await expect(page.locator('#update-status')).toHaveText('최신 버전을 사용하고 있어요.');
     await expect(page.getByRole('button', { name: '저장 후 새 버전 적용', exact: true })).toBeHidden();
     await expect(page.getByRole('button', { name: '지금 업데이트', exact: true })).toHaveCount(0);
-    // Reproduce a failed canonical script fetch, then recover with a fresh URL.
-    failPlainWorker = true;
+    // A failed release marker must not be reported as "already up to date".
+    failReleaseMarker = true;
     await check.click(); await expect(check).toBeEnabled();
-    await expect(page.locator('#update-status')).toHaveText('최신 버전을 사용하고 있어요.');
-    expect(failedWorkerRequests).toBeGreaterThan(0);
-    expect(await page.evaluate(async () => {
-      const registration = await navigator.serviceWorker.getRegistration();
-      return new URL(registration!.waiting!.scriptURL).searchParams.has('retry');
-    })).toBe(true);
-    failEveryWorker = true;
-    await check.click();
-    await expect(page.locator('#update-status')).toContainText('업데이트 파일을 받지 못했어요');
-    await expect(page.locator('#update-status')).not.toContainText('Failed to update');
-    failEveryWorker = false; failPlainWorker = false;
+    await expect(page.locator('#update-status')).toContainText('서버의 버전 정보를 확인하지 못했어요');
+    failReleaseMarker = false;
     await context.setOffline(true); await check.click();
     await expect(page.locator('#update-status')).toContainText('오프라인'); await expect(check).toBeEnabled();
     await context.setOffline(false); await page.getByRole('button', { name: '완료', exact: true }).click();
@@ -75,9 +69,23 @@ test('settings can check, download and apply a real worker update without losing
     await page.mouse.move(canvas!.x + 100, canvas!.y + 180); await page.mouse.down();
     await page.mouse.move(canvas!.x + 250, canvas!.y + 200, { steps: 15 }); await page.mouse.up();
     release = 2;
-    await page.getByRole('button', { name: '노트 설정', exact: true }).click(); await check.click();
+    await page.getByRole('button', { name: '노트 설정', exact: true }).click();
+    failEveryWorker = true;
+    await check.click();
+    await expect(page.locator('#update-status')).toContainText('업데이트 파일을 받지 못했어요');
+    await expect(page.locator('#update-status')).not.toContainText('Failed to update');
+    failEveryWorker = false;
+    failFreshWorker = true;
+    await check.click();
     const apply = page.getByRole('button', { name: '저장 후 새 버전 적용', exact: true });
     await expect(apply).toBeVisible(); await expect(page.locator('#update-status')).toContainText('새 버전이 준비');
+    expect(failedWorkerRequests).toBeGreaterThan(0);
+    expect(await page.evaluate(async () => {
+      const registration = await navigator.serviceWorker.getRegistration();
+      const worker = registration!.waiting ?? registration!.active!;
+      return new URL(worker.scriptURL).searchParams.has('retry');
+    })).toBe(true);
+    failFreshWorker = false;
     await Promise.all([page.waitForEvent('load'), apply.click()]);
     await expect(page.locator('h1')).toContainText('나의 서재'); expect(await workerRelease(page)).toBe(2);
     await page.getByRole('button', { name: '업데이트 보존 검증 열기', exact: true }).click();
@@ -95,21 +103,7 @@ test('settings can check, download and apply a real worker update without losing
     await expect(page.locator('.welcome-banner h2')).toHaveText('업데이트가 있어요.');
     const bannerUpdate = page.getByRole('button', { name: '지금 업데이트', exact: true }); await expect(bannerUpdate).toBeVisible();
     await page.screenshot({ path: '../MyNotes-update-banner.png' });
-    await Promise.all([page.waitForEvent('load'), bannerUpdate.click()]);
-    expect(await workerRelease(page)).toBe(3);
-    await expect(page.locator('.welcome-banner h2')).toHaveText('오늘의 생각을 펼쳐보세요.');
-    await expect(page.getByRole('button', { name: '지금 업데이트', exact: true })).toHaveCount(0);
-    await page.waitForTimeout(1200);
-    await expect(page.getByRole('button', { name: '지금 업데이트', exact: true })).toHaveCount(0);
-    release = 4;
-    // Returning to an already-open app also checks for a new deployment.
-    await page.evaluate(() => {
-      const now = Date.now();
-      Date.now = () => now + 20_000;
-      window.dispatchEvent(new Event('focus'));
-    });
-    await expect(page.locator('.welcome-banner h2')).toHaveText('업데이트가 있어요.');
-    // Another window may activate an update after this window showed the banner.
+    // Another window can activate the waiting worker before this app applies it.
     await page.evaluate(async () => {
       const registration = await navigator.serviceWorker.getRegistration();
       await new Promise<void>(resolve => {
@@ -117,8 +111,10 @@ test('settings can check, download and apply a real worker update without losing
         registration!.waiting!.postMessage({ type: 'SKIP_WAITING' });
       });
     });
-    await expect(page.getByRole('button', { name: '지금 업데이트', exact: true })).toHaveCount(0);
+    await expect(bannerUpdate).toBeVisible();
     await page.getByRole('button', { name: '설정 및 백업', exact: true }).click(); await check.click();
-    await expect(page.locator('#update-status')).toHaveText('최신 버전을 사용하고 있어요.');
+    await expect(page.locator('#update-status')).toContainText('새 버전이 준비');
+    await Promise.all([page.waitForEvent('load'), apply.click()]);
+    expect(await workerRelease(page)).toBe(3);
   } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }
 });

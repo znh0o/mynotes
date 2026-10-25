@@ -21,3 +21,23 @@ test('tablet PWA starts fullscreen without an editor toggle, while phone chrome 
   await page.getByRole('button', { name: '문서 메뉴' }).click();
   await expect(page.locator('[data-action=fullscreen]')).toHaveCount(0);
 });
+
+test('returning from a note keeps tablet fullscreen active', async ({ page }) => {
+  await page.goto('./');
+  await page.getByRole('button', { name: '새 노트', exact: true }).click();
+  await page.getByRole('button', { name: '노트 만들기', exact: true }).click();
+  await expect(page.locator('.editor-header')).toBeVisible();
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => document.documentElement });
+    (window as any).fullscreenExits = 0;
+    document.exitFullscreen = async () => { (window as any).fullscreenExits++; };
+  });
+  await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).click();
+  await expect(page.locator('#library-title')).toBeVisible();
+  expect(await page.evaluate(() => (window as any).fullscreenExits)).toBe(0);
+  await page.getByRole('button', { name: 'Notelin 시작 가이드 열기', exact: true }).click();
+  await expect(page.locator('.editor-header')).toBeVisible();
+  await page.evaluate(() => history.back());
+  await expect(page.locator('#library-title')).toBeVisible();
+  expect(await page.evaluate(() => (window as any).fullscreenExits)).toBe(0);
+});

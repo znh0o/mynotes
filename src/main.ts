@@ -8,7 +8,7 @@ import { LibraryView, type LibraryState } from './ui/library';
 import { AppHistory, type AppRoute, type Direction } from './ui/history';
 import { finishSlide, slidePreviousView } from './ui/transitions';
 import { escape, icon, modal, pickFile, report, run, toast } from './ui/common';
-import { checkForUpdate, applyWaitingUpdate, hasWaitingUpdate, updateRepairUrl } from './pwa/updates';
+import { checkForUpdate, applyWaitingUpdate, hasReadyUpdate, updateRepairUrl } from './pwa/updates';
 import { version as appVersion } from '../package.json';
 import { installAppZoomGuard } from './ui/app-zoom';
 import { getAppearance, setAppearance, type Appearance } from './ui/appearance';
@@ -62,17 +62,17 @@ async function applyUpdate() {
 }
 function watchServiceWorker(registration: ServiceWorkerRegistration) {
   serviceWorkerRegistration = registration;
-  const noticeIfWaiting = () => {
-    void hasWaitingUpdate(registration).then(available => {
-      if (available) showAvailableUpdate(); else if (!updateApplying) showLatestVersion();
+  const noticeIfReady = () => {
+    void hasReadyUpdate(registration).then(available => {
+      if (available) showAvailableUpdate();
     }).catch(() => {});
   };
   registration.addEventListener('updatefound', () => {
-    registration.installing?.addEventListener('statechange', noticeIfWaiting);
-    noticeIfWaiting();
+    registration.installing?.addEventListener('statechange', noticeIfReady);
+    noticeIfReady();
   });
-  navigator.serviceWorker.addEventListener('controllerchange', noticeIfWaiting);
-  noticeIfWaiting(); refreshUpdateControls(); void probeUpdate();
+  navigator.serviceWorker.addEventListener('controllerchange', noticeIfReady);
+  refreshUpdateControls(); void probeUpdate();
 }
 async function registerAppWorker() {
   const existing = await navigator.serviceWorker.getRegistration(import.meta.env.BASE_URL);
@@ -87,7 +87,7 @@ async function registerAppWorker() {
     immediate: true,
     onNeedReload() { /* Manual activation below reloads only after saving. */ },
     onOfflineReady() { toast('오프라인 사용 준비가 완료됐어요.'); },
-    onNeedRefresh() { if (serviceWorkerRegistration) void hasWaitingUpdate(serviceWorkerRegistration).then(available => { if (available) showAvailableUpdate(); else showLatestVersion(); }); },
+    onNeedRefresh() { if (serviceWorkerRegistration) void hasReadyUpdate(serviceWorkerRegistration).then(available => { if (available) showAvailableUpdate(); }); },
     onRegisteredSW(_url, registration) { if (registration) watchServiceWorker(registration); },
     onRegisterError(error) { console.error('Service Worker registration failed', error); toast('오프라인 설치를 준비하지 못했어요. 연결을 확인해 주세요.', true); }
   });
@@ -121,7 +121,6 @@ async function open(id: string) {
   await navigation.navigate({ screen: 'note', id });
 }
 async function renderRoute(route: AppRoute, direction: Direction) {
-  if (route.screen === 'library' && document.fullscreenElement) await document.exitFullscreen().catch(() => {});
   if (route.screen === 'library' && library && !editor) {
     library.setFilter(route.filter); libraryState = library.snapshot(); return;
   }
