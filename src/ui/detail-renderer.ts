@@ -50,6 +50,11 @@ export class DetailRenderer {
     if (this.canvas.width || this.canvas.height) this.canvas.width = this.canvas.height = 0;
   }
 
+  suspend() {
+    clearTimeout(this.timer);
+    this.release();
+  }
+
   set(page: Page | undefined, scale: number) {
     if (this.page?.id !== page?.id || this.scale !== scale) this.release();
     this.page = page; this.scale = scale;
@@ -97,7 +102,7 @@ export class DetailRenderer {
     if (ratio <= baseRatio * 1.04) { this.release(); return; }
     const generation = ++this.generation, temp = document.createElement('canvas');
     await background(temp, page, ratio, { x, y, w, h });
-    if (generation !== this.generation || this.page?.id !== page.id) {
+    if (generation !== this.generation || this.page?.id !== page.id || this.viewport.classList.contains('zoom-preview')) {
       temp.width = temp.height = 0; return;
     }
     const previous = this.tile?.background;

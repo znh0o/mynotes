@@ -4,7 +4,7 @@ import { setInkColor } from './helpers';
 
 test.use({ deviceScaleFactor: 2.5, viewport: { width: 1280, height: 800 } });
 
-test('zoomed PDF and ink use a sharp visible tile instead of enlarging the capped page canvas', async ({ page }) => {
+test('zoomed PDF and ink use a sharp visible tile instead of enlarging the capped page canvas', async ({ page, context }) => {
   await page.goto('./');
   const pdf = await PDFDocument.create(), sheet = pdf.addPage([794, 1123]);
   const font = await pdf.embedFont(StandardFonts.Helvetica);
@@ -23,16 +23,54 @@ test('zoomed PDF and ink use a sharp visible tile instead of enlarging the cappe
     const base = document.querySelector<HTMLCanvasElement>('#paper-background')!;
     const tile = document.querySelector<HTMLCanvasElement>('.paper-surface .paper-detail')!;
     const data = tile.getContext('2d')!.getImageData(0, 0, tile.width, tile.height).data;
-    let dark = 0;
-    for (let i = 0; i < data.length; i += 16) if (data[i] < 80 && data[i + 3] > 200) dark++;
+    const baseData = base.getContext('2d')!.getImageData(0, 0, base.width, base.height).data;
+    const surface = tile.parentElement!, left = Number.parseFloat(tile.style.left), top = Number.parseFloat(tile.style.top);
+    const width = Number.parseFloat(tile.style.width), height = Number.parseFloat(tile.style.height);
+    let dark = 0, aligned = 0;
+    for (let i = 0; i < data.length; i += 16) {
+      if (data[i] >= 80 || data[i + 3] <= 200) continue;
+      dark++;
+      const pixel = i / 4, tx = pixel % tile.width, ty = Math.floor(pixel / tile.width);
+      const bx = Math.round((left + tx * width / tile.width) * base.width / surface.clientWidth);
+      const by = Math.round((top + ty * height / tile.height) * base.height / surface.clientHeight);
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+        const x = bx + dx, y = by + dy;
+        if (x < 0 || y < 0 || x >= base.width || y >= base.height) continue;
+        if (baseData[(y * base.width + x) * 4] < 140) { aligned++; dy = 3; break; }
+      }
+    }
     return { dpr: devicePixelRatio, baseDensity: base.width / base.getBoundingClientRect().width,
-      detailDensity: tile.width / tile.getBoundingClientRect().width, pixels: tile.width * tile.height, dark };
+      detailDensity: tile.width / tile.getBoundingClientRect().width, pixels: tile.width * tile.height, dark, aligned };
   });
   expect(sizes.baseDensity).toBeLessThan(.9);
   expect(sizes.detailDensity).toBeGreaterThan(sizes.baseDensity * 1.1);
   expect(sizes.detailDensity).toBeGreaterThan(2.4);
   expect(sizes.pixels).toBeLessThan(8100000);
   expect(sizes.dark).toBeGreaterThan(50);
+  expect(sizes.aligned / sizes.dark).toBeGreaterThan(.7);
+  const suspended = await page.evaluate(() => {
+    document.querySelector('.paper-viewport')!.dispatchEvent(new WheelEvent('wheel',
+      { deltaY: 150, ctrlKey: true, bubbles: true, cancelable: true }));
+    const canvas = document.querySelector<HTMLCanvasElement>('.paper-surface .paper-detail')!;
+    return { hidden: canvas.hidden, width: canvas.width };
+  });
+  expect(suspended).toEqual({ hidden: true, width: 0 });
+  await expect(detail).toBeVisible();
+  const viewport = (await page.locator('.paper-viewport').boundingBox())!;
+  const cdp = await context.newCDPSession(page);
+  const touches = (distance: number) => [
+    { id: 1, x: viewport.x + viewport.width / 2 - distance / 2, y: viewport.y + 220 },
+    { id: 2, x: viewport.x + viewport.width / 2 + distance / 2, y: viewport.y + 220 },
+  ];
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: touches(160) });
+  await expect(page.locator('.zoom-preview')).toHaveCount(1);
+  await expect(detail).toBeHidden();
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: touches(220) });
+  await expect(detail).toBeHidden();
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(page.locator('.zoom-preview')).toHaveCount(0);
+  await expect(detail).toBeVisible();
+  await cdp.detach();
   await setInkColor(page, '#1260ec');
   const paper = (await page.locator('#paper-live').boundingBox())!;
   await page.mouse.move(paper.x + 360, paper.y + 320); await page.mouse.down();

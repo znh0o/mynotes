@@ -1027,6 +1027,7 @@ export class EditorView {
         this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
         if (this.touches.size === 2) {
           this.cancelViewportUpdate(); this.viewport.classList.add('zoom-preview');
+          this.detail.suspend(); this.companionDetail.suspend();
           this.engine.cancel(); this.companionEngine.cancel(); const [a, b] = [...this.touches.values()], r = this.viewport.getBoundingClientRect();
           this.pinch = { distance: Math.hypot(b.x - a.x, b.y - a.y), scale: this.scale, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2,
             scrollX: this.viewport.scrollLeft, scrollY: this.viewport.scrollTop, centerX: (a.x + b.x) / 2 - r.left, centerY: (a.y + b.y) / 2 - r.top };
@@ -1066,7 +1067,10 @@ export class EditorView {
     this.viewport.addEventListener('wheel', e => {
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
-        if (!this.viewport.classList.contains('zoom-preview')) { this.engine.cancel(); this.companionEngine.cancel(); }
+        if (!this.viewport.classList.contains('zoom-preview')) {
+          this.engine.cancel(); this.companionEngine.cancel();
+          this.detail.suspend(); this.companionDetail.suspend();
+        }
         this.viewport.classList.add('zoom-preview');
         this.pendingScale = Math.max(.2, Math.min(4, (this.pendingScale ?? this.scale) * Math.exp(-e.deltaY * .002)));
         const target = this.pendingScale;
