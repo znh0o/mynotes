@@ -199,6 +199,7 @@ test('pen width stays reachable in split view and pen dragging changes new strok
     }
   }
   await page.setViewportSize({ width: 834, height: 1000 });
+  await expect(page.locator('html')).toHaveAttribute('data-device-ui', 'tablet');
   const cdp = await page.context().newCDPSession(page);
   const dragWidth = async (value: number) => {
     const r = (await slider.boundingBox())!;
