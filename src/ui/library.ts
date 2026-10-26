@@ -58,7 +58,7 @@ export class LibraryView {
   }
   async show() {
     const [notes, folders, columns, profile] = await Promise.all([db.notes.toArray(), db.folders.toArray(), db.settings.get('library-columns'), db.settings.get('user-profile')]);
-    this.notes = notes; this.folders = folders;
+    this.notes = notes.filter(note => !note.temporary); this.folders = folders;
     this.columns = [4, 5, 6].includes(columns?.value as number) ? columns!.value as 4 | 5 | 6 : 'auto';
     this.profile = profileFrom(profile?.value);
     this.render();

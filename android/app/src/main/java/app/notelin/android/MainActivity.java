@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.view.MotionEvent;
 import android.view.View;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -14,6 +15,7 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     private boolean dark;
+    private boolean stylusButtonDown;
 
     @Override public void onCreate(Bundle state) {
         registerPlugin(NotelinDevicePlugin.class);
@@ -41,6 +43,41 @@ public class MainActivity extends BridgeActivity {
             NotelinDevicePlugin plugin = (NotelinDevicePlugin) bridge.getPlugin("NotelinDevice").getInstance();
             plugin.receiveDocument(intent);
         }
+    }
+
+    @Override public boolean dispatchTouchEvent(MotionEvent event) {
+        observeStylusButton(event);
+        return super.dispatchTouchEvent(event);
+    }
+
+    @Override public boolean dispatchGenericMotionEvent(MotionEvent event) {
+        observeStylusButton(event);
+        return super.dispatchGenericMotionEvent(event);
+    }
+
+    private void observeStylusButton(MotionEvent event) {
+        boolean stylus = false;
+        for (int i = 0; i < event.getPointerCount(); i++) {
+            if (event.getToolType(i) == MotionEvent.TOOL_TYPE_STYLUS) { stylus = true; break; }
+        }
+        if (!stylus) return;
+        int buttons = event.getButtonState();
+        boolean pressed = (buttons & (MotionEvent.BUTTON_STYLUS_PRIMARY | MotionEvent.BUTTON_STYLUS_SECONDARY)) != 0;
+        // Some Samsung devices report the side button as a primary hover press.
+        // A normal pen tip can report PRIMARY during contact, so never infer a
+        // side-button press from PRIMARY on ACTION_DOWN or ACTION_MOVE.
+        int action = event.getActionMasked();
+        if ((action == MotionEvent.ACTION_BUTTON_PRESS || action == MotionEvent.ACTION_HOVER_ENTER
+            || action == MotionEvent.ACTION_HOVER_MOVE) && (buttons & MotionEvent.BUTTON_PRIMARY) != 0)
+            pressed = true;
+        if (stylusButtonDown && (buttons & MotionEvent.BUTTON_PRIMARY) != 0 &&
+            (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_MOVE)) pressed = true;
+        if (pressed && !stylusButtonDown && bridge != null) {
+            NotelinDevicePlugin plugin = (NotelinDevicePlugin) bridge.getPlugin("NotelinDevice").getInstance();
+            plugin.stylusButtonPressed();
+        }
+        stylusButtonDown = pressed;
+        if (action == MotionEvent.ACTION_HOVER_EXIT || action == MotionEvent.ACTION_CANCEL) stylusButtonDown = false;
     }
 
     private boolean isTablet() { return getResources().getConfiguration().smallestScreenWidthDp >= 600; }

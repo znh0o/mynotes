@@ -17,6 +17,7 @@ import { brushKey, brushProfile, inkTools, isInkTool, type BrushProfile, type In
 import { defaultPenCollection, duplicatePen, isPenKind, penKinds, penNames, type PenCollection, type PenKind, type PenPreset } from '../data/pen-presets';
 import { loadSharedPens, sharedPensKey } from '../data/shared-pens';
 import { bindPhoneEditor } from './phone-chrome';
+import { isNativeApp } from '../platform/native';
 
 const shapeChoices: { id: Shape; name: string; drawing: string }[] = [
   { id: 'rect', name: '사각형', drawing: '<rect x="8" y="11" width="40" height="30" rx="2" />' },
@@ -99,7 +100,20 @@ export class EditorView {
       <div class="phone-document-panel" id="phone-document-panel" role="dialog" aria-label="문서 메뉴" popover="auto"><div class="phone-document-heading">문서 메뉴</div><div class="phone-document-primary"></div><div class="phone-document-secondary"></div></div>
       <div class="selection-toolbar" hidden><span id="selection-count"></span>${button('CopyPlus', '선택 복제', 'selection-duplicate')}${button('Plus', '선택 확대', 'selection-grow')}${button('Minus', '선택 축소', 'selection-shrink')}${button('Trash2', '선택 삭제', 'selection-delete')}${button('X', '선택 해제', 'deselect')}</div>
     </div>`;
+    if (this.note.temporary) {
+      const save = document.createElement('button');
+      save.type = 'button'; save.className = 'external-pdf-save'; save.dataset.action = 'save-to-library';
+      save.textContent = '서재에 저장';
+      this.root.querySelector('.editor-header-actions')!.prepend(save);
+      const notice = document.createElement('div');
+      notice.className = 'external-pdf-notice';
+      notice.textContent = '외부 PDF · 서재에 저장하지 않고 닫으면 이 문서의 필기가 삭제돼요.';
+      this.root.querySelector('.editor-body')!.append(notice);
+    }
     bindPhoneEditor(this.root, this.abort.signal);
+    if (isNativeApp) window.addEventListener('notelin-native-stylus-button', () => {
+      if (!document.querySelector('dialog[open]')) this.togglePenEraser();
+    }, { signal: this.abort.signal });
     this.viewport = this.root.querySelector('.paper-viewport')!;
     this.engine = new InkEngine(this.root.querySelector('#paper-ink')!, this.root.querySelector('#paper-live')!, () => this.changed(), count => this.showSelection(count, this.engine),
       (p, tool) => this.insert(p, tool), () => toast('직선으로 정리했어요. 펜을 댄 채 끝점을 움직일 수 있어요.'), () => this.togglePenEraser());
@@ -589,6 +603,16 @@ export class EditorView {
     if (action === 'search') this.search();
     if (action === 'settings') this.settings();
     if (action === 'save') run(async () => { await this.flush(); await this.saveThumbnail(this.page); toast('저장했어요.'); });
+    if (action === 'save-to-library') run(async () => {
+      target.setAttribute('disabled', '');
+      try {
+        await this.flush();
+        await db.notes.update(this.note.id, { temporary: false, updated: Date.now() });
+        this.note.temporary = false;
+        target.remove(); this.root.querySelector('.external-pdf-notice')?.remove();
+        toast('서재에 저장했어요.');
+      } finally { target.removeAttribute('disabled'); }
+    });
     if (action === 'goto-page') modal('페이지 이동', `<label class="form-label">페이지 번호<input type="number" name="page" min="1" max="${this.note.pageIds.length}" value="${this.index + 1}" required /></label>`, '이동', async data => { await this.showPage(Number(data.get('page')) - 1); });
     if (action === 'export') run(async () => {
       await this.flush(); target.setAttribute('disabled', '');
@@ -841,10 +865,12 @@ export class EditorView {
     // otherwise close a newly opened popover in that same pointerup event.
     const panel = document.createElement('div'); panel.id = 'eraser-picker'; panel.className = 'eraser-picker'; panel.popover = 'manual';
     panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', '지우개 설정');
-    panel.innerHTML = `<div class="writing-options-heading"><strong>지우개</strong>${button('X', '지우개 설정 닫기', 'close-eraser')}</div><div class="eraser-modes">${([['stroke', '스트로크 지우개', '닿은 획 전체를 지워요'], ['partial', '펜 지우개', '문지른 부분만 지워요']] as const).map(([id, name, description]) => `<button data-action="eraser-mode" data-id="${id}" aria-label="${name}" aria-pressed="${this.engine.options.partialEraser === (id === 'partial')}">${icon(id === 'stroke' ? 'PenLine' : 'Eraser', 20)}<span><strong>${name}</strong><small>${description}</small></span>${icon('Check', 16)}</button>`).join('')}</div><label class="eraser-size-label" for="eraser-size">지우개 크기 <output id="eraser-size-value">${this.engine.options.eraserSize}</output></label><input id="eraser-size" type="range" min="8" max="100" value="${this.engine.options.eraserSize}" aria-label="지우개 크기"/><p>측면 버튼을 누른 채 지우기는 기기가 표준 버튼 입력을 전달해야 해요. 삼성인터넷에서는 아래 호환 전환을 사용할 수 있어요.</p>`;
+    panel.innerHTML = `<div class="writing-options-heading"><strong>지우개</strong>${button('X', '지우개 설정 닫기', 'close-eraser')}</div><div class="eraser-modes">${([['stroke', '스트로크 지우개', '닿은 획 전체를 지워요'], ['partial', '펜 지우개', '문지른 부분만 지워요']] as const).map(([id, name, description]) => `<button data-action="eraser-mode" data-id="${id}" aria-label="${name}" aria-pressed="${this.engine.options.partialEraser === (id === 'partial')}">${icon(id === 'stroke' ? 'PenLine' : 'Eraser', 20)}<span><strong>${name}</strong><small>${description}</small></span>${icon('Check', 16)}</button>`).join('')}</div><label class="eraser-size-label" for="eraser-size">지우개 크기 <output id="eraser-size-value">${this.engine.options.eraserSize}</output></label><input id="eraser-size" type="range" min="8" max="100" value="${this.engine.options.eraserSize}" aria-label="지우개 크기"/><p>${isNativeApp ? '화면 가까이에서 S펜 옆 버튼을 누르면 펜과 지우개를 전환해요.' : '측면 버튼을 누른 채 지우기는 기기가 표준 버튼 입력을 전달해야 해요. 삼성인터넷에서는 아래 호환 전환을 사용할 수 있어요.'}</p>`;
     panel.insertAdjacentHTML('beforeend', `<button class="pen-button-help" data-action="pen-button-help" aria-expanded="false" aria-controls="pen-button-guide">${icon('HelpCircle', 15)} 버튼을 누르면 에어 커맨드가 열리나요?</button><p class="pen-button-guide" id="pen-button-guide" hidden><strong>기기 설정 → 유용한 기능 → S펜 → 에어 커맨드</strong>에서 <strong>펜 버튼으로 에어 커맨드 열기</strong>를 꺼 주세요.<br>그다음 버튼을 누른 채 펜촉을 종이에 대고 문질러 주세요. 앱에서 기기의 에어 커맨드 설정을 바꿀 수는 없어요. 꺼도 반응이 없다면 화면의 지우개 버튼을 사용해 주세요. 기기·브라우저에 따라 펜 버튼 입력이 전달되지 않을 수 있어요.</p>`);
     panel.insertAdjacentHTML('beforeend', `<button class="pen-button-help" data-action="pen-button-check">${icon('Move', 15)} S펜 버튼 입력 확인</button>`);
-    panel.insertAdjacentHTML('beforeend', `<label class="finger-switch"><input type="checkbox" id="samsung-pen-button-toggle" ${this.engine.options.samsungButtonToggle ? 'checked' : ''}/><span></span>삼성인터넷 버튼 호환</label><p>종이 가까이에서 펜을 띄운 채 버튼을 한 번 눌렀다 놓으면 펜 ↔ 지우개로 전환해요. 전환 후에는 버튼을 놓고 문질러 주세요.</p>`);
+    panel.insertAdjacentHTML('beforeend', isNativeApp
+      ? '<p>S펜을 화면 가까이에 두고 옆 버튼을 누르면 펜과 지우개가 전환돼요. 버튼을 놓고 필기해 주세요.</p>'
+      : `<label class="finger-switch"><input type="checkbox" id="samsung-pen-button-toggle" ${this.engine.options.samsungButtonToggle ? 'checked' : ''}/><span></span>삼성인터넷 버튼 호환</label><p>종이 가까이에서 펜을 띄운 채 버튼을 한 번 눌렀다 놓으면 펜 ↔ 지우개로 전환해요. 전환 후에는 버튼을 놓고 문질러 주세요.</p>`);
     this.root.querySelector('.editor-shell')!.append(panel);
     const rect = anchor.getBoundingClientRect();
     panel.style.left = `${Math.max(8, Math.min(rect.left, innerWidth - 296))}px`;

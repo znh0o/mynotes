@@ -4,6 +4,9 @@ import { PDFDocument } from 'pdf-lib';
 async function nativeBridge(page: Page, pdf = '') {
   await page.addInitScript(({ pdf }) => {
     const win = window as any;
+    const matchMedia = window.matchMedia.bind(window);
+    window.matchMedia = (query: string) => query.trim() === '(display-mode: standalone)'
+      ? { ...matchMedia(query), matches: true } as MediaQueryList : matchMedia(query);
     const state = win.nativeTest = {
       listeners: {} as Record<string, (data: unknown) => void>, chunks: [] as string[], exports: [] as string[],
       cancel: false, updates: 0, updateAvailable: true,
@@ -47,6 +50,11 @@ test('Android opens the library without installation UI and routes Back and back
   await expect(page.locator('[data-action=library-mode]')).toHaveCount(0);
   await page.getByRole('button', { name: 'Notelin 시작 가이드 열기', exact: true }).click();
   await expect(page.locator('#paper-live')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => !!(window as any).nativeTest.listeners.stylusButtonPressed)).toBe(true);
+  await page.evaluate(() => (window as any).nativeTest.listeners.stylusButtonPressed({}));
+  await expect(page.getByRole('button', { name: '지우개', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.evaluate(() => (window as any).nativeTest.listeners.stylusButtonPressed({}));
+  await expect(page.getByRole('button', { name: '펜', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect.poll(() => page.evaluate(() => !!(window as any).nativeTest.listeners.backButton)).toBe(true);
   await page.evaluate(() => (window as any).nativeTest.listeners.backButton({ canGoBack: true }));
   await expect(page.locator('.notes-grid').first()).toBeVisible();
@@ -77,6 +85,7 @@ test('Android PDF intents import intact bytes once and PDF export uses the docum
   await page.goto('./');
   await expect(page.locator('#paper-live')).toBeVisible();
   await expect(page.locator('.page-loading')).toBeHidden();
+  await expect(page.getByRole('button', { name: '서재에 저장', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'PDF 내보내기', exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as any).nativeTest.exports.length)).toBe(1);
   const exported = await page.evaluate(() => (window as any).nativeTest.exports[0]);
@@ -84,6 +93,8 @@ test('Android PDF intents import intact bytes once and PDF export uses the docum
   await page.evaluate(() => { (window as any).nativeTest.cancel = true; });
   await page.getByRole('button', { name: 'PDF 내보내기', exact: true }).click();
   await expect(page.locator('#toast')).toHaveText('저장을 취소했어요.');
+  await page.getByRole('button', { name: '서재에 저장', exact: true }).click();
+  await expect(page.getByRole('button', { name: '서재에 저장', exact: true })).toHaveCount(0);
   await page.reload();
   await expect(page.locator('.notes-grid').first()).toBeVisible();
   await expect(page.locator('#note-results .note-card')).toHaveCount(2);
@@ -95,4 +106,21 @@ test('Android PDF intents import intact bytes once and PDF export uses the docum
     database.close(); return [...new Uint8Array(await assets[0].blob.arrayBuffer())];
   });
   expect(stored).toEqual([...bytes]);
+});
+
+test('Android external PDF is discarded when closed without saving to the library', async ({ page }) => {
+  const original = await PDFDocument.create(); original.addPage([400, 600]);
+  await nativeBridge(page, Buffer.from(await original.save()).toString('base64'));
+  await page.goto('./');
+  await expect(page.getByRole('button', { name: '서재에 저장', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).click();
+  await expect(page.locator('#note-results .note-card')).toHaveCount(1);
+  await page.reload();
+  await expect(page.locator('#note-results .note-card')).toHaveCount(1);
+  const count = await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>(resolve => { const request = indexedDB.open('mynotes-v1'); request.onsuccess = () => resolve(request.result); });
+    const assets = await new Promise<any[]>(resolve => { const request = database.transaction('assets').objectStore('assets').getAll(); request.onsuccess = () => resolve(request.result); });
+    database.close(); return assets.length;
+  });
+  expect(count).toBe(0);
 });

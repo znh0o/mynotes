@@ -120,6 +120,9 @@ export async function deletePermanently(note: Note) {
     await db.notes.delete(note.id);
   });
 }
+export async function discardTemporaryNotes() {
+  for (const note of (await db.notes.toArray()).filter(note => note.temporary)) await deletePermanently(note);
+}
 export async function download(blob: Blob, filename: string) {
   if (isNativeApp) return saveNativeDocument(blob, filename);
   const url = URL.createObjectURL(blob), a = document.createElement('a');
@@ -132,11 +135,12 @@ function blobData(blob: Blob): Promise<string> {
 export async function backup() {
   const data = await db.transaction('r', db.tables, async () => ({
     format: 'mynotes', version: 1,
-    notes: await db.notes.toArray(), pages: await db.pages.toArray(),
+    notes: (await db.notes.toArray()).filter(note => !note.temporary), pages: await db.pages.toArray(),
     folders: await db.folders.toArray(), assets: await db.assets.toArray(), settings: await db.settings.toArray()
   }));
-  const assets = await Promise.all(data.assets.map(async a => ({ ...a, blob: await blobData(a.blob) })));
-  return download(new Blob([JSON.stringify({ ...data, assets })], { type: 'application/json' }), `Notelin-backup-${new Date().toISOString().slice(0, 10)}.json`);
+  const savedIds = new Set(data.notes.map(note => note.id));
+  const assets = await Promise.all(data.assets.filter(asset => savedIds.has(asset.noteId)).map(async a => ({ ...a, blob: await blobData(a.blob) })));
+  return download(new Blob([JSON.stringify({ ...data, pages: data.pages.filter(page => savedIds.has(page.noteId)), assets })], { type: 'application/json' }), `Notelin-backup-${new Date().toISOString().slice(0, 10)}.json`);
 }
 export async function restore(file: File) {
   if (file.size > 400 * 1024 * 1024) throw new Error('백업 파일은 400MB 이하로 복원할 수 있어요.');
@@ -156,7 +160,7 @@ export async function restore(file: File) {
   const notes: Note[] = input.notes.map((n: Note) => {
     if (!Array.isArray(n.pageIds) || typeof n.title !== 'string') throw new Error('손상된 노트');
     if (![n.created, n.updated, n.opened].every(v => finite(v, 1e15))) throw new Error('손상된 노트 날짜');
-    return { ...n, id: remap(n.id), title: `${n.title.slice(0, 100)} (복원)`, cover: color(n.cover), thumbnail: preview(n.thumbnail), folderId: n.folderId ? remap(n.folderId) : null, pageIds: n.pageIds.map(remap), lastPageId: n.lastPageId && n.pageIds.includes(n.lastPageId) ? remap(n.lastPageId) : undefined };
+    return { ...n, id: remap(n.id), title: `${n.title.slice(0, 100)} (복원)`, cover: color(n.cover), thumbnail: preview(n.thumbnail), folderId: n.folderId ? remap(n.folderId) : null, pageIds: n.pageIds.map(remap), lastPageId: n.lastPageId && n.pageIds.includes(n.lastPageId) ? remap(n.lastPageId) : undefined, temporary: false };
   });
   const noteIds = new Set<string>(input.notes.map((n: Note) => n.id));
   const pageIds = new Set(input.pages.map((p: Page) => p.id));

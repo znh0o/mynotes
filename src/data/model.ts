@@ -30,6 +30,7 @@ export interface Note {
   id: string; title: string; cover: string; folderId: string | null;
   pageIds: string[]; created: number; updated: number; opened: number;
   favorite: boolean; deleted: number | null; thumbnail?: string; lastPageId?: string;
+  temporary?: boolean;
 }
 export interface Folder { id: string; name: string; color: string }
 export interface Asset { id: string; noteId: string; blob: Blob; name: string }

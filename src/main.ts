@@ -1,7 +1,7 @@
 import './style.css';
 import './theme.css';
 import { registerSW } from 'virtual:pwa-register';
-import { backup, db, initialize, restore } from './data/store';
+import { backup, db, initialize, restore, deletePermanently, discardTemporaryNotes } from './data/store';
 import { importPDF } from './data/pdf';
 import { EditorView } from './ui/editor';
 import { LibraryView, type LibraryState } from './ui/library';
@@ -135,7 +135,16 @@ async function renderRoute(route: AppRoute, direction: Direction) {
   if (route.screen === 'note' && (!note || note.deleted)) throw new Error('노트를 찾을 수 없어요.');
   finishSlide(); const previous = root.firstElementChild, oldScroll = window.scrollY, wasEditor = !!editor;
   if (library) { libraryState = library.snapshot(); libraryScroll = oldScroll; library.destroy(); library = undefined; }
-  if (editor) { await editor.flush(); editor.destroy(); editor = undefined; }
+  if (editor) {
+    const previousNote = editor.note;
+    await editor.flush(); editor.destroy(); editor = undefined;
+    if (previousNote.temporary && (route.screen !== 'note' || route.id !== previousNote.id)) {
+      await deletePermanently(previousNote);
+      const index = tabs.findIndex(tab => tab.id === previousNote.id);
+      if (index >= 0) tabs.splice(index, 1);
+      toast('서재에 저장하지 않은 PDF를 닫았어요.');
+    }
+  }
   if (route.screen === 'library') {
     const restoreScroll = libraryState.filter === route.filter ? libraryScroll : 0;
     libraryState = { ...libraryState, filter: route.filter };
@@ -233,6 +242,7 @@ function settings() {
 }
 async function boot() {
   await initialize();
+  await discardTemporaryNotes();
   await navigation.start();
   if (isNativeApp) {
     await initializeNativeShell();
@@ -255,7 +265,7 @@ async function receiveNativeDocuments() {
         try {
           toast('PDF를 가져오는 중이에요…');
           await editor?.flush();
-          const note = await importPDF(await readNativeDocument(document), null);
+          const note = await importPDF(await readNativeDocument(document), null, true);
           await completeNativeDocument(document.id);
           await open(note.id);
         } catch (error) { await completeNativeDocument(document.id); report(error); }
@@ -290,7 +300,7 @@ async function receiveSharedPdf() {
     const name = encodedName ? decodeURIComponent(encodedName) : '공유한 PDF.pdf';
     const file = new File([await response.blob()], name, { type: 'application/pdf' });
     toast('PDF를 가져오는 중이에요…');
-    const note = await importPDF(file, null);
+    const note = await importPDF(file, null, true);
     clearShareUrl();
     await open(note.id);
   } catch (error) { report(error); }

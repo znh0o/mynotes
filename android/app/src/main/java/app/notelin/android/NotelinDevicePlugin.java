@@ -154,6 +154,10 @@ public class NotelinDevicePlugin extends Plugin {
         } catch (Exception error) { call.reject(error.getMessage(), error); }
     }
 
+    public void stylusButtonPressed() {
+        notifyListeners("stylusButtonPressed", new JSObject());
+    }
+
     public void receiveDocument(Intent intent) {
         Uri uri;
         if (Intent.ACTION_VIEW.equals(intent.getAction())) uri = intent.getData();

@@ -73,3 +73,5 @@
 :root[data-theme=dark] .ink-toolbar :is(.tool-button,.tool-group>.icon-button,.editor-options>.icon-button,.pen-width-control>button,.palette-edit,.custom-color,.pencil-mode-trigger){color:#d7e0ee}
 :root[data-theme=dark] .ink-toolbar .tool-button.active,:root[data-theme=dark] .ink-toolbar .tool-button.active:hover{background:#34475f;color:#fff}
 :root[data-theme=dark] .ink-toolbar .pen-width-control,:root[data-theme=dark] .ink-toolbar .pen-width-control>label,:root[data-theme=dark] .ink-toolbar .pen-width-control>output{color:#c2d0e5}
+:root[data-theme=dark] .external-pdf-notice{background:#1c2c43ee;border-color:#496386;color:#d9e6f8}
+:root[data-theme=dark] .editor-header .external-pdf-save{background:#e8f1ff;color:#244e8e}

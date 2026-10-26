@@ -307,6 +307,11 @@ html,body,#app,.library-shell,.library-main,.library-content,.modal,.modal-body{
 .editor-header .icon-button:hover,.editor-header .editor-page-controls .icon-button:hover,.editor-header .editor-header-actions [data-action=view-options][aria-expanded=true]{background:#ffffff22;color:#fff}
 .editor-header button:focus-visible{outline-color:#d4e6ff}
 .editor-header .save-indicator.save-error{color:#ffe0a9}
+.editor-header .external-pdf-save{flex:none;min-height:27px;padding:0 12px;border-radius:6px;background:#fff;color:#285da4;font-size:11px;font-weight:700;white-space:nowrap}
+.editor-header .external-pdf-save:hover{background:#e8f1ff}
+.editor-header .external-pdf-save:disabled{opacity:.55}
+.external-pdf-notice{position:absolute;z-index:6;top:12px;left:50%;transform:translateX(-50%);padding:7px 13px;border:1px solid #d7e1ee;border-radius:8px;background:#fffefbee;box-shadow:0 3px 12px #25384c16;color:#445a70;font-size:11px;white-space:nowrap;pointer-events:none}
+@media(max-width:760px){.editor-header .external-pdf-save{min-height:25px;padding:0 7px;font-size:10px}.external-pdf-notice{top:7px;max-width:calc(100% - 20px);white-space:normal;text-align:center;font-size:10px}}
 .ink-toolbar .tool-button{color:#20262e}
 .ink-toolbar .tool-button.active,.ink-toolbar .tool-button.active:hover{background:#e2e9f2;color:#161c23;box-shadow:none}
 .ink-toolbar :is(.tool-group>.icon-button,.editor-options>.icon-button,.pen-width-control>button,.palette-edit,.custom-color,.pencil-mode-trigger){color:#20262e}

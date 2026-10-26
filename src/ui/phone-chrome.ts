@@ -43,10 +43,11 @@ export function bindPhoneEditor(root: HTMLElement, signal: AbortSignal) {
       }
       move(root.querySelector<HTMLElement>('.editor-page-controls')!, primary);
       for (const action of ['save', 'sidebar', 'search', 'export', 'settings']) {
-        move(root.querySelector<HTMLElement>(`[data-action=${action}]`)!, secondary);
+        const node = root.querySelector<HTMLElement>(`[data-action=${action}]`);
+        if (node) move(node, secondary);
       }
     } else {
-      for (const [node, marker] of moved) { marker.after(node); marker.remove(); }
+      for (const [node, marker] of moved) { if (node.isConnected) marker.after(node); marker.remove(); }
       moved.clear();
     }
   };

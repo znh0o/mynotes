@@ -29,7 +29,7 @@ async function documentFor(id: string) {
   }
   return doc;
 }
-export async function importPDF(file: File, folderId: string | null): Promise<Note> {
+export async function importPDF(file: File, folderId: string | null, temporary = false): Promise<Note> {
   if (file.size > 150 * 1024 * 1024) throw new Error('PDF는 150MB 이하로 가져올 수 있어요.');
   const lib = await pdfjs(), task = lib.getDocument({ ...pdfOptions, data: new Uint8Array(await file.arrayBuffer()) });
   try {
@@ -40,7 +40,7 @@ export async function importPDF(file: File, folderId: string | null): Promise<No
       pages.push({ id: uid(), noteId: id, width: v.width, height: v.height, paper: 'blank', paperColor: '#ffffff', spacing: 32, items: [], revision: 0, pdfAssetId: assetId, pdfIndex: i });
       p.cleanup();
     }
-    const now = Date.now(), note: Note = { id, title: file.name.replace(/\.pdf$/i, ''), cover: '#d9bfd1', folderId, pageIds: pages.map(p => p.id), created: now, updated: now, opened: now, favorite: false, deleted: null };
+    const now = Date.now(), note: Note = { id, title: file.name.replace(/\.pdf$/i, ''), cover: '#d9bfd1', folderId, pageIds: pages.map(p => p.id), created: now, updated: now, opened: now, favorite: false, deleted: null, ...(temporary ? { temporary: true } : {}) };
     const asset: Asset = { id: assetId, noteId: id, blob: new Blob([await file.arrayBuffer()], { type: 'application/pdf' }), name: file.name };
     await persistNew(note, pages, [asset]); return note;
   } finally { await task.destroy(); }

@@ -13,7 +13,7 @@ interface NotelinDevicePlugin {
   completeDocument(options: { id: string }): Promise<void>;
   setAppearance(options: { dark: boolean }): Promise<void>;
   openUpdates(): Promise<void>;
-  addListener(event: 'documentReceived', callback: () => void): Promise<PluginListenerHandle>;
+  addListener(event: 'documentReceived' | 'stylusButtonPressed', callback: () => void): Promise<PluginListenerHandle>;
 }
 const device = registerPlugin<NotelinDevicePlugin>('NotelinDevice');
 const chunkSize = 512 * 1024;
@@ -22,6 +22,7 @@ export async function initializeNativeShell() {
   if (!isNativeApp) return;
   await App.addListener('backButton', () => history.back());
   await App.addListener('pause', () => window.dispatchEvent(new Event('notelin-pause')));
+  await device.addListener('stylusButtonPressed', () => window.dispatchEvent(new Event('notelin-native-stylus-button')));
   const appearance = () => { void device.setAppearance({ dark: document.documentElement.dataset.theme === 'dark' }).catch(console.error); };
   new MutationObserver(appearance).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   appearance();
