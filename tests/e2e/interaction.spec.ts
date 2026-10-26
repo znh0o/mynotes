@@ -87,6 +87,23 @@ test('pinch and wheel bursts reuse canvas buffers until the gesture ends', async
   await cdp.detach();
 });
 
+test('a pen contact started on the toolbar cannot spill ink onto the page', async ({ page, context }) => {
+  await page.goto('./'); await page.getByRole('button', { name: '새 노트', exact: true }).click();
+  await page.getByRole('button', { name: '노트 만들기', exact: true }).click();
+  await expect(page.locator('.page-loading')).toBeHidden();
+  const toolbar = (await page.locator('.toolbar-separator').first().boundingBox())!;
+  const canvas = (await page.locator('#paper-live').boundingBox())!;
+  const cdp = await context.newCDPSession(page);
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', pointerType: 'pen', button: 'left', buttons: 1,
+    force: .5, x: toolbar.x + toolbar.width / 2, y: toolbar.y + toolbar.height / 2, clickCount: 1 });
+  for (let i = 0; i < 8; i++) await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', pointerType: 'pen',
+    button: 'left', buttons: 1, force: .5, x: canvas.x + 120 + i * 12, y: canvas.y + 150 });
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', pointerType: 'pen', button: 'left', buttons: 0,
+    force: 0, x: canvas.x + 204, y: canvas.y + 150, clickCount: 1 });
+  await expect(page.getByRole('button', { name: '실행 취소 (Ctrl+Z)' })).toBeDisabled();
+  await cdp.detach();
+});
+
 test('editor blocks refresh shortcuts and asks before browser reload while updates remain allowed', async ({ page }) => {
   await page.goto('./'); await page.getByRole('button', { name: '새 노트', exact: true }).click();
   await page.getByRole('button', { name: '노트 만들기', exact: true }).click();

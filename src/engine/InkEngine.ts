@@ -45,11 +45,21 @@ export class InkEngine {
   private samsungButton = new SamsungPenToggle();
   private sharpPreview?: (item: Stroke | ShapeItem | null, recompute?: boolean) => void;
   private palmGuard?: PalmRejection;
+  private outsidePens = new Set<number>();
   constructor(private ink: HTMLCanvasElement, private live: HTMLCanvasElement,
     private changed: () => void, private selection: (count: number) => void,
     private insert: (point: Point, tool: Tool) => void, private straightened: () => void = () => {},
     private toggleEraser: () => void = () => {}) {
     const options = { signal: this.abort.signal };
+    document.addEventListener('pointerdown', e => {
+      if (e.pointerType !== 'pen') return;
+      if (e.target === live) this.outsidePens.delete(e.pointerId);
+      else this.outsidePens.add(e.pointerId);
+    }, { ...options, capture: true });
+    const releaseOutside = (e: PointerEvent) => { if (e.pointerType === 'pen') this.outsidePens.delete(e.pointerId); };
+    document.addEventListener('pointerup', releaseOutside, { ...options, capture: true });
+    document.addEventListener('pointercancel', releaseOutside, { ...options, capture: true });
+    document.addEventListener('pointermove', e => { if (e.pointerType === 'pen' && !penContact(e)) releaseOutside(e); }, { ...options, capture: true });
     const button = (e: PointerEvent) => {
       if (!this.samsungButton.update(e, this.options.samsungButtonToggle, this.activePointer !== null)) return false;
       this.lastPen = performance.now(); e.preventDefault(); this.toggleEraser(); return true;
@@ -73,7 +83,7 @@ export class InkEngine {
     });
     try { this.pixelObserver.observe(live, { box: 'device-pixel-content-box' }); }
     catch { this.pixelObserver.observe(live); }
-    window.addEventListener('blur', () => { this.samsungButton.reset(); this.palmGuard?.resetActive(); if (this.activePointer !== null) this.cancel(); }, options);
+    window.addEventListener('blur', () => { this.samsungButton.reset(); this.outsidePens.clear(); this.palmGuard?.resetActive(); if (this.activePointer !== null) this.cancel(); }, options);
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.samsungButton.reset(); }, options);
   }
   load(page: Page) {
@@ -251,6 +261,7 @@ export class InkEngine {
   }
   private down(e: PointerEvent) {
     if (!this.page || this.activePointer !== null) return;
+    if (e.pointerType === 'pen' && this.outsidePens.has(e.pointerId)) return;
     if (e.pointerType === 'pen' ? !penContact(e) : e.button !== 0) return;
     if (e.pointerType === 'pen') this.lastPen = performance.now();
     if (e.pointerType === 'touch' && (this.palmGuard?.rejectTouch(e) ||
