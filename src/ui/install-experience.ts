@@ -1,8 +1,7 @@
 import { getAppearance, setAppearance, type Appearance } from './appearance';
 import { initInstallDemo } from './install-demo';
 
-type Platform = 'android' | 'ios' | 'mac';
-interface InstallPrompt extends Event { prompt(): Promise<void>; userChoice: Promise<{ outcome: string }> }
+type Platform = 'android' | 'ios';
 const siteUrl = 'https://znh0o.github.io/mynotes/';
 const apkUrl = 'https://github.com/znh0o/mynotes/releases/latest/download/Notelin.apk';
 
@@ -89,10 +88,22 @@ export function initInstallExperience(root: HTMLElement) {
 
   const ua = navigator.userAgent;
   const ios = /iPad|iPhone|iPod/.test(ua) || /Macintosh/.test(ua) && navigator.maxTouchPoints > 1;
-  let platform: Platform = ios ? 'ios' : /Macintosh|Mac OS X/.test(ua) ? 'mac' : 'android';
-  let prompt: InstallPrompt | undefined;
+  let platform: Platform = ios ? 'ios' : 'android';
   const guide = root.querySelector<HTMLElement>('#install-manual')!;
-  window.addEventListener('beforeinstallprompt', event => { event.preventDefault(); prompt = event as InstallPrompt; });
+  // Android is distributed as an APK; suppress the browser's unrelated PWA prompt.
+  window.addEventListener('beforeinstallprompt', event => event.preventDefault());
+  const iosDialog = root.querySelector<HTMLDialogElement>('.install-ios-dialog')!;
+  const closeIosDialog = () => iosDialog.close();
+  iosDialog.querySelector<HTMLButtonElement>('.install-ios-close')!.addEventListener('click', closeIosDialog);
+  iosDialog.addEventListener('click', event => { if (event.target === iosDialog) closeIosDialog(); });
+  iosDialog.querySelector<HTMLButtonElement>('.install-ios-copy')!.addEventListener('click', async () => {
+    const status = iosDialog.querySelector<HTMLElement>('.install-ios-status')!;
+    try { await navigator.clipboard.writeText(siteUrl); status.textContent = '설치 주소를 복사했어요. Safari에서 열어주세요.'; }
+    catch {
+      const url = iosDialog.querySelector<HTMLInputElement>('.install-ios-url')!;
+      url.focus(); url.select(); status.textContent = '주소를 길게 눌러 복사한 뒤 Safari에서 열어주세요.';
+    }
+  });
   const instructions: Record<Platform, { caption: string; description: string; heading: string; manual: string; steps: [string, string][] }> = {
     android: {
       caption: 'Android 8 이상 · Galaxy Tab & Phone', description: 'Android 기기에 Notelin을 설치하세요.', heading: 'Notelin 설치 방법',
@@ -103,11 +114,6 @@ export function initInstallExperience(root: HTMLElement) {
       caption: 'iPhone · iPad · Safari 웹 앱(PWA)', description: 'Safari에서 홈 화면에 웹 앱을 추가하세요.', heading: 'iPhone · iPad에 PWA 설치하기',
       manual: '채팅 앱 안의 브라우저에서는 메뉴가 보이지 않을 수 있어요. 주소를 복사해 Safari에서 열어주세요.',
       steps: [['Safari에서 열기','iPhone 또는 iPad의 Safari에서 이 페이지를 여세요.'],['공유 → 홈 화면에 추가','공유 버튼을 누르고 ‘홈 화면에 추가’를 선택하세요. ‘웹 앱으로 열기’ 항목이 있으면 켜 주세요.'],['추가한 아이콘으로 실행','‘추가’를 누른 뒤 홈 화면의 Notelin 아이콘을 열면 서재로 이어져요.']],
-    },
-    mac: {
-      caption: 'Mac · Safari 웹 앱(PWA)', description: 'Safari에서 Dock에 Notelin 웹 앱을 추가하세요.', heading: 'Mac에 PWA 설치하기',
-      manual: 'macOS Sonoma 14 이상 Safari에서는 ‘Dock에 추가’를 사용할 수 있어요. 지원되는 Chrome에서는 브라우저의 앱 설치 메뉴를 사용해 주세요.',
-      steps: [['Safari에서 열기','Mac의 Safari에서 이 페이지를 여세요.'],['파일 → Dock에 추가','메뉴 막대의 ‘파일 → Dock에 추가’를 선택하세요. 공유 메뉴에서도 찾을 수 있어요.'],['추가한 앱으로 실행','이름을 Notelin으로 확인하고 ‘추가’를 누른 뒤 Dock에서 실행하세요.']],
     },
   };
   function selectPlatform(next: Platform) {
@@ -128,15 +134,11 @@ export function initInstallExperience(root: HTMLElement) {
   }
   root.querySelectorAll<HTMLButtonElement>('[data-platform]').forEach(button => button.addEventListener('click', () => selectPlatform(button.dataset.platform as Platform)));
   selectPlatform(platform);
-  root.querySelectorAll<HTMLAnchorElement>('[data-download]').forEach(link => link.addEventListener('click', async event => {
+  root.querySelectorAll<HTMLAnchorElement>('[data-download]').forEach(link => link.addEventListener('click', event => {
     if (platform !== 'android') {
       event.preventDefault();
-      if (platform === 'mac' && prompt) {
-        try { const deferred = prompt; prompt = undefined; await deferred.prompt(); await deferred.userChoice; return; } catch { /* The manual guide remains available. */ }
-      }
-      guide.classList.add('install-manual-emphasis');
-      root.querySelector<HTMLElement>('#install-guide')!.scrollIntoView({ behavior: reducedMotion.matches ? 'instant' : 'smooth' });
-      guide.tabIndex = -1; guide.focus({ preventScroll: true });
+      if (!iosDialog.open) iosDialog.showModal();
+      iosDialog.querySelector<HTMLElement>('#install-ios-title')!.focus();
     } else if (!navigator.onLine) {
       event.preventDefault(); guide.textContent = 'APK 다운로드에는 인터넷 연결이 필요해요. 연결한 뒤 다시 눌러 주세요.';
       guide.classList.add('install-manual-emphasis'); guide.scrollIntoView({ behavior: reducedMotion.matches ? 'instant' : 'smooth', block: 'center' });

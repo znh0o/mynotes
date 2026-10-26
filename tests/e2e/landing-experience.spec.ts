@@ -1,25 +1,31 @@
 import { test, expect } from '@playwright/test';
 
-test('Apple visitors get PWA instructions while Android keeps the APK route', async ({ browser }) => {
-  for (const [device, userAgent, instruction] of [
-    ['iPhone', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1', '홈 화면에 추가'],
-    ['iPad', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15', '홈 화면에 추가'],
-    ['Mac', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 Version/17.0 Safari/605.1.15', 'Dock에 추가'],
+test('iPhone and iPad installation taps open a visible PWA guide while Android keeps the APK route', async ({ browser }) => {
+  for (const [device, userAgent] of [
+    ['iPhone', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1'],
+    ['iPad', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15'],
   ] as const) {
     const context = await browser.newContext({
       baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:4173/mynotes/', userAgent,
-      hasTouch: device === 'iPad', viewport: device === 'iPhone' ? { width: 390, height: 844 } : { width: 1050, height: 800 },
+      hasTouch: true, viewport: device === 'iPhone' ? { width: 390, height: 844 } : { width: 1050, height: 800 },
     });
     try {
       if (device === 'iPad') await context.addInitScript(() => Object.defineProperty(navigator, 'maxTouchPoints', { get: () => 5 }));
       const page = await context.newPage(); await page.goto('./');
-      const cta = page.getByRole('link', { name: 'PWA 설치하기' });
-      await expect(cta).toHaveAttribute('href', '#install-guide');
+      const modal = page.getByRole('dialog', { name: 'iPhone · iPad에 설치하기' });
       await expect(page.getByRole('link', { name: 'Android 앱 다운로드' })).toHaveCount(0);
-      await cta.click();
-      await expect(page.locator('[data-guide-steps]')).toContainText(instruction);
-      await expect(page.locator('#install-manual')).toBeFocused();
-      await page.getByRole('button', { name: 'Android', exact: true }).click();
+      await expect(page.getByRole('button', { name: 'Mac', exact: true })).toHaveCount(0);
+      for (const selector of ['.install-hero [data-download]', '.install-header [data-download]', '#install-guide [data-download]']) {
+        const cta = page.locator(selector);
+        await expect(cta).toHaveAttribute('href', '#install-guide');
+        await cta.tap();
+        await expect(modal).toBeVisible();
+        await expect(modal).toContainText('홈 화면에 추가');
+        await expect(modal.getByRole('heading')).toBeFocused();
+        await modal.getByRole('button', { name: '설치 안내 닫기' }).tap();
+        await expect(modal).toBeHidden();
+      }
+      await page.getByRole('button', { name: 'Android', exact: true }).tap();
       await expect(page.getByRole('link', { name: 'Android 앱 다운로드' })).toHaveAttribute('href', 'https://github.com/znh0o/mynotes/releases/latest/download/Notelin.apk');
       expect(await page.evaluate(() => indexedDB.databases())).toEqual([]);
     } finally { await context.close(); }

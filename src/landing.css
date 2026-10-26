@@ -93,3 +93,27 @@
   .install-guide h2{font-size:32px}
   .install-help{padding:60px 24px 68px}
 }
+
+.install-ios-dialog{position:fixed;inset:0;width:min(440px,calc(100vw - 28px));max-width:none;max-height:calc(100dvh - 28px);margin:auto;overflow:auto;padding:27px;border:1px solid var(--install-line);border-radius:17px;background:var(--install-paper);color:var(--install-ink);font-family:inherit;box-shadow:0 25px 70px #15294535}
+.install-ios-dialog::backdrop{background:#14263d80;backdrop-filter:blur(3px)}
+.install-ios-dialog-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:17px}
+.install-ios-icon{width:43px;height:43px;display:grid;place-items:center;border-radius:12px;background:var(--install-tint);color:var(--install-blue)}
+.install-ios-icon svg{width:22px;height:22px}
+.install-ios-close{width:34px;height:34px;display:grid;place-items:center;border-radius:7px;color:var(--install-muted)}
+.install-ios-close:hover{background:var(--install-panel)}
+.install-ios-close svg{width:18px;height:18px}
+.install-ios-dialog h2{font-size:26px;line-height:1.3;font-weight:650;letter-spacing:-.055em;outline:none}
+.install-ios-intro{margin-top:9px;color:var(--install-muted);font-size:13px;line-height:1.7}
+.install-ios-dialog ol{display:grid;gap:0;margin:25px 0 18px;padding:0;list-style:none;border-top:1px solid var(--install-line)}
+.install-ios-dialog li{display:flex;align-items:flex-start;gap:13px;padding:15px 0;border-bottom:1px solid var(--install-line)}
+.install-ios-dialog li>span{width:23px;height:23px;flex:none;display:grid;place-items:center;border-radius:50%;background:var(--install-tint);color:var(--install-blue);font-size:11px;font-weight:700}
+.install-ios-dialog li p{font-size:13px;line-height:1.7}
+.install-ios-dialog li strong{font-weight:700;color:var(--install-blue)}
+.install-ios-dialog li svg{width:16px;height:16px;vertical-align:-3px;color:var(--install-blue)}
+.install-ios-hint{font-size:11px;line-height:1.7;color:var(--install-muted)}
+.install-ios-url{width:100%;margin-top:15px;padding:12px;border:1px solid var(--install-line);border-radius:8px;background:var(--install-bg);color:var(--install-muted);font:inherit;font-size:12px;text-overflow:ellipsis}
+.install-ios-copy{width:100%;min-height:44px;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:9px;border-radius:8px;background:var(--install-blue);color:#fff;font-size:12px;font-weight:650}
+.install-ios-copy svg{width:17px;height:17px}
+.install-ios-status{margin-top:11px;color:var(--install-blue);font-size:11px;line-height:1.6}
+.install-ios-status:empty{display:none}
+@media(max-width:620px){.install-ios-dialog{inset:auto 0 0;width:100vw;max-height:88dvh;margin:0;padding:24px 22px calc(22px + env(safe-area-inset-bottom));border-radius:18px 18px 0 0;border-bottom:0}}
