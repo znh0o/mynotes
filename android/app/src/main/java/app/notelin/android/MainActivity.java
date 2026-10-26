@@ -22,9 +22,10 @@ public class MainActivity extends BridgeActivity {
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         View content = findViewById(android.R.id.content);
         ViewCompat.setOnApplyWindowInsetsListener(content, (view, insets) -> {
-            Insets safe = insets.getInsets(isTablet()
-                ? WindowInsetsCompat.Type.displayCutout()
-                : WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+            int safeTypes = WindowInsetsCompat.Type.navigationBars() | WindowInsetsCompat.Type.captionBar()
+                | WindowInsetsCompat.Type.displayCutout();
+            if (!isTablet()) safeTypes |= WindowInsetsCompat.Type.statusBars();
+            Insets safe = insets.getInsets(safeTypes);
             Insets keyboard = insets.getInsets(WindowInsetsCompat.Type.ime());
             view.setPadding(safe.left, safe.top, safe.right, Math.max(safe.bottom, keyboard.bottom));
             return insets;
@@ -51,8 +52,11 @@ public class MainActivity extends BridgeActivity {
         controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
         controller.setAppearanceLightStatusBars(!dark);
         controller.setAppearanceLightNavigationBars(!dark);
-        if (isTablet()) controller.hide(WindowInsetsCompat.Type.systemBars());
-        else controller.show(WindowInsetsCompat.Type.systemBars());
+        // Hiding navigation bars makes Android consume the first edge gesture
+        // to reveal system controls. Keep Back available on the first gesture.
+        controller.show(WindowInsetsCompat.Type.navigationBars());
+        if (isTablet()) controller.hide(WindowInsetsCompat.Type.statusBars());
+        else controller.show(WindowInsetsCompat.Type.statusBars());
         getWindow().getDecorView().setBackgroundColor(Color.parseColor(dark ? "#0e1624" : "#f4f7ff"));
         ViewCompat.requestApplyInsets(findViewById(android.R.id.content));
     }
