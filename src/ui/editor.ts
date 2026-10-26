@@ -114,6 +114,8 @@ export class EditorView {
     this.engine.setSharpPreview((item, recompute) => this.detail.preview(item, recompute));
     this.companionEngine.setSharpPreview((item, recompute) => this.companionDetail.preview(item, recompute));
     this.engine.setPalmGuard(this.palmGuard); this.companionEngine.setPalmGuard(this.palmGuard);
+    this.engine.setInkRendered((page, region) => this.detail.refreshInk(page, region));
+    this.companionEngine.setInkRendered((page, region) => this.companionDetail.refreshInk(page, region));
     this.companionEngine.options = this.engine.options;
     this.editingEngine = this.engine;
     this.root.querySelector('.paper-sizing')!.addEventListener('pointerdown', () => this.focusEngine(this.engine), { capture: true, signal: this.abort.signal });

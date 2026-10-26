@@ -20,6 +20,13 @@ describe('editable ink geometry', () => {
     expect(erase([stroke], p(150), p(160), 5, true)[0]).toBe(stroke);
     expect(erase([{ ...stroke, points: [p(50)] }], p(50), p(50), 8, true)).toEqual([]);
   });
+  it('reuses untouched pages and invalidates cached erase bounds after moving ink', () => {
+    const moved = structuredClone(stroke), items = [moved];
+    expect(erase(items, p(250, -20), p(250, 20), 5, false)).toBe(items);
+    transform(items, 200, 0);
+    expect(erase(items, p(250, -20), p(250, 20), 5, false)).toEqual([]);
+    expect(erase([stroke], p(45, 30), p(55, 30), 5, false)).toEqual([stroke]);
+  });
   it('transforms both strokes and objects in one coordinate system', () => {
     const s = structuredClone(stroke); transform([s], 10, 20, 2);
     expect(s.points[0]).toEqual({ ...p(0), x: 10, y: 20 });

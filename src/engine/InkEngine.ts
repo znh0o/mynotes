@@ -1,5 +1,5 @@
 import { uid, type ImageItem, type Item, type Page, type Point, type Shape, type ShapeItem, type Stroke, type TextItem, type Tool } from '../data/model';
-import { bounds, erase, inside, transform } from './geometry';
+import { bounds, erase, inside, transform, overlaps, paintBounds, union, type InkRect } from './geometry';
 import { drawItem, drawItems } from './render';
 import { LiveStroke } from './LiveStroke';
 import { canStraighten, straightPoints } from './straight-line';
@@ -31,6 +31,8 @@ export class InkEngine {
   private pixelSize?: { cssWidth: number; deviceWidth: number };
   private pixelObserver: ResizeObserver;
   private dirtyInk = false;
+  private dirtyRegion: InkRect | null = null;
+  private inkRendered?: (page: Page, region?: InkRect) => void;
   private history: Item[][] = [];
   private future: Item[][] = [];
   private clipboard: Item[] = [];
@@ -92,6 +94,7 @@ export class InkEngine {
   }
   setSharpPreview(draw: (item: Stroke | ShapeItem | null, recompute?: boolean) => void) { this.sharpPreview = draw; }
   setPalmGuard(guard: PalmRejection) { this.palmGuard = guard; }
+  setInkRendered(draw: (page: Page, region?: InkRect) => void) { this.inkRendered = draw; }
   resize(force = false) {
     if (!this.page) return;
     this.inputRect = undefined;
@@ -121,7 +124,20 @@ export class InkEngine {
     const ctx = canvas.getContext('2d')!; ctx.setTransform(1, 0, 0, 1, 0, 0); if (clear) ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.setTransform(this.ratio, 0, 0, this.ratio, 0, 0); return ctx;
   }
-  render() { if (this.page) drawItems(this.context(this.ink), this.textSession ? this.page.items.filter(i => i.id !== this.textSession!.id) : this.page.items); }
+  render(region?: InkRect) {
+    if (!this.page) return;
+    if (region) {
+      const x = Math.floor(region.x * this.ratio) / this.ratio, y = Math.floor(region.y * this.ratio) / this.ratio;
+      region = { x, y, w: Math.ceil((region.x + region.w) * this.ratio) / this.ratio - x,
+        h: Math.ceil((region.y + region.h) * this.ratio) / this.ratio - y };
+    }
+    const ctx = this.context(this.ink, !region);
+    ctx.save();
+    if (region) { ctx.beginPath(); ctx.rect(region.x, region.y, region.w, region.h); ctx.clip(); ctx.clearRect(region.x, region.y, region.w, region.h); }
+    let items = this.textSession ? this.page.items.filter(i => i.id !== this.textSession!.id) : this.page.items;
+    if (region) items = items.filter(item => overlaps(paintBounds(item), region));
+    drawItems(ctx, items); ctx.restore(); this.inkRendered?.(this.page, region);
+  }
   private preview() {
     if (this.stroke && !this.straightSource && this.liveStroke.draw(this.context(this.live, false), this.stroke, this.ratio)) {
       this.sharpPreview?.(this.stroke); return;
@@ -147,7 +163,20 @@ export class InkEngine {
     ctx.restore();
     this.sharpPreview?.(this.stroke ?? this.shape, !!this.straightSource);
   }
-  private schedule() { if (!this.frame) this.frame = requestAnimationFrame(() => { this.frame = 0; if (this.dirtyInk) { this.dirtyInk = false; this.render(); } this.preview(); }); }
+  private schedule() { if (!this.frame) this.frame = requestAnimationFrame(() => {
+    this.frame = 0;
+    if (this.dirtyInk) { this.dirtyInk = false; const region = this.dirtyRegion; this.dirtyRegion = null; this.render(region ?? undefined); }
+    this.preview();
+  }); }
+  private eraseSegment(a: Point, b: Point) {
+    let region: InkRect | undefined;
+    const items = erase(this.page.items, a, b, this.options.eraserSize / 2, this.options.partialEraser,
+      stroke => { const box = paintBounds(stroke); region = region ? union(region, box) : box; });
+    if (items === this.page.items || !region) return;
+    this.page.items = items;
+    this.dirtyRegion = this.dirtyInk ? this.dirtyRegion && union(this.dirtyRegion, region) : region;
+    this.dirtyInk = true;
+  }
   private checkpoint() { this.before = this.page.items.slice(); }
   private mutableSelection() {
     this.page.items = this.page.items.map(item => this.selected.has(item.id) ? structuredClone(item) : item);
@@ -256,7 +285,7 @@ export class InkEngine {
     clearTimeout(this.holdTimer); this.holdTimer = undefined; this.holdAnchor = undefined; this.straightSource = undefined;
     if (this.before && this.page) { this.page.items = this.before; this.before = null; this.render(); }
     this.stroke = null; this.shape = null; this.lasso = []; this.activePointer = null; this.moving = false; this.imageGesture = undefined; this.gestureTool = null; this.inputRect = undefined;
-    this.liveStroke.reset(); this.dirtyInk = false;
+    this.liveStroke.reset(); this.dirtyInk = false; this.dirtyRegion = null;
     if (this.page) this.preview();
   }
   private down(e: PointerEvent) {
@@ -284,7 +313,7 @@ export class InkEngine {
       if (this.selected.size && p.x >= b.x - 12 && p.x <= b.x + b.w + 12 && p.y >= b.y - 12 && p.y <= b.y + b.h + 12) { this.mutableSelection(); this.moving = true; }
       else { this.clearSelection(); this.lasso = [p]; }
     } else if (tool === 'eraser') {
-      this.page.items = erase(this.page.items, p, p, this.options.eraserSize / 2, this.options.partialEraser); this.dirtyInk = true;
+      this.eraseSegment(p, p);
     } else if (tool === 'shape') this.shape = { id: uid(), kind: 'shape', shape: this.options.shape, x: p.x, y: p.y, w: 0, h: 0, color: this.options.color, width: this.options.width };
     else if (['pen', 'fountain', 'pencil', 'highlighter'].includes(tool)) this.stroke = { id: uid(), kind: 'stroke', tool: tool as Stroke['tool'], color: this.options.color,
       width: this.options.width,
@@ -299,7 +328,7 @@ export class InkEngine {
     clearTimeout(this.holdTimer); this.holdTimer = undefined; this.holdAnchor = undefined; this.straightSource = undefined;
     this.stroke = null; this.shape = null; this.lasso = []; this.moving = false;
     this.liveStroke.reset(); this.context(this.live); this.start = this.last = p;
-    this.beginSegment(tool, p); this.dirtyInk = true;
+    this.beginSegment(tool, p); this.dirtyInk = true; this.dirtyRegion = null;
   }
   private armStraightLine(point: Point) {
     if (!this.stroke || !this.options.holdToLine || this.straightSource) return;
@@ -351,7 +380,7 @@ export class InkEngine {
       } else if (this.shape && this.start) { this.shape.w = p.x - this.start.x; this.shape.h = p.y - this.start.y; }
       else if (this.moving) { transform(this.page.items.filter(i => this.selected.has(i.id)), p.x - this.last.x, p.y - this.last.y); this.dirtyInk = true; }
       else if (this.lasso.length) this.lasso.push(p);
-      else if (this.gestureTool === 'eraser') { this.page.items = erase(this.page.items, this.last, p, this.options.eraserSize / 2, this.options.partialEraser); this.dirtyInk = true; }
+      else if (this.gestureTool === 'eraser') this.eraseSegment(this.last, p);
       this.last = p;
     }
     this.schedule();
@@ -361,7 +390,7 @@ export class InkEngine {
     clearTimeout(this.holdTimer); this.holdTimer = undefined; this.holdAnchor = undefined;
     if (e.pointerType === 'pen') this.lastPen = performance.now();
     cancelAnimationFrame(this.frame); this.frame = 0;
-    if (this.dirtyInk) { this.render(); this.dirtyInk = false; }
+    if (this.dirtyInk) { this.render(this.dirtyRegion ?? undefined); this.dirtyInk = false; this.dirtyRegion = null; }
     if (this.stroke) {
       this.preview();
       const ctx = this.context(this.ink, false);
@@ -384,7 +413,10 @@ export class InkEngine {
         if (item.kind === 'stroke' ? item.points.some(p => inside(p, polygon)) : inside({ x: b.x + b.w / 2, y: b.y + b.h / 2 }, polygon)) this.selected.add(item.id);
       }
       this.before = null; this.selection(this.selected.size);
-    } else this.commit();
+    } else {
+      if (this.gestureTool === 'eraser' && this.before?.length === this.page.items.length && this.before.every((item, i) => item === this.page.items[i])) this.before = null;
+      this.commit();
+    }
     this.stroke = null; this.shape = null; this.lasso = []; this.moving = false; this.imageGesture = undefined; this.straightSource = undefined;
     this.activePointer = null; this.gestureTool = null; this.inputRect = undefined; this.dirtyInk = false; this.preview();
     if (this.live.hasPointerCapture(e.pointerId)) this.live.releasePointerCapture(e.pointerId);

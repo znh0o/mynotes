@@ -2,6 +2,7 @@ import type { Page, ShapeItem, Stroke } from '../data/model';
 import { background } from '../data/pdf';
 import { LiveStroke } from '../engine/LiveStroke';
 import { drawItem, drawItems } from '../engine/render';
+import { overlaps, paintBounds, type InkRect } from '../engine/geometry';
 
 interface Tile {
   pageId: string; x: number; y: number; w: number; h: number;
@@ -113,13 +114,26 @@ export class DetailRenderer {
     this.timer = setTimeout(() => { void this.render().catch(this.error); }, delay);
   }
 
-  refreshInk(page: Page) {
+  refreshInk(page: Page, region?: InkRect) {
     if (this.tile?.pageId !== page.id || this.page?.id !== page.id) return;
     const tile = this.tile, ctx = this.canvas.getContext('2d')!;
+    if (region && !overlaps(tile, region)) return;
+    if (region) {
+      const x = Math.floor((region.x - tile.x) * tile.ratio) / tile.ratio + tile.x;
+      const y = Math.floor((region.y - tile.y) * tile.ratio) / tile.ratio + tile.y;
+      region = { x, y, w: Math.ceil((region.x + region.w - tile.x) * tile.ratio) / tile.ratio + tile.x - x,
+        h: Math.ceil((region.y + region.h - tile.y) * tile.ratio) / tile.ratio + tile.y - y };
+    }
+    ctx.save();
+    if (region) {
+      ctx.setTransform(tile.ratio, 0, 0, tile.ratio, -tile.x * tile.ratio, -tile.y * tile.ratio);
+      ctx.beginPath(); ctx.rect(region.x, region.y, region.w, region.h); ctx.clip();
+    }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.drawImage(tile.background, 0, 0);
     ctx.setTransform(tile.ratio, 0, 0, tile.ratio, -tile.x * tile.ratio, -tile.y * tile.ratio);
-    drawItems(ctx, page.items);
+    drawItems(ctx, region ? page.items.filter(item => overlaps(paintBounds(item), region)) : page.items);
+    ctx.restore();
   }
 
   private async render() {

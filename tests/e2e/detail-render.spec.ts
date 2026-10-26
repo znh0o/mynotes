@@ -102,6 +102,21 @@ test('zoomed PDF and ink use a sharp visible tile instead of enlarging the cappe
     for (let i = 0; i < data.length; i += 16) if (data[i + 2] > data[i] + 80 && data[i + 2] > data[i + 1] + 60) blue++;
     return blue;
   })).toBeGreaterThan(20);
+  await page.getByRole('button', { name: '지우개', exact: true }).click();
+  await page.getByRole('dialog', { name: '지우개 설정' }).getByRole('button', { name: '스트로크 지우개', exact: true }).click();
+  const eraser = await context.newCDPSession(page);
+  await eraser.send('Input.dispatchMouseEvent', { type: 'mousePressed', pointerType: 'pen', button: 'left', buttons: 1,
+    force: .5, x: paper.x + 560, y: paper.y + 320, clickCount: 1 });
+  // The visible high-resolution ink must disappear while the pen is still down.
+  await expect.poll(() => detail.evaluate((canvas: HTMLCanvasElement) => {
+    const data = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
+    let blue = 0;
+    for (let i = 0; i < data.length; i += 16) if (data[i + 2] > data[i] + 80 && data[i + 2] > data[i + 1] + 60) blue++;
+    return blue;
+  })).toBe(0);
+  await eraser.send('Input.dispatchMouseEvent', { type: 'mouseReleased', pointerType: 'pen', button: 'left', buttons: 0,
+    force: 0, x: paper.x + 560, y: paper.y + 320, clickCount: 1 });
+  await eraser.detach();
   await page.locator('.paper-viewport').evaluate(viewport => { viewport.scrollTop = 640; });
   await expect.poll(async () => Number.parseFloat(await detail.evaluate(canvas => (canvas as HTMLCanvasElement).style.top))).toBeGreaterThan(0);
   await page.getByRole('button', { name: '보기 옵션' }).click();
