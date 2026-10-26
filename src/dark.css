@@ -9,7 +9,8 @@
 :root[data-theme=dark] :is(.library-shell,.editor-shell){color:var(--night-text);background:#0e1624}
 :root[data-theme=dark] :is(.library-sidebar,.editor-header,.ink-toolbar,.page-sidebar,.editor-footer){background:var(--night-surface);border-color:var(--border)}
 :root[data-theme=dark] .library-topbar{background:#151f30e8;border-color:var(--border)}
-:root[data-theme=dark] :is(.brand-wordmark,.install-brand img,.install-footer img){filter:invert(1) hue-rotate(180deg);mix-blend-mode:screen}
+:root[data-theme=dark] .brand-wordmark{filter:invert(1) hue-rotate(180deg);mix-blend-mode:screen}
+:root[data-theme=dark] :is(.install-brand img,.install-footer img){filter:invert(1) hue-rotate(180deg);mix-blend-mode:normal}
 :root[data-theme=dark] :is(.muted,.page-heading p,.workspace-label,.sidebar-empty,.add-folder,.text-button,.local-badge,.breadcrumb,.nav-item,.nav-item>small,.device-note,.device-note div span,.note-info span,.recent-note span,.sort-field select,.collection-tab,.note-density,.page-sidebar-heading,.page-sidebar-heading>span,.page-thumb,.page-navigation,.editor-page-controls,.page-position,.tool-button,.ink-toolbar .pen-width-control,.editor-header-actions,.profile-details dt,.profile-form label,.pen-picker-help,.pen-edit-label,.pen-edit-range,.color-picker-hue-label,.color-picker-bottom label,.writing-options-panel .muted,.image-picker p,.image-picker-actions small,.view-panel-paper,.settings-version,.settings-footnote){color:var(--night-muted)}
 :root[data-theme=dark] :is(.page-heading h1,.section-heading h2,.recent-note strong,.note-info strong,.breadcrumb strong,.profile-summary,.profile-popover h2,.pen-picker-heading strong,.writing-options-heading,.settings-section h3,.modal header h2,.profile-details dd,.view-options-panel,.shape-picker,.image-picker-actions strong){color:var(--night-text)}
 :root[data-theme=dark] :is(.eyebrow,.sidebar-section-title,.heading-dot,.banner-link,.banner-label,.section-heading h2 svg,.page-sidebar-heading strong,.collection-tab.active,.view-toggle .icon-button.active,.view-options-panel .icon-button,.add-page-button){color:var(--night-accent)}
@@ -78,7 +79,7 @@
 :root[data-theme=dark] .install-hero h1 em{color:#91b2ff}
 :root[data-theme=dark] .install-ink-line{color:#46689f}
 :root[data-theme=dark] :is(.install-description,.install-nav a,.install-caption,.install-capabilities p,.install-section-heading>span,.install-workflow-step p,.install-footer span,.install-product-showcase figcaption){color:#a5b7d1}
-:root[data-theme=dark] :is(.install-overline,.install-header-link,.install-hero-actions>a,.install-capabilities span,.install-section-heading p,.install-footer a){color:#a1bdf0}
+:root[data-theme=dark] :is(.install-overline,.install-header-link,.install-hero-actions>a:not(.install-cta),.install-capabilities span,.install-section-heading p,.install-footer a){color:#a1bdf0}
 :root[data-theme=dark] .install-header-link{border-color:#3b5378}
 :root[data-theme=dark] .install-header-link:hover{background:#243959}
 :root[data-theme=dark] .install-preview-tabs{background:#1b2a42;border-color:#354b6a}

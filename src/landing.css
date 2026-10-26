@@ -20,7 +20,7 @@
   backdrop-filter:blur(16px);
 }
 .install-brand{display:inline-flex;align-items:center;flex:none}
-.install-brand img{display:block;width:144px;height:54px;object-fit:contain;mix-blend-mode:multiply}
+.install-brand img{display:block;width:144px;height:54px;object-fit:contain;mix-blend-mode:normal}
 .install-appearance{position:relative;flex:none;margin-left:0}
 .install-appearance-toggle{display:grid;place-items:center;width:40px;height:40px;border:1px solid #dce4ef;border-radius:9px;color:#345987;background:#fff;transition:background .2s,border-color .2s}
 .install-appearance-toggle:hover,.install-appearance-toggle[aria-expanded=true]{background:#edf3ff;border-color:#adc5ed}
@@ -53,9 +53,9 @@
 .install-cta:active{transform:translateY(0)}
 .install-cta svg{width:19px;height:19px;transition:transform .2s}
 .install-cta:hover svg{transform:translateX(3px)}
-.install-hero-actions>a{display:inline-flex;align-items:center;gap:10px;color:#526a8b;font-size:13px;font-weight:600}
-.install-hero-actions>a:hover{color:var(--install-blue)}
-.install-hero-actions>a span{font-size:18px}
+.install-hero-actions>a:not(.install-cta){display:inline-flex;align-items:center;gap:10px;color:#526a8b;font-size:13px;font-weight:600}
+.install-hero-actions>a:not(.install-cta):hover{color:var(--install-blue)}
+.install-hero-actions>a:not(.install-cta) span{font-size:18px}
 .install-caption{margin-top:18px;color:#76859a;font-size:11px;letter-spacing:.025em}
 .install-product-showcase{max-width:1060px;margin:44px auto 0;min-width:0}
 .install-preview-tabs{position:relative;display:flex;justify-content:center;gap:4px;width:max-content;max-width:100%;margin:0 auto 28px;padding:5px;background:#e7edf6;border:1px solid #e0e8f4;border-radius:30px}
@@ -111,7 +111,7 @@
 .install-manual{grid-column:1/-1;margin-top:8px;padding:18px 22px;border:1px solid #526989;border-radius:9px;color:#bdcde3;font-size:12px;line-height:1.85;scroll-margin-top:110px;transition:border-color .2s,background .2s}
 .install-manual-emphasis{border-color:#b9d5ff;background:#30517e;color:#fff}
 .install-footer{max-width:1256px;margin:auto;padding:28px;display:flex;align-items:center;gap:28px}
-.install-footer img{display:block;width:124px;height:46px;object-fit:contain;mix-blend-mode:multiply}
+.install-footer img{display:block;width:124px;height:46px;object-fit:contain;mix-blend-mode:normal}
 .install-footer span{color:#7a8a9f;font-size:11px}
 .install-footer a{margin-left:auto;color:#5574a0;font-size:11px;font-weight:650}
 /* Native scroll timelines run in both directions; older browsers use repeatable reveals. */
@@ -166,7 +166,7 @@
   .install-ink-line{bottom:-15px;stroke-width:3px}
   .install-hero-actions{gap:20px;margin-top:26px}
   .install-cta{min-width:200px;min-height:50px;font-size:13px;padding:0 18px}
-  .install-hero-actions>a{font-size:12px}
+  .install-hero-actions>a:not(.install-cta){font-size:12px}
   .install-caption{font-size:10px}
   .install-product-showcase{margin-top:32px}
   .install-preview-tabs{margin-bottom:22px;padding:4px}

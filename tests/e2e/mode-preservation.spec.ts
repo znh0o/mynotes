@@ -16,7 +16,7 @@ test('opening an existing note in browser mode shows installation and preserves 
   });
   await page.evaluate(() => sessionStorage.setItem('notelin-e2e-browser', '1'));
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Notelin 설치하기' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Android 앱 다운로드' })).toBeVisible();
   await expect(page.locator('.library-shell,#paper-live')).toHaveCount(0);
   const after = await page.evaluate(async () => {
     const open = indexedDB.open('mynotes-v1');

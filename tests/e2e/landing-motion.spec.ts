@@ -48,23 +48,22 @@ test('scroll reveals finish and reduced motion keeps every section available', a
   await expect(page.locator('.install-hero h1')).toHaveCSS('animation-name', 'none');
   await page.getByRole('link', { name: '설치 방법', exact: true }).click();
   await expect(page.locator('#install-guide')).toBeFocused();
-  await expect(page.getByRole('button', { name: '지금 설치하기' })).toBeInViewport();
+  await expect(page.getByRole('link', { name: 'APK 다운로드', exact: true })).toBeInViewport();
   await page.getByRole('link', { name: '맨 위로' }).click();
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
 });
 
-test('header and final call to action both use the real install flow', async ({ page }) => {
+test('header and final call to action download the same current Android APK', async ({ page }) => {
+  await page.route('https://github.com/znh0o/mynotes/releases/latest/download/Notelin.apk', route => route.fulfill({
+    status: 200, contentType: 'application/vnd.android.package-archive',
+    headers: { 'content-disposition': 'attachment; filename="Notelin.apk"' }, body: 'test-apk-download',
+  }));
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('./');
-  await page.getByRole('button', { name: '앱 설치', exact: true }).click();
-  await expect(page.locator('#install-manual')).toBeInViewport();
-  await page.evaluate(() => {
-    (window as any).prompted = false;
-    const event = new Event('beforeinstallprompt', { cancelable: true });
-    Object.defineProperty(event, 'prompt', { value: async () => { (window as any).prompted = true; } });
-    Object.defineProperty(event, 'userChoice', { value: Promise.resolve({ outcome: 'accepted' }) });
-    window.dispatchEvent(event);
-  });
-  await page.getByRole('button', { name: '지금 설치하기' }).click();
-  await expect.poll(() => page.evaluate(() => (window as any).prompted)).toBe(true);
+  for (const selector of ['.install-header [data-download]', '#install-guide [data-download]']) {
+    const link = page.locator(selector);
+    await expect(link).toHaveAttribute('href', 'https://github.com/znh0o/mynotes/releases/latest/download/Notelin.apk');
+    const download = page.waitForEvent('download'); await link.click();
+    expect((await download).suggestedFilename()).toBe('Notelin.apk');
+  }
 });

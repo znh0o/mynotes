@@ -39,7 +39,7 @@ if (!release) {
     body: 'Android 설치형 Notelin입니다.\n\n- 기존 필기·PDF 편집 기능과 노트 목록\n- PDF 연결 프로그램 및 공유로 가져오기\n- Android 파일 선택 창으로 PDF·백업 저장\n- 태블릿 전체화면과 시스템 뒤로가기\n- 설정에서 업데이트 확인·다운로드·설치\n\n기존 PWA 노트는 PWA의 설정 → 전체 백업 후 APK의 백업 파일 복원으로 옮겨 주세요. 첫 설치와 업데이트의 마지막 확인은 Android 시스템에서 진행합니다.',
   });
 }
-for (const [assetName, content, type] of [[name, bytes, 'application/vnd.android.package-archive'], [`${name}.sha256`, Buffer.from(checksum), 'text/plain']]) {
+for (const [assetName, content, type] of [[name, bytes, 'application/vnd.android.package-archive'], [`${name}.sha256`, Buffer.from(checksum), 'text/plain'], ['Notelin.apk', bytes, 'application/vnd.android.package-archive']]) {
   const digest = `sha256:${createHash('sha256').update(content).digest('hex')}`;
   const existing = release.assets.find(asset => asset.name === assetName);
   if (existing) {
