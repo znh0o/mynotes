@@ -7,6 +7,7 @@ import { button, contextMenu, escape, icon, modal, pickFile, report, run, toast,
 import { isAppReloadApproved } from '../pwa/navigation';
 import { PagePreviews } from './page-previews';
 import { DetailRenderer } from './detail-renderer';
+import { PalmRejection } from '../engine/PalmRejection';
 import { trackDialog } from './history';
 import { InlineTextEditor } from './inline-text';
 import { showPenCheck } from './pen-check';
@@ -56,6 +57,7 @@ export class EditorView {
   private previews!: PagePreviews;
   private detail!: DetailRenderer;
   private companionDetail!: DetailRenderer;
+  private palmGuard = new PalmRejection();
   private toolHint = '볼펜 · 힘을 줘도 굵기가 일정한 선';
   private inkAdjustment: 'width' | 'darkness' = 'width';
   private previousInkTool: Tool = 'pen';
@@ -109,6 +111,9 @@ export class EditorView {
       this.viewport, this.root.querySelector('#paper-background')!, this.root.querySelector('#paper-ink')!, report);
     this.companionDetail = new DetailRenderer(this.root.querySelector('.spread-companion')!, this.root.querySelector('.spread-live')!,
       this.viewport, this.root.querySelector('.spread-background')!, this.root.querySelector('.spread-ink')!, report);
+    this.engine.setSharpPreview((item, recompute) => this.detail.preview(item, recompute));
+    this.companionEngine.setSharpPreview((item, recompute) => this.companionDetail.preview(item, recompute));
+    this.engine.setPalmGuard(this.palmGuard); this.companionEngine.setPalmGuard(this.palmGuard);
     this.companionEngine.options = this.engine.options;
     this.editingEngine = this.engine;
     this.root.querySelector('.paper-sizing')!.addEventListener('pointerdown', () => this.focusEngine(this.engine), { capture: true, signal: this.abort.signal });
@@ -1023,6 +1028,7 @@ export class EditorView {
       if (inText && e.pointerType !== 'touch' || this.engine.options.tool === 'text' && e.defaultPrevented) return;
       if (e.pointerType === 'pen' && this.engine.options.tool !== 'hand') return;
       if (e.pointerType === 'touch') {
+        if (this.palmGuard.rejectTouch(e)) return;
         if ((this.engine.activePointer !== null || this.companionEngine.activePointer !== null) && !this.engine.options.fingerDrawing) return;
         this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
         if (this.touches.size === 2) {
@@ -1033,9 +1039,6 @@ export class EditorView {
             scrollX: this.viewport.scrollLeft, scrollY: this.viewport.scrollTop, centerX: (a.x + b.x) / 2 - r.left, centerY: (a.y + b.y) / 2 - r.top };
           this.pan = null;
         }
-        // A deliberate two-finger pinch is allowed after lifting the pen;
-        // one-finger palm contacts during the brief pen hover window stay ignored.
-        if (this.touches.size === 1 && Math.max(this.engine.lastPen, this.companionEngine.lastPen) > 0 && performance.now() - Math.max(this.engine.lastPen, this.companionEngine.lastPen) < 800) return;
       }
       if (inText && this.touches.size < 2) return;
       if ((e.pointerType === 'touch' && !this.engine.options.fingerDrawing && this.touches.size === 1) || this.engine.options.tool === 'hand') {

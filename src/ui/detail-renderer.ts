@@ -1,6 +1,7 @@
-import type { Page } from '../data/model';
+import type { Page, ShapeItem, Stroke } from '../data/model';
 import { background } from '../data/pdf';
-import { drawItems } from '../engine/render';
+import { LiveStroke } from '../engine/LiveStroke';
+import { drawItem, drawItems } from '../engine/render';
 
 interface Tile {
   pageId: string; x: number; y: number; w: number; h: number;
@@ -11,6 +12,9 @@ interface Tile {
 // visible part at the display's physical resolution, including the PDF and ink.
 export class DetailRenderer {
   private canvas = document.createElement('canvas');
+  private sharpLive = document.createElement('canvas');
+  private sharpStroke = new LiveStroke();
+  private currentPreview?: Stroke | ShapeItem;
   private observer: ResizeObserver;
   private pixelSize?: { cssWidth: number; deviceWidth: number };
   private page?: Page;
@@ -27,6 +31,11 @@ export class DetailRenderer {
     this.canvas.hidden = true;
     this.canvas.style.pointerEvents = 'none';
     surface.insertBefore(this.canvas, live);
+    this.sharpLive.className = 'paper-sharp-live';
+    this.sharpLive.setAttribute('aria-hidden', 'true');
+    this.sharpLive.hidden = true;
+    this.sharpLive.style.pointerEvents = 'none';
+    live.after(this.sharpLive);
     viewport.addEventListener('scroll', this.onScroll, { passive: true });
     this.observer = new ResizeObserver(entries => {
       const entry = entries[0], deviceWidth = entry?.devicePixelContentBoxSize?.[0]?.inlineSize;
@@ -48,6 +57,44 @@ export class DetailRenderer {
     this.tile = undefined;
     this.canvas.hidden = true;
     if (this.canvas.width || this.canvas.height) this.canvas.width = this.canvas.height = 0;
+    this.currentPreview = undefined;
+    this.clearPreview(true);
+  }
+
+  private clearPreview(release = false) {
+    this.sharpStroke.reset();
+    const wasVisible = !this.sharpLive.hidden;
+    this.sharpLive.hidden = true;
+    this.live.style.opacity = '';
+    if (release) this.sharpLive.width = this.sharpLive.height = 0;
+    else if (wasVisible && this.sharpLive.width) {
+      const ctx = this.sharpLive.getContext('2d')!;
+      ctx.resetTransform(); ctx.clearRect(0, 0, this.sharpLive.width, this.sharpLive.height);
+    }
+  }
+
+  preview(item: Stroke | ShapeItem | null, recompute = false) {
+    if (recompute || item && this.currentPreview && item !== this.currentPreview) this.clearPreview();
+    this.currentPreview = item ?? undefined;
+    const tile = this.tile;
+    if (!item || !tile || this.canvas.hidden || this.viewport.classList.contains('zoom-preview')) {
+      this.clearPreview(); return;
+    }
+    if (this.sharpLive.width !== this.canvas.width || this.sharpLive.height !== this.canvas.height) {
+      this.sharpLive.width = this.canvas.width; this.sharpLive.height = this.canvas.height;
+      this.sharpStroke.reset();
+    }
+    this.sharpLive.style.left = this.canvas.style.left; this.sharpLive.style.top = this.canvas.style.top;
+    this.sharpLive.style.width = this.canvas.style.width; this.sharpLive.style.height = this.canvas.style.height;
+    const ctx = this.sharpLive.getContext('2d')!;
+    ctx.setTransform(tile.ratio, 0, 0, tile.ratio, -tile.x * tile.ratio, -tile.y * tile.ratio);
+    if (item.kind !== 'stroke' || !this.sharpStroke.draw(ctx, item, tile.ratio)) {
+      ctx.resetTransform(); ctx.clearRect(0, 0, this.sharpLive.width, this.sharpLive.height);
+      ctx.setTransform(tile.ratio, 0, 0, tile.ratio, -tile.x * tile.ratio, -tile.y * tile.ratio);
+      drawItem(ctx, item);
+    }
+    this.sharpLive.hidden = false;
+    this.live.style.opacity = '0';
   }
 
   suspend() {
@@ -106,12 +153,14 @@ export class DetailRenderer {
       temp.width = temp.height = 0; return;
     }
     const previous = this.tile?.background;
+    this.clearPreview();
     this.tile = { pageId: page.id, x, y, w, h, ratio, targetRatio, background: temp };
     this.canvas.width = temp.width; this.canvas.height = temp.height;
     this.canvas.style.left = `${x * cssScale}px`; this.canvas.style.top = `${y * cssScale}px`;
     this.canvas.style.width = `${w * cssScale}px`; this.canvas.style.height = `${h * cssScale}px`;
     this.refreshInk(page);
     this.canvas.hidden = false;
+    if (this.currentPreview) this.preview(this.currentPreview);
     if (previous) previous.width = previous.height = 0;
   }
 
@@ -121,5 +170,6 @@ export class DetailRenderer {
     this.viewport.removeEventListener('scroll', this.onScroll);
     this.release();
     this.canvas.remove();
+    this.sharpLive.remove();
   }
 }

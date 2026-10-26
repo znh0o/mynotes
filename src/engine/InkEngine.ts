@@ -5,6 +5,7 @@ import { LiveStroke } from './LiveStroke';
 import { canStraighten, straightPoints } from './straight-line';
 import { penContact, penEraser, SamsungPenToggle } from './pen-input';
 import { EraserCursor } from './EraserCursor';
+import { PalmRejection } from './PalmRejection';
 
 export interface InkOptions {
   tool: Tool; color: string; width: number; fingerDrawing: boolean;
@@ -42,6 +43,8 @@ export class InkEngine {
   private textSession?: { id: string; before: Item[] };
   private eraserCursor: EraserCursor;
   private samsungButton = new SamsungPenToggle();
+  private sharpPreview?: (item: Stroke | ShapeItem | null, recompute?: boolean) => void;
+  private palmGuard?: PalmRejection;
   constructor(private ink: HTMLCanvasElement, private live: HTMLCanvasElement,
     private changed: () => void, private selection: (count: number) => void,
     private insert: (point: Point, tool: Tool) => void, private straightened: () => void = () => {},
@@ -51,12 +54,12 @@ export class InkEngine {
       if (!this.samsungButton.update(e, this.options.samsungButtonToggle, this.activePointer !== null)) return false;
       this.lastPen = performance.now(); e.preventDefault(); this.toggleEraser(); return true;
     };
-    live.addEventListener('pointerdown', e => { if (!button(e)) this.down(e); }, options);
-    live.addEventListener('pointermove', e => { if (!button(e)) this.move(e); }, options);
-    live.addEventListener('pointerup', e => { button(e); this.up(e); }, options);
-    live.addEventListener('pointercancel', e => { button(e); if (e.pointerId === this.activePointer) this.cancel(); }, options);
-    live.addEventListener('pointerleave', e => button(e), options);
-    live.addEventListener('lostpointercapture', e => { if (e.pointerId === this.activePointer) this.cancel(); }, options);
+    live.addEventListener('pointerdown', e => { this.palmGuard?.notePen(e); if (!button(e)) this.down(e); }, options);
+    live.addEventListener('pointermove', e => { this.palmGuard?.notePen(e); if (!button(e)) this.move(e); }, options);
+    live.addEventListener('pointerup', e => { this.palmGuard?.notePen(e); button(e); this.up(e); }, options);
+    live.addEventListener('pointercancel', e => { this.palmGuard?.notePen(e); button(e); if (e.pointerId === this.activePointer) this.cancel(); }, options);
+    live.addEventListener('pointerleave', e => { this.palmGuard?.notePen(e); button(e); }, options);
+    live.addEventListener('lostpointercapture', e => { if (e.pointerType === 'pen') this.palmGuard?.endPen(e.pointerId); if (e.pointerId === this.activePointer) this.cancel(); }, options);
     live.addEventListener('contextmenu', e => e.preventDefault(), options);
     this.eraserCursor = new EraserCursor(live, () => ({ pageWidth: this.page?.width, tool: this.options.tool,
       size: this.options.eraserSize, activePointer: this.activePointer, rect: this.inputRect }), this.abort.signal);
@@ -70,13 +73,15 @@ export class InkEngine {
     });
     try { this.pixelObserver.observe(live, { box: 'device-pixel-content-box' }); }
     catch { this.pixelObserver.observe(live); }
-    window.addEventListener('blur', () => { this.samsungButton.reset(); if (this.activePointer !== null) this.cancel(); }, options);
+    window.addEventListener('blur', () => { this.samsungButton.reset(); this.palmGuard?.resetActive(); if (this.activePointer !== null) this.cancel(); }, options);
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.samsungButton.reset(); }, options);
   }
   load(page: Page) {
     this.samsungButton.reset(); this.cancel(); this.page = page; this.selected.clear(); this.selection(0);
     this.history = []; this.future = []; this.resize(true);
   }
+  setSharpPreview(draw: (item: Stroke | ShapeItem | null, recompute?: boolean) => void) { this.sharpPreview = draw; }
+  setPalmGuard(guard: PalmRejection) { this.palmGuard = guard; }
   resize(force = false) {
     if (!this.page) return;
     this.inputRect = undefined;
@@ -94,7 +99,7 @@ export class InkEngine {
       if (canvas.width !== width) canvas.width = width;
       if (canvas.height !== height) canvas.height = height;
     }
-    this.liveStroke.reset(); this.render(); this.preview();
+    this.liveStroke.reset(); this.sharpPreview?.(null); this.render(); this.preview();
   }
   point(e: PointerEvent): Point {
     const r = this.inputRect ?? this.live.getBoundingClientRect();
@@ -108,7 +113,9 @@ export class InkEngine {
   }
   render() { if (this.page) drawItems(this.context(this.ink), this.textSession ? this.page.items.filter(i => i.id !== this.textSession!.id) : this.page.items); }
   private preview() {
-    if (this.stroke && !this.straightSource && this.liveStroke.draw(this.context(this.live, false), this.stroke, this.ratio)) return;
+    if (this.stroke && !this.straightSource && this.liveStroke.draw(this.context(this.live, false), this.stroke, this.ratio)) {
+      this.sharpPreview?.(this.stroke); return;
+    }
     this.liveStroke.reset();
     const ctx = this.context(this.live);
     if (this.stroke) drawItem(ctx, this.stroke);
@@ -128,6 +135,7 @@ export class InkEngine {
       for (const p of corners) { ctx.beginPath(); ctx.arc(p.x, p.y, radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
     }
     ctx.restore();
+    this.sharpPreview?.(this.stroke ?? this.shape, !!this.straightSource);
   }
   private schedule() { if (!this.frame) this.frame = requestAnimationFrame(() => { this.frame = 0; if (this.dirtyInk) { this.dirtyInk = false; this.render(); } this.preview(); }); }
   private checkpoint() { this.before = this.page.items.slice(); }
@@ -245,7 +253,8 @@ export class InkEngine {
     if (!this.page || this.activePointer !== null) return;
     if (e.pointerType === 'pen' ? !penContact(e) : e.button !== 0) return;
     if (e.pointerType === 'pen') this.lastPen = performance.now();
-    if (e.pointerType === 'touch' && !['text', 'image'].includes(this.options.tool) && (!this.options.fingerDrawing || this.lastPen > 0 && performance.now() - this.lastPen < 800)) return;
+    if (e.pointerType === 'touch' && (this.palmGuard?.rejectTouch(e) ||
+      !['text', 'image'].includes(this.options.tool) && !this.options.fingerDrawing)) return;
     const tool = penEraser(e) ? 'eraser' : this.options.tool;
     if (tool === 'hand') return;
     e.preventDefault();

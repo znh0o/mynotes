@@ -73,8 +73,29 @@ test('zoomed PDF and ink use a sharp visible tile instead of enlarging the cappe
   await cdp.detach();
   await setInkColor(page, '#1260ec');
   const paper = (await page.locator('#paper-live').boundingBox())!;
-  await page.mouse.move(paper.x + 360, paper.y + 320); await page.mouse.down();
-  await page.mouse.move(paper.x + 760, paper.y + 320, { steps: 12 }); await page.mouse.up();
+  const sharp = page.locator('.paper-surface .paper-sharp-live');
+  const pen = await context.newCDPSession(page);
+  await pen.send('Input.dispatchMouseEvent', { type: 'mousePressed', pointerType: 'pen', button: 'left', buttons: 1,
+    force: .5, x: paper.x + 360, y: paper.y + 320, clickCount: 1 });
+  for (let i = 1; i <= 8; i++) await pen.send('Input.dispatchMouseEvent', { type: 'mouseMoved', pointerType: 'pen',
+    button: 'left', buttons: 1, force: .5, x: paper.x + 360 + i * 25, y: paper.y + 320 });
+  await expect(sharp).toBeVisible();
+  await expect(page.locator('#paper-live')).toHaveCSS('opacity', '0');
+  const liveInk = await sharp.evaluate((canvas: HTMLCanvasElement) => {
+    const rect = canvas.getBoundingClientRect(), data = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
+    let blue = 0;
+    for (let i = 0; i < data.length; i += 16) if (data[i + 2] > data[i] + 80 && data[i + 2] > data[i + 1] + 60) blue++;
+    return { density: canvas.width / rect.width, blue };
+  });
+  expect(liveInk.density).toBeGreaterThan(2.4);
+  expect(liveInk.blue).toBeGreaterThan(20);
+  for (let i = 1; i <= 4; i++) await pen.send('Input.dispatchMouseEvent', { type: 'mouseMoved', pointerType: 'pen',
+    button: 'left', buttons: 1, force: .5, x: paper.x + 560 + i * 50, y: paper.y + 320 });
+  await pen.send('Input.dispatchMouseEvent', { type: 'mouseReleased', pointerType: 'pen', button: 'left', buttons: 0,
+    force: 0, x: paper.x + 760, y: paper.y + 320, clickCount: 1 });
+  await pen.detach();
+  await expect(sharp).toBeHidden();
+  await expect(page.locator('#paper-live')).toHaveCSS('opacity', '1');
   await expect.poll(() => detail.evaluate((canvas: HTMLCanvasElement) => {
     const data = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
     let blue = 0;
