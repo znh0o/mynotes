@@ -1,12 +1,16 @@
 import './style.css';
 import './theme.css';
+import './bookshelf.css';
 import { registerSW } from 'virtual:pwa-register';
 import { backup, db, initialize, restore } from './data/store';
 import { importPDF } from './data/pdf';
 import { EditorView } from './ui/editor';
-import { LibraryView, type LibraryState } from './ui/library';
+import { ClassicLibraryView, type LibraryState } from './ui/library';
+import { BookshelfLibraryView } from './ui/bookshelf-library';
+import type { LibraryMode } from './ui/library-mode';
 import { AppHistory, type AppRoute, type Direction } from './ui/history';
 import { finishSlide, slidePreviousView } from './ui/transitions';
+import { isBookOpening } from './ui/book-opening';
 import { escape, icon, modal, pickFile, report, run, toast } from './ui/common';
 import { checkForUpdate, applyWaitingUpdate, hasReadyUpdate, updateRepairUrl } from './pwa/updates';
 import { version as appVersion } from '../package.json';
@@ -18,7 +22,9 @@ installAppZoomGuard();
 installDeviceUI();
 
 const root = document.querySelector<HTMLElement>('#app')!;
-let library: LibraryView | undefined, editor: EditorView | undefined;
+let library: ClassicLibraryView | BookshelfLibraryView | undefined, editor: EditorView | undefined;
+let libraryMode: LibraryMode = 'classic';
+let changingLibraryMode = false;
 const tabs: { id: string; title: string }[] = [];
 let libraryState: LibraryState = { filter: 'all', query: '', sort: 'updated', list: false };
 let libraryScroll = 0;
@@ -120,6 +126,24 @@ async function home() {
 async function open(id: string) {
   await navigation.navigate({ screen: 'note', id });
 }
+function createLibrary() {
+  const args = [root, open, settings, (filter: string) => navigation.navigate({ screen: 'library', filter }), libraryState, applyUpdate, changeLibraryMode] as const;
+  return libraryMode === 'bookshelf' ? new BookshelfLibraryView(...args) : new ClassicLibraryView(...args);
+}
+async function changeLibraryMode(mode: LibraryMode) {
+  if (changingLibraryMode || libraryMode === mode || !library || editor) return;
+  changingLibraryMode = true;
+  const current = library;
+  try {
+    await db.settings.put({ key: 'library-view-mode', value: mode });
+    libraryMode = mode;
+    if (library !== current || editor) return;
+    libraryState = library.snapshot();
+    library.destroy(); library = undefined;
+    library = createLibrary();
+    await library.show(); refreshUpdateControls(); window.scrollTo(0, 0);
+  } finally { changingLibraryMode = false; }
+}
 async function renderRoute(route: AppRoute, direction: Direction) {
   if (route.screen === 'library' && library && !editor) {
     library.setFilter(route.filter); libraryState = library.snapshot(); return;
@@ -132,7 +156,7 @@ async function renderRoute(route: AppRoute, direction: Direction) {
   if (route.screen === 'library') {
     const restoreScroll = libraryState.filter === route.filter ? libraryScroll : 0;
     libraryState = { ...libraryState, filter: route.filter };
-    library = new LibraryView(root, open, settings, filter => navigation.navigate({ screen: 'library', filter }), libraryState, applyUpdate);
+    library = createLibrary();
     await library.show(); refreshUpdateControls(); window.scrollTo(0, restoreScroll);
   } else {
     const existing = tabs.find(t => t.id === note!.id);
@@ -140,7 +164,8 @@ async function renderRoute(route: AppRoute, direction: Direction) {
     await db.notes.update(note!.id, { opened: Date.now() });
     editor = new EditorView(root, note!, tabs, open, home, closeTab, settings); await editor.start(); window.scrollTo(0, 0);
   }
-  slidePreviousView(root, previous, wasEditor && route.screen === 'note' ? 'none' : direction, oldScroll);
+  if (route.screen === 'note' && !wasEditor && isBookOpening()) previous?.remove();
+  else slidePreviousView(root, previous, wasEditor && route.screen === 'note' ? 'none' : direction, oldScroll);
 }
 async function closeTab(id: string) {
   const current = editor?.note.id; if (current === id) await editor?.flush();
@@ -190,7 +215,9 @@ function settings() {
   });
 }
 async function boot() {
-  await initialize(); await navigation.start();
+  await initialize();
+  libraryMode = (await db.settings.get('library-view-mode'))?.value === 'bookshelf' ? 'bookshelf' : 'classic';
+  await navigation.start();
   await receiveSharedPdf();
   const estimate = await navigator.storage?.estimate?.();
   if (estimate?.usage && estimate.quota && estimate.usage / estimate.quota > .8) toast('저장 공간이 거의 찼어요. 설정에서 백업해 주세요.', true);

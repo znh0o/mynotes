@@ -482,7 +482,7 @@ export class EditorView {
     if (action === 'pen-menu') {
       const open = this.root.querySelector<HTMLElement>('.pen-picker:popover-open');
       if (open) open.hidePopover();
-      else { this.selectTool(this.selectedPen().tool); this.showPenPicker(target); }
+      else { if (!isPenKind(this.engine.options.tool)) this.selectTool(this.selectedPen().tool); this.showPenPicker(target); }
     }
     if (action === 'pen-select') {
       const preset = this.pens.presets.find(pen => pen.id === id);
@@ -503,11 +503,15 @@ export class EditorView {
       this.penDraft.tool = id; this.root.querySelectorAll<HTMLElement>('.pen-edit-kind').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.id === id)));
       this.root.querySelector<HTMLElement>('.pen-edit-darkness')!.hidden = id !== 'pencil';
     }
-    if (action === 'pen-color' && this.penDraft) openColorPicker(this.penDraft.color, undefined, color => {
-      this.penDraft!.color = color;
-      this.root.querySelector<HTMLElement>('.pen-edit-color-swatch')?.style.setProperty('background-color', color);
-      const label = this.root.querySelector<HTMLElement>('.pen-edit-color-value'); if (label) label.textContent = color.toUpperCase();
-    }, target);
+    if (action === 'pen-color' && this.penDraft) {
+      const draft = this.penDraft;
+      openColorPicker(draft.color, undefined, color => {
+        if (this.penDraft !== draft) return;
+        draft.color = color;
+        this.root.querySelector<HTMLElement>('.pen-edit-color-swatch')?.style.setProperty('background-color', color);
+        const label = this.root.querySelector<HTMLElement>('.pen-edit-color-value'); if (label) label.textContent = color.toUpperCase();
+      }, target);
+    }
     if (action === 'pen-save') this.savePenDraft();
     if (action === 'pen-move' && id) this.movePen(id, Number(target.dataset.step));
     if (action === 'pen-delete' && id) this.deletePen(id);
@@ -618,6 +622,7 @@ export class EditorView {
     if (el.id === 'hold-to-line') { this.engine.options.holdToLine = el.checked; void db.settings.put({ key: 'hold-to-line', value: el.checked }).catch(report); }
   }
   private setColor(color: string) {
+    if (!/^#[0-9a-f]{6}$/i.test(color)) return;
     this.engine.options.color = color;
     this.textEditor?.setColor(color);
     this.syncColor(); this.rememberBrush();
@@ -625,7 +630,12 @@ export class EditorView {
   private syncColor() {
     const color = this.engine.options.color;
     this.root.querySelector<HTMLElement>('#width-preview')!.style.backgroundColor = color;
-    this.root.querySelectorAll<HTMLElement>('[data-action=color]').forEach(e => e.classList.toggle('active', e.dataset.id === color));
+    const paletteMatch = this.palette.some(swatch => swatch.toLowerCase() === color.toLowerCase());
+    this.root.querySelectorAll<HTMLElement>('[data-action=color]').forEach(e => e.classList.toggle('active', e.dataset.id?.toLowerCase() === color.toLowerCase()));
+    const custom = this.root.querySelector<HTMLElement>('.custom-color');
+    custom?.classList.toggle('active', !paletteMatch);
+    custom?.style.setProperty('--current-color', color);
+    if (custom) custom.title = `색상 선택 · 현재 ${color.toUpperCase()}`;
     if (isPenKind(this.engine.options.tool)) this.root.querySelector<HTMLElement>('.pen-tool')?.style.setProperty('--pen-color', color);
   }
   private renderPalette() {
@@ -752,7 +762,8 @@ export class EditorView {
     draft.width = Number(panel.querySelector<HTMLInputElement>('#pen-edit-width')!.value);
     draft.pencilDarkness = Number(panel.querySelector<HTMLInputElement>('#pen-edit-darkness')!.value) / 100;
     const index = this.pens.presets.findIndex(preset => preset.id === draft.id);
-    if (index < 0) this.pens.presets.push(draft); else this.pens.presets[index] = draft;
+    const saved = { ...draft };
+    if (index < 0) this.pens.presets.push(saved); else this.pens.presets[index] = saved;
     this.pens.selectedId = draft.id; this.penDraft = undefined;
     this.selectTool(draft.tool); this.rememberPens(); this.renderPenPicker(panel, 'list');
   }

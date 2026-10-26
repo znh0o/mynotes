@@ -11,8 +11,8 @@ afterEach(async () => { await db.settings.clear(); });
 
 it('combines legacy pen variants without losing colliding IDs or modifying the source settings', async () => {
   const first = fallback(), second = fallback();
-  first.presets[0].color = '#dd3344';
-  second.presets[0].color = '#28aa55';
+  first.presets[0] = { ...first.presets[0], color: '#dd3344' };
+  second.presets[0] = { ...second.presets[0], color: '#28aa55' };
   await db.settings.bulkPut([{ key: 'note-pen-presets:first', value: first }, { key: 'note-pen-presets:second', value: second }]);
   const shared = await loadSharedPens('first', fallback(), db);
   expect(shared.presets).toHaveLength(4);
@@ -25,7 +25,7 @@ it('combines legacy pen variants without losing colliding IDs or modifying the s
 
 it('uses the common saved list after a later edit instead of restoring older document presets', async () => {
   const shared = await loadSharedPens('first', fallback(), db);
-  shared.presets[0].name = '공용 빨간 볼펜'; shared.presets[0].color = '#dd3344'; shared.presets[0].width = 4.5;
+  shared.presets[0] = { ...shared.presets[0], name: '공용 빨간 볼펜', color: '#dd3344', width: 4.5 };
   await db.settings.put({ key: sharedPensKey, value: shared });
   await db.settings.put({ key: 'note-pen-presets:second', value: fallback() });
   expect(await loadSharedPens('second', fallback(), db)).toEqual(shared);

@@ -15,6 +15,13 @@ async function items(page: Page) {
     db.close(); return pages.find(p => p.noteId === note)?.items || [];
   });
 }
+async function savedPens(page: Page) {
+  return page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>(resolve => { const r = indexedDB.open('mynotes-v1'); r.onsuccess = () => resolve(r.result); });
+    const collection = await new Promise<any>(resolve => { const r = db.transaction('settings').objectStore('settings').get('pen-presets'); r.onsuccess = () => resolve(r.result?.value); });
+    db.close(); return collection;
+  });
+}
 async function pencilMode(page: Page, mode: 'width' | 'darkness') {
   await page.getByRole('button', { name: /연필 조절 항목:/ }).click();
   await page.locator(`[data-action="pencil-mode"][data-id="${mode}"]`).click();
@@ -48,12 +55,19 @@ test('saved pens change only in the edit view; toolbar adjustments affect the cu
   await pens.getByRole('button', { name: '펜 메뉴 닫기' }).click();
   await page.getByRole('slider', { name: '펜 굵기', exact: true }).fill('2');
   await setInkColor(page, '#aa1122');
+  await expect(page.locator('.custom-color')).toHaveClass(/active/);
+  await expect.poll(async () => (await savedPens(page)).presets.find((pen: any) => pen.name === '볼펜').color).toBe('#3344aa');
   await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).click();
   await page.reload(); await page.getByRole('button', { name: '펜별 설정 열기', exact: true }).click();
   await expect(page.locator('.page-loading')).toBeHidden();
-  await selectPen(page, '볼펜');
   await expect(page.getByRole('slider', { name: '펜 굵기', exact: true })).toHaveValue('5.5');
   await expect(page.locator('#width-preview')).toHaveCSS('background-color', 'rgb(51, 68, 170)');
+  await expect(page.locator('.custom-color')).toHaveClass(/active/);
+  const reopened = (await page.locator('#paper-live').boundingBox())!;
+  await page.mouse.move(reopened.x + 100, reopened.y + 220); await page.mouse.down();
+  await page.mouse.move(reopened.x + 220, reopened.y + 220, { steps: 8 }); await page.mouse.up();
+  await expect.poll(async () => (await items(page)).length).toBe(2);
+  expect((await items(page))[1]).toMatchObject({ tool: 'pen', width: 5.5, color: '#3344aa' });
 });
 
 test('legacy pencil darkness survives while temporary pencil changes reset after switching tools', async ({ page }) => {

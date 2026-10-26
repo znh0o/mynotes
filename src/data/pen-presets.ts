@@ -10,7 +10,7 @@ export interface PenPreset {
   id: string; name: string; tool: PenKind; color: string; width: number;
   pencilDarkness: number; pencilAdjustment: 'width' | 'darkness';
 }
-export interface PenCollection { selectedId: string; presets: PenPreset[] }
+export interface PenCollection { selectedId: string; presets: Readonly<PenPreset>[] }
 
 export function defaultPenCollection(legacy: Record<PenKind, BrushProfile>): PenCollection {
   const presets = penKinds.map((tool, index) => ({
@@ -46,6 +46,6 @@ export function penCollection(value: unknown, fallback: PenCollection): PenColle
   return { presets, selectedId: presets.some(pen => pen.id === raw.selectedId) ? raw.selectedId as string : presets[0].id };
 }
 
-export function duplicatePen(preset: PenPreset, count: number): PenPreset {
+export function duplicatePen(preset: Readonly<PenPreset>, count: number): PenPreset {
   return { ...preset, id: uid(), name: `${penNames[preset.tool]} ${count}` };
 }

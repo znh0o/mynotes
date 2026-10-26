@@ -3,6 +3,7 @@ import { covers, createNote, paperNames, uid, type Folder, type Note, type Paper
 import { importPDF, thumbnail } from '../data/pdf';
 import { icon, button, escape, safeColor, modal, toast, run, pickFile, contextMenu, confirmAction, formatDate } from './common';
 import { bindPhoneLibrary } from './phone-chrome';
+import { libraryModeSwitch } from './library-mode';
 export interface LibraryState { filter: string; query: string; sort: string; list: boolean }
 interface Profile { name: string; school: string; grade: string; classroom: string }
 const emptyProfile = (): Profile => ({ name: '', school: '', grade: '', classroom: '' });
@@ -14,7 +15,7 @@ function profileFrom(value: unknown): Profile {
   return { name: field('name', 40), school: field('school', 80), grade: field('grade', 20), classroom: field('classroom', 20) };
 }
 
-export class LibraryView {
+export class ClassicLibraryView {
   private notes: Note[] = [];
   private folders: Folder[] = [];
   private filter = 'all';
@@ -30,7 +31,7 @@ export class LibraryView {
   private phoneCleanup?: () => void;
   constructor(private root: HTMLElement, private openNote: (id: string) => Promise<void>, private settings: () => void,
     private navigateFilter: (filter: string) => Promise<void> = async filter => this.setFilter(filter), initial?: LibraryState,
-    private applyUpdate: () => Promise<void> = async () => {}) {
+    private applyUpdate: () => Promise<void> = async () => {}, private changeMode: (mode: 'classic' | 'bookshelf') => Promise<void> = async () => {}) {
     if (initial) { this.filter = initial.filter; this.query = initial.query; this.sort = initial.sort; this.list = initial.list; }
     root.addEventListener('click', e => this.click(e), { signal: this.abort.signal });
     root.addEventListener('input', e => {
@@ -113,7 +114,7 @@ export class LibraryView {
         </div>
       </aside>
       <div class="library-main">
-        <header class="library-topbar"><div class="breadcrumb">${button('Menu', '메뉴 열기', 'mobile-menu')}<span>나의 공간</span>${icon('ChevronRight', 13)}<img class="phone-wordmark" src="${import.meta.env.BASE_URL}notelin-wordmark-lockup.png" alt="Notelin" /><strong id="breadcrumb-title">나의 서재</strong></div><div class="topbar-right"><div class="profile-anchor"><button class="avatar" type="button" data-action="profile" aria-label="프로필" aria-expanded="false" aria-controls="profile-popover">${escape(this.profileInitial())}</button><div class="profile-popover" id="profile-popover" role="dialog" aria-label="프로필" hidden></div></div></div></header>
+        <header class="library-topbar"><div class="breadcrumb">${button('Menu', '메뉴 열기', 'mobile-menu')}<span>나의 공간</span>${icon('ChevronRight', 13)}<img class="phone-wordmark" src="${import.meta.env.BASE_URL}notelin-wordmark-lockup.png" alt="Notelin" /><strong id="breadcrumb-title">나의 서재</strong></div><div class="topbar-right">${libraryModeSwitch('classic')}<div class="profile-anchor"><button class="avatar" type="button" data-action="profile" aria-label="프로필" aria-expanded="false" aria-controls="profile-popover">${escape(this.profileInitial())}</button><div class="profile-popover" id="profile-popover" role="dialog" aria-label="프로필" hidden></div></div></div></header>
         <main class="library-content">
           <div class="page-heading"><div><h1 id="library-title">나의 서재<span class="heading-dot">.</span></h1><p id="library-subtitle" hidden></p></div><div class="heading-actions"><button class="button secondary" data-action="import">${icon('Upload', 18)} PDF 가져오기</button><button class="button primary" data-action="new">${icon('Plus', 19)} 새 노트</button></div></div>
           <section class="welcome-banner ${this.updateAvailable ? 'update-banner' : ''}">${this.bannerContent()}</section>
@@ -216,6 +217,7 @@ export class LibraryView {
     const { action, id } = target.dataset;
     if (this.filter === 'trash' && ['new', 'import'].includes(action || '')) return;
     if (action === 'apply-update') run(this.applyUpdate);
+    if (action === 'library-mode' && id === 'bookshelf') run(() => this.changeMode('bookshelf'));
     if (action === 'filter') { this.root.querySelector('.library-sidebar')?.classList.remove('mobile-open'); run(() => this.navigateFilter(id!)); }
     if (action === 'new') this.newNote();
     if (action === 'open') run(() => this.openNote(id!));

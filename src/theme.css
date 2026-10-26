@@ -32,6 +32,7 @@
 .ink-toolbar .custom-color>svg{display:block;width:14px;height:14px;margin:0}
 .ink-toolbar .custom-color:hover{border-color:#5a8de9;background:#deebff;color:#2059c4}
 .ink-toolbar .custom-color:focus-visible{outline:2px solid #5a8de9;outline-offset:2px}
+.ink-toolbar .custom-color.active{border-color:var(--current-color);box-shadow:0 0 0 2px #fff,0 0 0 3px var(--current-color);background:color-mix(in srgb,var(--current-color) 14%,#fff)}
 .pen-picker{position:fixed;inset:auto auto auto auto;margin:0;width:326px;max-width:calc(100vw - 16px);max-height:calc(100dvh - 130px);overflow:auto;padding:13px;border:1px solid #cbdaf3;border-radius:14px;background:#fff;color:#304d78;box-shadow:0 18px 48px #243e6a30;touch-action:pan-y}
 .pen-picker::backdrop{background:transparent}
 .pen-picker-heading{display:flex;align-items:center;justify-content:space-between;padding:1px 2px 11px}
