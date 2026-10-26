@@ -37,8 +37,9 @@ test('fullscreen launch opens the notebook library and is still a valid install 
 
 test('browser mode shows only the install experience and never opens the notes database', async ({ page }) => {
   await page.goto('./');
-  await expect(page.getByRole('heading', { name: /생각이 쌓이는/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /손으로 쓰는/ })).toBeVisible();
   await expect(page.getByText('S펜에 맞춘 필기', { exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: 'PDF 공부' }).click();
   await expect(page.getByText('PDF 위에 바로 기록', { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Android 앱 다운로드' })).toBeVisible();
   await expect.poll(() => page.locator('.install-device img').first().evaluate(image => (image as HTMLImageElement).naturalWidth)).toBe(1440);

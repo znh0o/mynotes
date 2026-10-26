@@ -10,7 +10,6 @@
 :root[data-theme=dark] :is(.library-sidebar,.editor-header,.ink-toolbar,.page-sidebar,.editor-footer){background:var(--night-surface);border-color:var(--border)}
 :root[data-theme=dark] .library-topbar{background:#151f30e8;border-color:var(--border)}
 :root[data-theme=dark] .brand-wordmark{filter:invert(1) hue-rotate(180deg);mix-blend-mode:screen}
-:root[data-theme=dark] :is(.install-brand img,.install-footer img){filter:invert(1) hue-rotate(180deg);mix-blend-mode:normal}
 :root[data-theme=dark] :is(.muted,.page-heading p,.workspace-label,.sidebar-empty,.add-folder,.text-button,.local-badge,.breadcrumb,.nav-item,.nav-item>small,.device-note,.device-note div span,.note-info span,.recent-note span,.sort-field select,.collection-tab,.note-density,.page-sidebar-heading,.page-sidebar-heading>span,.page-thumb,.page-navigation,.editor-page-controls,.page-position,.tool-button,.ink-toolbar .pen-width-control,.editor-header-actions,.profile-details dt,.profile-form label,.pen-picker-help,.pen-edit-label,.pen-edit-range,.color-picker-hue-label,.color-picker-bottom label,.writing-options-panel .muted,.image-picker p,.image-picker-actions small,.view-panel-paper,.settings-version,.settings-footnote){color:var(--night-muted)}
 :root[data-theme=dark] :is(.page-heading h1,.section-heading h2,.recent-note strong,.note-info strong,.breadcrumb strong,.profile-summary,.profile-popover h2,.pen-picker-heading strong,.writing-options-heading,.settings-section h3,.modal header h2,.profile-details dd,.view-options-panel,.shape-picker,.image-picker-actions strong){color:var(--night-text)}
 :root[data-theme=dark] :is(.eyebrow,.sidebar-section-title,.heading-dot,.banner-link,.banner-label,.section-heading h2 svg,.page-sidebar-heading strong,.collection-tab.active,.view-toggle .icon-button.active,.view-options-panel .icon-button,.add-page-button){color:var(--night-accent)}
@@ -67,33 +66,6 @@
 :root[data-theme=dark] #toast.error{background:#512c38;color:#ffe3e9;border-color:#946070}
 :root[data-theme=dark]:fullscreen{background:#0b1220}
 
-:root[data-theme=dark] .install-page{--install-ink:#e4ecfa;--install-blue:#91b2ff;--install-muted:#a6b8d0;background:#0e1624}
-:root[data-theme=dark] .install-header{background:#111c2cea;border-color:#2c3d56}
-:root[data-theme=dark] .install-appearance-toggle{background:#1b2b43;border-color:#3b5378;color:#c7d9f8}
-:root[data-theme=dark] .install-appearance-toggle:hover,:root[data-theme=dark] .install-appearance-toggle[aria-expanded=true]{background:#273d5e;border-color:#7090bc}
-:root[data-theme=dark] .install-appearance-menu:not([hidden]){background:#1b2b43;border-color:#3b5378;box-shadow:0 14px 34px #0008}
-:root[data-theme=dark] .install-appearance-menu button{color:#c0d0e8}
-:root[data-theme=dark] .install-appearance-menu button:hover{background:#304966}
-:root[data-theme=dark] .install-appearance-menu button[aria-pressed=true]{background:#355a90;color:#fff}
-:root[data-theme=dark] .install-hero{background:linear-gradient(180deg,#0e1624 40%,#14233b)}
-:root[data-theme=dark] .install-hero h1 em{color:#91b2ff}
-:root[data-theme=dark] .install-ink-line{color:#46689f}
-:root[data-theme=dark] :is(.install-description,.install-nav a,.install-caption,.install-capabilities p,.install-section-heading>span,.install-workflow-step p,.install-footer span,.install-product-showcase figcaption){color:#a5b7d1}
-:root[data-theme=dark] :is(.install-overline,.install-header-link,.install-hero-actions>a:not(.install-cta),.install-capabilities span,.install-section-heading p,.install-footer a){color:#a1bdf0}
-:root[data-theme=dark] .install-header-link{border-color:#3b5378}
-:root[data-theme=dark] .install-header-link:hover{background:#243959}
-:root[data-theme=dark] .install-preview-tabs{background:#1b2a42;border-color:#354b6a}
-:root[data-theme=dark] .install-preview-tabs button{color:#a6b8d2}
-:root[data-theme=dark] .install-preview-tabs button[aria-selected=true]{background:#354e73;color:#edf4ff;box-shadow:none}
-:root[data-theme=dark] .install-device{border-color:#536581;background:#26334a;box-shadow:0 32px 55px -25px #000a}
-:root[data-theme=dark] .install-capabilities>div+div:before{background:#2a3a52}
-:root[data-theme=dark] .install-capabilities>div+div{border-color:#2a3a52}
-:root[data-theme=dark] .install-feature-art{color:#8eace2}
-:root[data-theme=dark] .install-workflow{background:#111c2c}
-:root[data-theme=dark] :is(.install-library-shot,.install-window-bar){background:#1c2b42;border-color:#354b68}
-:root[data-theme=dark] .install-workflow-step{border-color:#30435e}
-:root[data-theme=dark] .install-workflow-step>span{border-color:#415b7f;color:#adc7f6}
-:root[data-theme=dark] .install-guide{background:#182b48}
 
 :root[data-theme=dark] .editor-header{background:#284b79;border-color:#3d6090}
 :root[data-theme=dark] .editor-header :is(.editor-home,.note-tab,.editor-page-controls,.page-position,.editor-header-actions,.save-indicator){color:#e8f1ff}
