@@ -6,7 +6,9 @@ test('choose four, five or six notes per row in folders and retain it across nav
     const db = await new Promise<IDBDatabase>(resolve => { const r = indexedDB.open('mynotes-v1'); r.onsuccess = () => resolve(r.result); });
     try {
       await new Promise<void>((resolve, reject) => {
-        const tx = db.transaction(['notes', 'pages', 'folders'], 'readwrite');
+        const tx = db.transaction(['notes', 'pages', 'folders', 'settings'], 'readwrite');
+        // A device that previously selected the removed bookshelf must still open its notes.
+        tx.objectStore('settings').put({ key: 'library-view-mode', value: 'bookshelf' });
         tx.objectStore('folders').put({ id: 'density-folder', name: '배치 검사', color: '#5482da' });
         for (let i = 0; i < 12; i++) {
           const id = `density-note-${i}`, pageId = `${id}-page`, now = Date.now() + i;
@@ -17,7 +19,10 @@ test('choose four, five or six notes per row in folders and retain it across nav
       });
     } finally { db.close(); }
   });
-  await page.reload(); await page.locator('.folder-nav').getByRole('button', { name: '배치 검사 12', exact: true }).click();
+  await page.reload();
+  await expect(page.locator('.notes-grid').first()).toBeVisible();
+  await expect(page.locator('[data-action=library-mode]')).toHaveCount(0);
+  await page.locator('.folder-nav').getByRole('button', { name: '배치 검사 12', exact: true }).click();
   const setting = page.getByRole('combobox', { name: '한 줄 노트 개수', exact: true });
   const firstRow = () => page.locator('#note-results .note-card').evaluateAll(cards => {
     const first = cards[0].getBoundingClientRect().top;

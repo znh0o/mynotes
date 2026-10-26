@@ -592,7 +592,7 @@ export class EditorView {
     if (action === 'goto-page') modal('페이지 이동', `<label class="form-label">페이지 번호<input type="number" name="page" min="1" max="${this.note.pageIds.length}" value="${this.index + 1}" required /></label>`, '이동', async data => { await this.showPage(Number(data.get('page')) - 1); });
     if (action === 'export') run(async () => {
       await this.flush(); target.setAttribute('disabled', '');
-      try { toast('PDF 내보내기를 준비하고 있어요…'); await exportPDF(this.note, (n, total) => toast(`PDF 생성 중 ${n} / ${total}`)); toast('PDF를 내보냈어요.'); }
+      try { toast('PDF 내보내기를 준비하고 있어요…'); const saved = await exportPDF(this.note, (n, total) => toast(`PDF 생성 중 ${n} / ${total}`)); toast(saved === false ? '저장을 취소했어요.' : 'PDF를 내보냈어요.'); }
       finally { target.removeAttribute('disabled'); }
     });
     if (action?.startsWith('selection-')) { this.editingEngine.selectionAction(action.slice(10)); if (action === 'selection-duplicate') toast('선택한 내용을 복제했어요.'); }

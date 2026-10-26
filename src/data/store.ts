@@ -1,5 +1,7 @@
 import Dexie, { type Table } from 'dexie';
 import { createNote, type Asset, type Folder, type Note, type Page } from './model';
+import { isNativeApp, saveNativeDocument } from '../platform/native';
+import { restoredSettings, mergeRestoredPens } from './backup-settings';
 
 export class NotesDB extends Dexie {
   notes!: Table<Note, string>;
@@ -118,7 +120,8 @@ export async function deletePermanently(note: Note) {
     await db.notes.delete(note.id);
   });
 }
-export function download(blob: Blob, filename: string) {
+export async function download(blob: Blob, filename: string) {
+  if (isNativeApp) return saveNativeDocument(blob, filename);
   const url = URL.createObjectURL(blob), a = document.createElement('a');
   a.href = url; a.download = filename; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 30000);
@@ -130,10 +133,10 @@ export async function backup() {
   const data = await db.transaction('r', db.tables, async () => ({
     format: 'mynotes', version: 1,
     notes: await db.notes.toArray(), pages: await db.pages.toArray(),
-    folders: await db.folders.toArray(), assets: await db.assets.toArray()
+    folders: await db.folders.toArray(), assets: await db.assets.toArray(), settings: await db.settings.toArray()
   }));
   const assets = await Promise.all(data.assets.map(async a => ({ ...a, blob: await blobData(a.blob) })));
-  download(new Blob([JSON.stringify({ ...data, assets })], { type: 'application/json' }), `Notelin-backup-${new Date().toISOString().slice(0, 10)}.json`);
+  return download(new Blob([JSON.stringify({ ...data, assets })], { type: 'application/json' }), `Notelin-backup-${new Date().toISOString().slice(0, 10)}.json`);
 }
 export async function restore(file: File) {
   if (file.size > 400 * 1024 * 1024) throw new Error('백업 파일은 400MB 이하로 복원할 수 있어요.');
@@ -155,7 +158,7 @@ export async function restore(file: File) {
     if (![n.created, n.updated, n.opened].every(v => finite(v, 1e15))) throw new Error('손상된 노트 날짜');
     return { ...n, id: remap(n.id), title: `${n.title.slice(0, 100)} (복원)`, cover: color(n.cover), thumbnail: preview(n.thumbnail), folderId: n.folderId ? remap(n.folderId) : null, pageIds: n.pageIds.map(remap), lastPageId: n.lastPageId && n.pageIds.includes(n.lastPageId) ? remap(n.lastPageId) : undefined };
   });
-  const noteIds = new Set(input.notes.map((n: Note) => n.id));
+  const noteIds = new Set<string>(input.notes.map((n: Note) => n.id));
   const pageIds = new Set(input.pages.map((p: Page) => p.id));
   const assetIds = new Set(input.assets.map((a: Asset) => a.id));
   for (const n of input.notes) if (n.pageIds.some((id: string) => !pageIds.has(id))) throw new Error('누락된 페이지');
@@ -182,7 +185,12 @@ export async function restore(file: File) {
     return { ...p, id: remap(p.id), noteId: remap(p.noteId), thumbnail: preview(p.thumbnail), pdfAssetId: p.pdfAssetId ? remap(p.pdfAssetId) : undefined,
       items: p.items.map(i => ({ ...i, id: remap(i.id), ...(i.kind === 'image' ? { assetId: remap(i.assetId) } : {}) })) };
   });
-  await db.transaction('rw', db.notes, db.pages, db.folders, db.assets, async () => {
+  const settings = restoredSettings(input.settings, noteIds, ids);
+  await db.transaction('rw', db.notes, db.pages, db.folders, db.assets, db.settings, async () => {
     await db.folders.bulkAdd(folders); await db.notes.bulkAdd(notes); await db.pages.bulkAdd(pages); await db.assets.bulkAdd(assets);
+    for (const setting of settings) {
+      if (setting.key === 'pen-presets') setting.value = mergeRestoredPens((await db.settings.get(setting.key))?.value, setting.value);
+      await db.settings.put(setting);
+    }
   });
 }

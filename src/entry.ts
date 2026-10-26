@@ -7,6 +7,7 @@ import { registerSW } from 'virtual:pwa-register';
 import { installFastTaps } from './ui/tool-taps';
 import { initInstallExperience } from './ui/install-experience';
 import { getAppearance, initAppearance, setAppearance, type Appearance } from './ui/appearance';
+import { isNativeApp } from './platform/native';
 
 type InstallPrompt = Event & {
   prompt: () => Promise<void>;
@@ -14,7 +15,7 @@ type InstallPrompt = Event & {
 };
 const root = document.querySelector<HTMLElement>('#app')!;
 initAppearance();
-const appMode = window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches;
+const appMode = isNativeApp || window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches;
 installFastTaps();
 // Display mode chooses the UI only. It is not proof of installation or an auth boundary.
 if (appMode) {

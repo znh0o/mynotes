@@ -5,8 +5,8 @@ import { readFileSync } from 'node:fs';
 const packageVersion = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version as string;
 const releaseRevision = process.env.GITHUB_SHA || `version-${packageVersion}`;
 
-export default defineConfig({
-  base: '/mynotes/',
+export default defineConfig(({ mode }) => ({
+  base: mode === 'android' ? '/' : '/mynotes/',
   define: { __NOTELIN_RELEASE__: JSON.stringify(releaseRevision) },
   plugins: [{
     name: 'notelin-release-marker',
@@ -15,6 +15,7 @@ export default defineConfig({
       this.emitFile({ type: 'asset', fileName: 'release-worker.js', source: `self.addEventListener('message', event => { if (event.data?.type === 'NOTELIN_RELEASE') event.ports[0]?.postMessage({ revision: ${JSON.stringify(releaseRevision)} }); });` });
     }
   }, VitePWA({
+    disable: mode === 'android',
     strategies: 'injectManifest',
     srcDir: 'src',
     filename: 'sw.js',
@@ -33,5 +34,5 @@ export default defineConfig({
     },
     devOptions: { enabled: false }
   })],
-  build: { target: 'es2022', chunkSizeWarningLimit: 900 }
-});
+  build: { outDir: mode === 'android' ? 'dist-android' : 'dist', target: 'es2022', chunkSizeWarningLimit: 900 }
+}));

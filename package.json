@@ -1,6 +1,6 @@
 {
   "name": "notelin",
-  "version": "1.9.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,15 +9,22 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "build:android:web": "node scripts/prepare-assets.mjs && tsc --noEmit && vite build --mode android",
+    "android:sync": "npm run build:android:web && cap sync android",
+    "android:apk": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-android.ps1"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.3",
     "dexie": "^4.2.1",
     "lucide": "^0.468.0",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.4.299"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
     "@playwright/test": "^1.64.1",
     "@types/node": "^24.0.0",
     "fake-indexeddb": "^6.2.4",

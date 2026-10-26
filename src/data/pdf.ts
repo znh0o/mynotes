@@ -82,5 +82,5 @@ export async function thumbnail(page: Page) {
 export async function exportPDF(note: Note, progress: (n: number, total: number) => void) {
   const { renderPDF } = await import('./pdf-export');
   const bytes = await renderPDF(note, id => db.pages.get(id), id => db.assets.get(id), progress);
-  download(new Blob([bytes as BlobPart], { type: 'application/pdf' }), `${note.title.replace(/[<>:"/\\|?*]/g, '_')}.pdf`);
+  return download(new Blob([bytes as BlobPart], { type: 'application/pdf' }), `${note.title.replace(/[<>:"/\\|?*]/g, '_')}.pdf`);
 }

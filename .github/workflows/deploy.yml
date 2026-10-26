@@ -28,9 +28,26 @@ jobs:
         if: github.event_name != 'pull_request'
         with:
           path: dist
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm run android:sync
+      - run: node scripts/prepare-android.mjs
+      - run: chmod +x android/gradlew && ./android/gradlew -p android :app:assembleDebug :app:lintDebug --console=plain
+        timeout-minutes: 15
   deploy:
     if: github.event_name != 'pull_request'
-    needs: build
+    needs: [build, android]
     runs-on: ubuntu-latest
     permissions:
       pages: write
