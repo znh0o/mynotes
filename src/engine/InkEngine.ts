@@ -315,6 +315,10 @@ export class InkEngine {
     }, 600);
   }
   private move(e: PointerEvent) {
+    if (e.pointerType === 'touch' && this.palmGuard?.rejectTouch(e)) {
+      if (e.pointerId === this.activePointer) this.cancel();
+      return;
+    }
     if (e.pointerType === 'pen') this.lastPen = performance.now();
     // With a barrel held in the air, tip contact/lift arrives as pointermove,
     // rather than another pointerdown/up (chorded Pointer Events).

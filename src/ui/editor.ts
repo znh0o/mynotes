@@ -1048,6 +1048,17 @@ export class EditorView {
       }
     }, { signal });
     this.viewport.addEventListener('pointermove', e => {
+      if (e.pointerType === 'touch' && this.palmGuard.rejectTouch(e)) {
+        this.touches.delete(e.pointerId);
+        if (this.pan?.id === e.pointerId) {
+          this.viewport.scrollLeft = this.pan.left; this.viewport.scrollTop = this.pan.top; this.pan = null;
+        }
+        if (this.pinch) {
+          const p = this.pinch; this.pinch = null; this.zoom(p.scale);
+          this.viewport.scrollLeft = p.scrollX; this.viewport.scrollTop = p.scrollY;
+        }
+        return;
+      }
       if (e.pointerType === 'touch' && this.touches.has(e.pointerId)) this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (this.pinch && this.touches.size === 2) {
         const [a, b] = [...this.touches.values()], p = this.pinch;

@@ -18,6 +18,10 @@ test('broad contacts and pen-adjacent touches do not draw or trigger a pinch', a
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [contact(1, 220, 25)] });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await expect(undo).toBeDisabled();
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [contact(6, 120, 3)] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [contact(6, 220, 25)] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(undo).toBeDisabled();
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [contact(2, 140, 25), contact(3, 340, 25)] });
   await expect(page.locator('.zoom-preview')).toHaveCount(0);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
