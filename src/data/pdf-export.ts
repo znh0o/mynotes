@@ -1,6 +1,6 @@
 import { PDFDocument, type PDFPage, type PDFFont, rgb, degrees, LineCapStyle, pushGraphicsState, popGraphicsState, rectangle, clip, endPath, StandardFonts } from 'pdf-lib';
 import { smooth, drawItem } from '../engine/render';
-import { brushLayers } from '../engine/brush';
+import { brushLayers, roundedEndRadii } from '../engine/brush';
 import { graphitePDF } from './graphite-pdf';
 import { textFont, textLines } from '../engine/text';
 import type { Asset, Item, Note, Page, Point, Stroke } from './model';
@@ -32,14 +32,17 @@ function ink(out: PDFPage, stroke: Stroke, height: number) {
     return;
   }
   const left: {x: number; y: number}[] = [], right: {x: number; y: number}[] = [];
+  const radii = roundedEndRadii(points, points.map(point => radius(stroke, point)), stroke.width);
   points.forEach((point, i) => {
     const prev = points[Math.max(0, i - 1)], next = points[Math.min(points.length - 1, i + 1)];
-    const angle = Math.atan2(next.y - prev.y, next.x - prev.x) + Math.PI / 2, r = radius(stroke, point);
+    const angle = Math.atan2(next.y - prev.y, next.x - prev.x) + Math.PI / 2, r = radii[i];
     left.push({ x: point.x + Math.cos(angle) * r, y: point.y + Math.sin(angle) * r });
     right.push({ x: point.x - Math.cos(angle) * r, y: point.y - Math.sin(angle) * r });
   });
   out.drawSvgPath(path([...left, ...right.reverse()], true), { x: 0, y: height, color: c });
-  for (const p of [first, last]) out.drawCircle({ x: p.x, y: height - p.y, size: radius(stroke, p), color: c });
+  for (const index of [0, points.length - 1]) {
+    const p = points[index]; out.drawCircle({ x: p.x, y: height - p.y, size: radii[index], color: c });
+  }
 }
 
 function paper(out: PDFPage, page: Page, font: PDFFont) {

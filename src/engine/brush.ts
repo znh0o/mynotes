@@ -8,25 +8,43 @@ const circle = (point: XY, radius: number) => Array.from({ length: 16 }, (_, i) 
   x: point.x + Math.cos(-i * Math.PI / 8) * radius, y: point.y + Math.sin(-i * Math.PI / 8) * radius
 }));
 
+// A stylus often reports near-zero pressure on contact and release. Keep its
+// interior pressure variation, but prevent those samples forming long needles.
+export function roundedEndRadii(points: Point[], radii: number[], width: number): number[] {
+  if (points.length < 2) return radii;
+  const distances = [0];
+  for (let i = 1; i < points.length; i++)
+    distances.push(distances[i - 1] + Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y));
+  const length = distances[distances.length - 1], reach = Math.min(width * 4, length / 3);
+  if (!reach) return radii;
+  let start = 0, end = 0;
+  for (let i = 0; i < radii.length; i++) {
+    if (distances[i] <= reach) start = Math.max(start, radii[i]);
+    if (length - distances[i] <= reach) end = Math.max(end, radii[i]);
+  }
+  start *= .8; end *= .8;
+  return radii.map((radius, i) => Math.max(radius,
+    distances[i] <= reach ? start : 0, length - distances[i] <= reach ? end : 0));
+}
+
 // These page-coordinate polygons are shared by Canvas, thumbnails and PDF.
 // Persisted seeds keep graphite identical after redraw, reload and backup.
 export function brushLayers(stroke: Stroke, sampled?: Point[]): BrushLayer[] {
   if (stroke.tool === 'pencil') return pencilLayers(stroke);
   const points = sampled ?? smooth(stroke.points);
   if (!points.length) return [];
-  const distances = [0];
-  for (let i = 1; i < points.length; i++) distances.push(distances[i - 1] + Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y));
-  const length = distances[distances.length - 1];
-  const left: XY[] = [], right: XY[] = [], radii: number[] = [];
+  const normals: number[] = [], raw: number[] = [];
   for (let i = 0; i < points.length; i++) {
     const point = points[i], prev = points[Math.max(0, i - 1)], next = points[Math.min(points.length - 1, i + 1)];
-    const direction = Math.atan2(next.y - prev.y, next.x - prev.x), normal = direction + Math.PI / 2;
-    const p = pressure(point.p);
+    const direction = Math.atan2(next.y - prev.y, next.x - prev.x);
     const nib = .5 + .5 * Math.abs(Math.sin(direction - Math.PI / 4));
-    const taperLength = Math.min(stroke.width * 1.8, length / 3);
-    const taper = length > stroke.width * 2 ? .65 + .35 * Math.min(1, Math.min(distances[i], length - distances[i]) / Math.max(.01, taperLength)) : 1;
-    const radius = stroke.width / 2 * (.12 + .88 * Math.pow(p, .9)) * nib * taper;
-    radii.push(radius);
+    normals.push(direction + Math.PI / 2);
+    raw.push(stroke.width / 2 * (.12 + .88 * Math.pow(pressure(point.p), .9)) * nib);
+  }
+  const radii = roundedEndRadii(points, raw, stroke.width);
+  const left: XY[] = [], right: XY[] = [];
+  for (let i = 0; i < points.length; i++) {
+    const point = points[i], normal = normals[i], radius = radii[i];
     left.push({ x: point.x + Math.cos(normal) * radius, y: point.y + Math.sin(normal) * radius });
     right.push({ x: point.x - Math.cos(normal) * radius, y: point.y - Math.sin(normal) * radius });
   }

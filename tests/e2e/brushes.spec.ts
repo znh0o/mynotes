@@ -1,6 +1,43 @@
 import { test, expect } from './standalone-test';
 import { selectPen, setInkColor } from './helpers';
 
+test('exported fountain ends stay round when stylus pressure falls at contact and release', async ({ page, context }) => {
+  await page.goto('./'); await page.getByRole('button', { name: '새 노트', exact: true }).click();
+  await page.locator('.paper-options label').filter({ hasText: '무지' }).click();
+  await page.getByRole('button', { name: '노트 만들기', exact: true }).click();
+  await expect(page.locator('.page-loading')).toBeHidden();
+  await selectPen(page, '만년필');
+  await page.getByRole('slider', { name: '펜 굵기', exact: true }).fill('20');
+  await setInkColor(page, '#1260ec');
+  const rect = (await page.locator('#paper-live').boundingBox())!, scale = rect.width / 794;
+  const cdp = await context.newCDPSession(page);
+  const send = (type: 'mousePressed' | 'mouseMoved' | 'mouseReleased', x: number, force: number) =>
+    cdp.send('Input.dispatchMouseEvent', { type, pointerType: 'pen', button: 'left', buttons: type === 'mouseReleased' ? 0 : 1,
+      force, x: rect.x + x * scale, y: rect.y + 200 * scale });
+  await send('mousePressed', 100, .05);
+  for (const [x, force] of [[110, .2], [120, .5], [140, .9], [200, .9], [260, .9], [280, .5], [290, .2], [300, .05]]) await send('mouseMoved', x, force);
+  await send('mouseReleased', 300, 0);
+  const download = page.waitForEvent('download'); await page.getByRole('button', { name: 'PDF 내보내기', exact: true }).click();
+  const path = await (await download).path();
+  await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).click();
+  const chooser = page.waitForEvent('filechooser'); await page.getByRole('button', { name: 'PDF 가져오기', exact: true }).click();
+  await (await chooser).setFiles(path!);
+  await expect(page.locator('#paper-background')).toBeVisible(); await expect(page.locator('.page-loading')).toBeHidden();
+  const widths = await page.locator('#paper-background').evaluate((canvas: HTMLCanvasElement) => {
+    const ctx = canvas.getContext('2d')!, ratio = canvas.width / 794;
+    return [100, 200, 300].map(x => {
+      const pixels = ctx.getImageData(Math.round(x * ratio), Math.round(178 * ratio), 1, Math.round(44 * ratio)).data;
+      let count = 0;
+      for (let i = 0; i < pixels.length; i += 4) if (pixels[i + 2] > pixels[i] + 50 && pixels[i + 2] > pixels[i + 1] + 30) count++;
+      return count;
+    });
+  });
+  expect(widths[1]).toBeGreaterThan(10);
+  expect(widths[0]).toBeGreaterThan(widths[1] * .45);
+  expect(widths[2]).toBeGreaterThan(widths[1] * .45);
+  await cdp.detach();
+});
+
 test('pencil PDF preserves the paper grain and its position', async ({ page, context }) => {
   await page.addInitScript(() => { Math.random = () => .12345; });
   await page.goto('./'); await page.getByRole('button', { name: '새 노트', exact: true }).click();

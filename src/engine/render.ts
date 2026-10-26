@@ -1,4 +1,4 @@
-import { smooth, brushLayers } from './brush';
+import { smooth, brushLayers, roundedEndRadii } from './brush';
 import { graphitePattern } from './graphite-pattern';
 import { drawText } from './text';
 export { smooth } from './brush';
@@ -48,18 +48,19 @@ export function drawStroke(ctx: CanvasRenderingContext2D, stroke: Stroke) {
     else ctx.stroke();
   } else {
     const left: {x: number; y: number}[] = [], right: {x: number; y: number}[] = [];
+    const radii = roundedEndRadii(pts, pts.map(p => stroke.width * (.22 + .78 * Math.pow(Math.max(.05, p.p), .65)) / 2), stroke.width);
     for (let i = 0; i < pts.length; i++) {
       const prev = pts[Math.max(0, i - 1)], next = pts[Math.min(pts.length - 1, i + 1)], p = pts[i];
       const angle = Math.atan2(next.y - prev.y, next.x - prev.x) + Math.PI / 2;
-      const radius = stroke.width * (.22 + .78 * Math.pow(Math.max(.05, p.p), .65)) / 2;
+      const radius = radii[i];
       left.push({ x: p.x + Math.cos(angle) * radius, y: p.y + Math.sin(angle) * radius });
       right.push({ x: p.x - Math.cos(angle) * radius, y: p.y - Math.sin(angle) * radius });
     }
     ctx.beginPath(); ctx.moveTo(left[0].x, left[0].y);
     left.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
     right.reverse().forEach(p => ctx.lineTo(p.x, p.y)); ctx.closePath(); ctx.fill();
-    for (const p of [pts[0], pts[pts.length - 1]]) {
-      ctx.beginPath(); ctx.arc(p.x, p.y, stroke.width * (.22 + .78 * Math.pow(Math.max(.05, p.p), .65)) / 2, 0, Math.PI * 2); ctx.fill();
+    for (const index of [0, pts.length - 1]) {
+      const p = pts[index]; ctx.beginPath(); ctx.arc(p.x, p.y, radii[index], 0, Math.PI * 2); ctx.fill();
     }
   }
   ctx.restore();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { brushLayers } from '../src/engine/brush';
+import { brushLayers, roundedEndRadii } from '../src/engine/brush';
 import { graphiteMaterial, graphiteOffset } from '../src/engine/graphite';
 import type { Stroke } from '../src/data/model';
 const pencil: Stroke = { id: 'graphite', kind: 'stroke', tool: 'pencil', color: '#30445e', width: 8, pressure: true, brushVersion: 2, textureSeed: 42, points: [{ x: 20, y: 50, p: .2, t: 0 }, { x: 180, y: 50, p: .9, t: 10 }] };
@@ -17,6 +17,15 @@ describe('versioned brush geometry', () => {
       expect(layers.length).toBeGreaterThan(0);
       expect(layers.flatMap(l => l.polygons.flat()).every(p => Number.isFinite(p.x) && Number.isFinite(p.y))).toBe(true);
     }
+  });
+  it('keeps low-pressure contact and release rounded without flattening interior pressure', () => {
+    const points = [.05, .1, .6, .9, .6, .1, .05].map((p, i) => ({ x: i * 10, y: 0, p, t: i }));
+    const raw = [.6, 1, 4, 5, 4, 1, .6];
+    const shaped = roundedEndRadii(points, raw, 12);
+    expect(shaped[0]).toBeGreaterThan(3);
+    expect(shaped[shaped.length - 1]).toBeGreaterThan(3);
+    expect(shaped[3]).toBe(5);
+    expect(roundedEndRadii(points, Array(points.length).fill(1), 12)).toEqual(Array(points.length).fill(1));
   });
   it('reuses a fixed paper material instead of allocating grains along the entire stroke', () => {
     const material = structuredClone(graphiteMaterial());
