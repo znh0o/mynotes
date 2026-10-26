@@ -8,6 +8,30 @@ async function back(page: Page) {
   }));
 }
 
+test('each notebook reopens at its own last viewed page', async ({ page }) => {
+  await page.goto('./');
+  for (const name of ['첫 노트', '둘째 노트']) {
+    await page.getByRole('button', { name: '새 노트', exact: true }).click();
+    await page.locator('[name=title]').fill(name);
+    await page.getByRole('button', { name: '노트 만들기', exact: true }).click();
+    await expect(page.locator('.page-loading')).toBeHidden();
+    await page.getByRole('button', { name: '페이지 목록', exact: true }).click();
+    await page.getByRole('button', { name: '페이지 추가', exact: true }).last().click();
+    await expect(page.locator('.page-position')).toHaveText('2 / 2');
+    if (name === '둘째 노트') {
+      await page.getByRole('button', { name: '페이지 추가', exact: true }).last().click();
+      await expect(page.locator('.page-position')).toHaveText('3 / 3');
+    }
+    await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).click();
+  }
+  await page.reload();
+  await page.getByRole('button', { name: '첫 노트 열기', exact: true }).click();
+  await expect(page.locator('.page-position')).toHaveText('2 / 2');
+  await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).click();
+  await page.getByRole('button', { name: '둘째 노트 열기', exact: true }).click();
+  await expect(page.locator('.page-position')).toHaveText('3 / 3');
+});
+
 test('back stays inside the app from settings, filters, folders and the home screen', async ({ page }) => {
   await page.goto('./'); await expect(page.locator('#library-title')).toContainText('나의 서재');
   await page.evaluate(() => (window as any).appSession = 'same-document');

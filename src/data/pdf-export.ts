@@ -15,13 +15,20 @@ function ink(out: PDFPage, stroke: Stroke, height: number) {
   const c = color(stroke.color), first = points[0], last = points[points.length - 1];
   if (stroke.tool === 'pencil') { graphitePDF(out, stroke, height); return; }
   if (stroke.tool === 'fountain' && stroke.brushVersion === 2) {
-    for (const layer of brushLayers(stroke, points)) out.drawSvgPath(layer.polygons.map(polygon => path(polygon, true)).join(' '), { x: 0, y: height, color: c, opacity: layer.opacity });
+    // Draw each cap separately so PDF viewers cannot cancel it against the
+    // body path when interpreting the fill winding of overlapping subpaths.
+    for (const layer of brushLayers(stroke, points)) for (const polygon of layer.polygons)
+      out.drawSvgPath(path(polygon, true), { x: 0, y: height, color: c, opacity: layer.opacity });
     return;
   }
   if (stroke.tool === 'highlighter' || !stroke.pressure) {
     const opacity = stroke.tool === 'highlighter' ? .32 : 1;
     if (points.length === 1) out.drawCircle({ x: first.x, y: height - first.y, size: stroke.width / 2, color: c, opacity });
-    else out.drawSvgPath(path(points), { x: 0, y: height, borderColor: c, borderWidth: stroke.width, borderLineCap: LineCapStyle.Round, borderOpacity: opacity });
+    else {
+      out.drawSvgPath(path(points), { x: 0, y: height, borderColor: c, borderWidth: stroke.width, borderLineCap: LineCapStyle.Round, borderOpacity: opacity });
+      if (stroke.tool !== 'highlighter') for (const point of [first, last])
+        out.drawCircle({ x: point.x, y: height - point.y, size: stroke.width / 2, color: c });
+    }
     return;
   }
   const left: {x: number; y: number}[] = [], right: {x: number; y: number}[] = [];

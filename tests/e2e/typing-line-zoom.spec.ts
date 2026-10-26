@@ -107,8 +107,9 @@ test('document typing fills the page margins and continues on new pages without 
   expect(saved.flatMap((p: any) => p.items).filter((i: any) => i.kind === 'stroke')).toHaveLength(1);
   await page.getByRole('button', { name: '타이핑과 직선 열기', exact: true }).click();
   await expect(canvas).toBeVisible(); await expect(page.locator('.page-loading')).toBeHidden();
+  await expect(page.locator('.page-position')).toHaveText('3 / 3');
   await page.getByRole('button', { name: '텍스트', exact: true }).click();
-  await expect(input).toHaveValue(saved[0].items.find((i: any) => i.textMode === 'document').text);
+  await expect(input).toHaveValue(saved[2].items.find((i: any) => i.textMode === 'document').text);
   await page.screenshot({ path: '../MyNotes-document-typing.png' });
 });
 

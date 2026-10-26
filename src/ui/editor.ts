@@ -61,6 +61,7 @@ export class EditorView {
   private penTimer?: ReturnType<typeof setTimeout>;
   private penDirty = false;
   private penWrites = Promise.resolve();
+  private pageSelectionWrites = Promise.resolve();
   private penDraft?: PenPreset;
   private dirtyBrushes = new Set<InkTool>();
   private brushTimer?: ReturnType<typeof setTimeout>;
@@ -167,7 +168,8 @@ export class EditorView {
     document.addEventListener('visibilitychange', () => { if (document.hidden) run(() => this.flush()); }, { signal: this.abort.signal });
     window.addEventListener('beforeunload', e => { if (!isAppReloadApproved()) { e.preventDefault(); e.returnValue = ''; } }, { signal: this.abort.signal });
     this.setupGestures();
-    await this.showPage(0);
+    const rememberedPage = this.note.pageIds.indexOf(this.note.lastPageId ?? '');
+    await this.showPage(rememberedPage < 0 ? 0 : rememberedPage);
     this.resizeObserver = new ResizeObserver(() => { if (this.fit && this.page) { this.setScale(this.fitScale(), true); void this.renderBackground(); void this.renderSpread(); } });
     this.resizeObserver.observe(this.viewport);
   }
@@ -206,6 +208,12 @@ export class EditorView {
   }
   private displayPage(page: Page, index: number) {
     this.index = index; this.page = page; this.engine.load(page);
+    if (this.note.lastPageId !== page.id) {
+      this.note.lastPageId = page.id;
+      const write = this.pageSelectionWrites.catch(() => {}).then(() => db.notes.update(this.note.id, { lastPageId: page.id }));
+      this.pageSelectionWrites = write.then(() => {});
+      void write.catch(report);
+    }
     this.syncSpreadLayout();
     this.focusEngine(this.engine);
     this.setScale(this.fit ? this.fitScale() : this.scale, this.fit); this.viewport.scrollTo({ left: 0, top: 0 });
@@ -365,6 +373,7 @@ export class EditorView {
     await this.queue.flush();
     await this.brushWrites; await this.persistBrushes();
     await this.penWrites; await this.persistPens();
+    await this.pageSelectionWrites;
   }
   private updateHistory() {
     this.root.querySelector<HTMLButtonElement>('[data-action=undo]')!.disabled = !this.editingEngine.canUndo;
@@ -623,12 +632,8 @@ export class EditorView {
   private persistPencilDarkness() { this.rememberBrush(); }
   private rememberBrush() {
     const tool = this.engine.options.tool; if (!isInkTool(tool)) return;
-    if (isPenKind(tool)) {
-      const preset = this.selectedPen();
-      preset.tool = tool; preset.width = this.engine.options.width; preset.color = this.engine.options.color;
-      if (tool === 'pencil') { preset.pencilDarkness = this.engine.options.pencilDarkness; preset.pencilAdjustment = this.inkAdjustment; }
-      this.rememberPens(); return;
-    }
+    // Toolbar changes affect the current stroke only. Saved pen cards are edited in the picker.
+    if (isPenKind(tool)) return;
     this.brushes[tool] = { width: this.engine.options.width, color: this.engine.options.color,
       ...(tool === 'highlighter' ? { highlighterWidthVersion: 2 as const } : {}) };
     this.dirtyBrushes.add(tool); clearTimeout(this.brushTimer);

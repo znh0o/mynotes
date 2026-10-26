@@ -24,7 +24,7 @@ export function brushLayers(stroke: Stroke, sampled?: Point[]): BrushLayer[] {
     const p = pressure(point.p);
     const nib = .5 + .5 * Math.abs(Math.sin(direction - Math.PI / 4));
     const taperLength = Math.min(stroke.width * 1.8, length / 3);
-    const taper = length > stroke.width * 2 ? .42 + .58 * Math.min(1, Math.min(distances[i], length - distances[i]) / Math.max(.01, taperLength)) : 1;
+    const taper = length > stroke.width * 2 ? .65 + .35 * Math.min(1, Math.min(distances[i], length - distances[i]) / Math.max(.01, taperLength)) : 1;
     const radius = stroke.width / 2 * (.12 + .88 * Math.pow(p, .9)) * nib * taper;
     radii.push(radius);
     left.push({ x: point.x + Math.cos(normal) * radius, y: point.y + Math.sin(normal) * radius });

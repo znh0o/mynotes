@@ -216,7 +216,7 @@ test('ballpoint and pencil stay fixed while fountain responds to pressure and pe
   await selectPen(page, '연필');
   await page.getByRole('button', { name: /연필 조절 항목:/ }).click();
   await page.locator('[data-action="pencil-mode"][data-id="darkness"]').click();
-  await expect(page.getByRole('slider', { name: '연필 진하기', exact: true })).toHaveValue('85');
+  await expect(page.getByRole('slider', { name: '연필 진하기', exact: true })).toHaveValue('70');
   await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).click();
   await page.getByRole('button', { name: '설정 및 백업', exact: true }).click();
   const download = page.waitForEvent('download'); await page.getByRole('button', { name: '전체 백업', exact: true }).click();

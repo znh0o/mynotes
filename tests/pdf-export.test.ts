@@ -5,6 +5,17 @@ import { createNote, type Page, type Asset } from '../src/data/model';
 
 const images = (document: PDFDocument) => document.context.enumerateIndirectObjects().filter(([, value]) => value instanceof PDFRawStream && value.dict.get(PDFName.of('Subtype'))?.toString() === '/Image');
 describe('vector PDF export', () => {
+  it('rounds both ends of a ballpoint stroke in the exported vector paths', async () => {
+    const { note, page } = createNote('Rounded ink', '#b9cee5', null, { paper: 'blank' });
+    page.items = [{ id: 'ink', kind: 'stroke', tool: 'pen', width: 8, color: '#1764da', pressure: false,
+      points: [{ x: 40, y: 80, p: .5, t: 0 }, { x: 80, y: 100, p: .5, t: 1 }, { x: 130, y: 80, p: .5, t: 2 }] }];
+    const document = await PDFDocument.load(await renderPDF(note, async () => page, async () => undefined, () => {}));
+    const stream = document.context.enumerateIndirectObjects().flatMap(([, value]) =>
+      value instanceof PDFRawStream && !value.dict.has(PDFName.of('Subtype'))
+        ? [new TextDecoder().decode(decodePDFRawStream(value).decode())] : []).join('\n');
+    expect(images(document)).toHaveLength(0);
+    expect((stream.match(/ c\n/g) || []).length).toBeGreaterThanOrEqual(8);
+  });
   it('writes pressure outlines, highlighter and shapes as PDF paths without bitmap overlays', async () => {
     const { note, page } = createNote('Vector', '#b9cee5', null, { paper: 'grid' });
     page.items = [

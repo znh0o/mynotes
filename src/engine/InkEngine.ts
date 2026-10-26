@@ -70,7 +70,9 @@ export class InkEngine {
     this.inputRect = undefined;
     const rect = this.live.getBoundingClientRect();
     const target = Math.max(1, (rect.width / this.page.width) * devicePixelRatio);
-    const ratio = Math.min(target, Math.sqrt(14000000 / (this.page.width * this.page.height)));
+    // Keep ink at native display density on large tablets when possible.
+    // The pixel cap still bounds the two canvas layers (and the second page).
+    const ratio = Math.min(target, Math.sqrt(18000000 / (this.page.width * this.page.height)));
     const width = Math.ceil(this.page.width * ratio), height = Math.ceil(this.page.height * ratio);
     if (!force && this.ink.width === width && this.ink.height === height && this.live.width === width && this.live.height === height) return;
     this.ratio = ratio;

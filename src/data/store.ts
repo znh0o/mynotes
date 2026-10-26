@@ -153,7 +153,7 @@ export async function restore(file: File) {
   const notes: Note[] = input.notes.map((n: Note) => {
     if (!Array.isArray(n.pageIds) || typeof n.title !== 'string') throw new Error('손상된 노트');
     if (![n.created, n.updated, n.opened].every(v => finite(v, 1e15))) throw new Error('손상된 노트 날짜');
-    return { ...n, id: remap(n.id), title: `${n.title.slice(0, 100)} (복원)`, cover: color(n.cover), thumbnail: preview(n.thumbnail), folderId: n.folderId ? remap(n.folderId) : null, pageIds: n.pageIds.map(remap) };
+    return { ...n, id: remap(n.id), title: `${n.title.slice(0, 100)} (복원)`, cover: color(n.cover), thumbnail: preview(n.thumbnail), folderId: n.folderId ? remap(n.folderId) : null, pageIds: n.pageIds.map(remap), lastPageId: n.lastPageId && n.pageIds.includes(n.lastPageId) ? remap(n.lastPageId) : undefined };
   });
   const noteIds = new Set(input.notes.map((n: Note) => n.id));
   const pageIds = new Set(input.pages.map((p: Page) => p.id));
