@@ -56,14 +56,21 @@ export async function loadImages(page: Page) {
   const needed = new Set(page.items.filter(i => i.kind === 'image').map(i => i.assetId));
   if (imageCache.size > 30) for (const key of imageCache.keys()) if (!needed.has(key)) imageCache.delete(key);
 }
-export async function background(canvas: HTMLCanvasElement, page: Page, scale: number) {
+export async function background(canvas: HTMLCanvasElement, page: Page, scale: number,
+  crop?: { x: number; y: number; w: number; h: number }) {
   const ctx = canvas.getContext('2d')!;
-  canvas.width = Math.ceil(page.width * scale); canvas.height = Math.ceil(page.height * scale);
+  canvas.width = Math.ceil((crop?.w ?? page.width) * scale);
+  canvas.height = Math.ceil((crop?.h ?? page.height) * scale);
   if (page.pdfAssetId && page.pdfIndex) {
     const doc = await documentFor(page.pdfAssetId), pdfPage = await doc.getPage(page.pdfIndex);
-    await pdfPage.render({ canvas, viewport: pdfPage.getViewport({ scale }) }).promise;
+    await pdfPage.render({ canvas, viewport: pdfPage.getViewport({ scale,
+      offsetX: -(crop?.x ?? 0) * scale, offsetY: -(crop?.y ?? 0) * scale }),
+      background: crop ? page.paperColor : undefined }).promise;
     pdfPage.cleanup();
-  } else { ctx.setTransform(scale, 0, 0, scale, 0, 0); drawPaper(ctx, page); }
+  } else {
+    ctx.setTransform(scale, 0, 0, scale, -(crop?.x ?? 0) * scale, -(crop?.y ?? 0) * scale);
+    drawPaper(ctx, page);
+  }
 }
 export async function thumbnail(page: Page) {
   await loadImages(page);

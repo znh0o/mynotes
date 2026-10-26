@@ -6,6 +6,7 @@ import { InkEngine } from '../engine/InkEngine';
 import { button, contextMenu, escape, icon, modal, pickFile, report, run, toast, confirmAction } from './common';
 import { isAppReloadApproved } from '../pwa/navigation';
 import { PagePreviews } from './page-previews';
+import { DetailRenderer } from './detail-renderer';
 import { trackDialog } from './history';
 import { InlineTextEditor } from './inline-text';
 import { showPenCheck } from './pen-check';
@@ -53,6 +54,8 @@ export class EditorView {
   private zoomTimer: ReturnType<typeof setTimeout> | undefined;
   private pendingScale: number | null = null;
   private previews!: PagePreviews;
+  private detail!: DetailRenderer;
+  private companionDetail!: DetailRenderer;
   private toolHint = '볼펜 · 힘을 줘도 굵기가 일정한 선';
   private inkAdjustment: 'width' | 'darkness' = 'width';
   private previousInkTool: Tool = 'pen';
@@ -102,6 +105,10 @@ export class EditorView {
       () => this.changed(this.companionEngine.page), count => this.showSelection(count, this.companionEngine),
       (p, tool) => run(async () => { const index = this.companionIndex(); await this.showPage(index); if (this.index === index) this.insert(p, tool); }),
       () => toast('직선으로 정리했어요. 펜을 댄 채 끝점을 움직일 수 있어요.'), () => this.togglePenEraser());
+    this.detail = new DetailRenderer(this.root.querySelector('.paper-surface')!, this.root.querySelector('#paper-live')!,
+      this.viewport, this.root.querySelector('#paper-background')!, this.root.querySelector('#paper-ink')!, report);
+    this.companionDetail = new DetailRenderer(this.root.querySelector('.spread-companion')!, this.root.querySelector('.spread-live')!,
+      this.viewport, this.root.querySelector('.spread-background')!, this.root.querySelector('.spread-ink')!, report);
     this.companionEngine.options = this.engine.options;
     this.editingEngine = this.engine;
     this.root.querySelector('.paper-sizing')!.addEventListener('pointerdown', () => this.focusEngine(this.engine), { capture: true, signal: this.abort.signal });
@@ -278,6 +285,7 @@ export class EditorView {
       canvas.width = backgroundCanvas.width; canvas.height = backgroundCanvas.height;
       canvas.getContext('2d')!.drawImage(backgroundCanvas, 0, 0);
       this.companionEngine.resize();
+      this.companionDetail.schedule(0);
       companion.classList.remove('spread-error');
     } catch (error) {
       if (generation === this.spreadGeneration) companion.classList.add('spread-error');
@@ -318,6 +326,7 @@ export class EditorView {
     if (generation !== this.generation || this.abort.signal.aborted) return;
     const canvas = this.root.querySelector<HTMLCanvasElement>('#paper-background')!;
     canvas.width = temp.width; canvas.height = temp.height; canvas.getContext('2d')!.drawImage(temp, 0, 0);
+    this.detail.schedule(0);
   }
   private async renderThumbnails() {
     const rows = await db.pages.bulkGet(this.note.pageIds);
@@ -341,6 +350,8 @@ export class EditorView {
   }
   private changed(page = this.page) {
     this.updateHistory();
+    if (page.id === this.page.id) this.detail.refreshInk(page);
+    else this.companionDetail.refreshInk(page);
     page.thumbnail = undefined;
     void this.queue.saveImmutable(page).catch(report);
     if (page.id === this.page.id) {
@@ -390,7 +401,11 @@ export class EditorView {
     empty.style.width = `${this.page.width * this.scale}px`; empty.style.height = `${this.page.height * this.scale}px`;
     this.textEditor.setScale(this.scale);
     this.root.querySelector('#zoom-value')!.textContent = `${Math.round(this.scale * 100)}%`;
-    if (rasterize) { this.engine.resize(); if (this.twoPage && this.spreadPage) this.companionEngine.resize(); }
+    if (rasterize) {
+      this.engine.resize(); if (this.twoPage && this.spreadPage) this.companionEngine.resize();
+      this.detail.set(this.page, this.scale);
+      this.companionDetail.set(this.twoPage ? this.spreadPage : undefined, this.scale);
+    }
   }
   private zoom(scale: number) {
     this.cancelViewportUpdate();
@@ -417,6 +432,8 @@ export class EditorView {
     cancelAnimationFrame(this.viewportFrame); this.viewportFrame = 0;
     const latest = this.viewportUpdate; this.viewportUpdate = null; latest?.(); this.pendingScale = null;
     this.engine.resize(); if (this.twoPage && this.spreadPage) this.companionEngine.resize(); this.viewport.classList.remove('zoom-preview');
+    this.detail.set(this.page, this.scale);
+    this.companionDetail.set(this.twoPage ? this.spreadPage : undefined, this.scale);
     run(() => this.renderBackground()); void this.renderSpread();
   }
   private click(e: Event) {
@@ -1063,5 +1080,5 @@ export class EditorView {
       }
     }, { signal, passive: false });
   }
-  destroy() { this.textEditor?.destroy(); this.previews?.destroy(); this.cancelViewportUpdate(); clearTimeout(this.thumbTimer); clearTimeout(this.companionThumbTimer); clearTimeout(this.brushTimer); clearTimeout(this.penTimer); this.generation++; this.spreadGeneration++; this.engine?.destroy(); this.companionEngine?.destroy(); this.abort.abort(); this.resizeObserver?.disconnect(); }
+  destroy() { this.textEditor?.destroy(); this.previews?.destroy(); this.detail?.destroy(); this.companionDetail?.destroy(); this.cancelViewportUpdate(); clearTimeout(this.thumbTimer); clearTimeout(this.companionThumbTimer); clearTimeout(this.brushTimer); clearTimeout(this.penTimer); this.generation++; this.spreadGeneration++; this.engine?.destroy(); this.companionEngine?.destroy(); this.abort.abort(); this.resizeObserver?.disconnect(); }
 }

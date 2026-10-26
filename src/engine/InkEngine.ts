@@ -27,6 +27,8 @@ export class InkEngine {
   private gestureTool: Tool | null = null;
   private frame = 0;
   private ratio = 1;
+  private pixelSize?: { cssWidth: number; deviceWidth: number };
+  private pixelObserver: ResizeObserver;
   private dirtyInk = false;
   private history: Item[][] = [];
   private future: Item[][] = [];
@@ -58,6 +60,16 @@ export class InkEngine {
     live.addEventListener('contextmenu', e => e.preventDefault(), options);
     this.eraserCursor = new EraserCursor(live, () => ({ pageWidth: this.page?.width, tool: this.options.tool,
       size: this.options.eraserSize, activePointer: this.activePointer, rect: this.inputRect }), this.abort.signal);
+    this.pixelObserver = new ResizeObserver(entries => {
+      const entry = entries[0], deviceWidth = entry?.devicePixelContentBoxSize?.[0]?.inlineSize;
+      if (!deviceWidth) return;
+      const cssWidth = entry.contentBoxSize?.[0]?.inlineSize ?? entry.contentRect.width;
+      if (this.pixelSize?.cssWidth === cssWidth && this.pixelSize.deviceWidth === deviceWidth) return;
+      this.pixelSize = { cssWidth, deviceWidth };
+      if (this.page && !this.live.closest('.zoom-preview')) this.resize();
+    });
+    try { this.pixelObserver.observe(live, { box: 'device-pixel-content-box' }); }
+    catch { this.pixelObserver.observe(live); }
     window.addEventListener('blur', () => { this.samsungButton.reset(); if (this.activePointer !== null) this.cancel(); }, options);
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.samsungButton.reset(); }, options);
   }
@@ -69,7 +81,9 @@ export class InkEngine {
     if (!this.page) return;
     this.inputRect = undefined;
     const rect = this.live.getBoundingClientRect();
-    const target = Math.max(1, (rect.width / this.page.width) * devicePixelRatio);
+    const physicalWidth = this.pixelSize && Math.abs(this.pixelSize.cssWidth - rect.width) < 1
+      ? Math.max(this.pixelSize.deviceWidth, rect.width * devicePixelRatio) : rect.width * devicePixelRatio;
+    const target = Math.max(1, physicalWidth / this.page.width);
     // Keep ink at native display density on large tablets when possible.
     // The pixel cap still bounds the two canvas layers (and the second page).
     const ratio = Math.min(target, Math.sqrt(18000000 / (this.page.width * this.page.height)));
@@ -352,5 +366,5 @@ export class InkEngine {
     if (this.live.hasPointerCapture(e.pointerId)) this.live.releasePointerCapture(e.pointerId);
   }
   previewEraserSize() { this.eraserCursor.previewSize(); }
-  destroy() { this.cancel(); this.abort.abort(); this.eraserCursor.destroy(); cancelAnimationFrame(this.frame); }
+  destroy() { this.cancel(); this.abort.abort(); this.pixelObserver.disconnect(); this.eraserCursor.destroy(); cancelAnimationFrame(this.frame); }
 }
