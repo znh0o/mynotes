@@ -99,6 +99,7 @@ test('custom book positions survive reopening and switching sort modes', async (
   await page.goto('./');
   for (const name of ['자리를 옮길 노트', '두 번째 책', '세 번째 책']) await createNote(page, name);
   await page.locator('[data-action=library-mode][data-id=bookshelf]').click();
+  await expect(page.locator('.book-spine')).toHaveCount(4);
   const titles = () => page.locator('.book-title').allTextContents();
   const recent = await titles();
   await page.getByRole('button', { name: '사용자 지정', exact: true }).click();
