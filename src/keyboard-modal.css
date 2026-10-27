@@ -6,17 +6,23 @@
   margin-top: 0;
   margin-bottom: 0;
   transform: translateY(-50%);
+  overflow: hidden;
 }
 
-.modal.keyboard-open header {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: inherit;
+.modal.keyboard-open form {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(var(--modal-visible-height, 100dvh) - 16px);
+  overflow: hidden;
 }
 
-.modal.keyboard-open footer {
-  position: sticky;
-  bottom: 0;
-  z-index: 1;
+.modal.keyboard-open .modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.modal.keyboard-open :is(header, footer) {
+  flex: 0 0 auto;
 }
