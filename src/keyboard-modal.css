@@ -1,0 +1,31 @@
+/* Keep the note form usable above the on-screen keyboard on landscape tablets. */
+.modal.keyboard-open {
+  top: 8px;
+  bottom: auto;
+  max-height: calc(var(--modal-visible-height, 100dvh) - 16px);
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.new-note-dialog.keyboard-open .new-note-options {
+  display: none;
+}
+
+.new-note-dialog.keyboard-open header {
+  padding-top: 12px;
+  padding-bottom: 8px;
+}
+
+.new-note-dialog.keyboard-open .modal-body {
+  padding-top: 4px;
+  padding-bottom: 0;
+}
+
+.new-note-dialog.keyboard-open .modal-body > .form-label {
+  margin-bottom: 12px;
+}
+
+.new-note-dialog.keyboard-open footer {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}

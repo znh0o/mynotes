@@ -17,7 +17,25 @@ export function modal(title: string, content: string, submitLabel: string, submi
   const dialog = document.createElement('dialog'); dialog.className = 'modal';
   dialog.innerHTML = `<form><header><div><h2>${escape(title)}</h2></div><button type="button" class="icon-button" data-close aria-label="닫기">${icon('X')}</button></header><div class="modal-body">${content}</div><footer><button type="button" class="button secondary" data-close>취소</button><button type="submit" class="button primary">${escape(submitLabel)}</button></footer></form>`;
   dialog.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', () => dialog.close()));
-  dialog.addEventListener('close', () => dialog.remove());
+  const keyboardState = window as Window & { __notelinKeyboardInset?: number; __notelinKeyboardUsableHeight?: number };
+  const fitKeyboard = () => {
+    const viewport = window.visualViewport;
+    const density = window.devicePixelRatio || 1;
+    const nativeVisible = keyboardState.__notelinKeyboardInset
+      ? (keyboardState.__notelinKeyboardUsableHeight ?? Infinity) / density : Infinity;
+    const visible = Math.min(window.innerHeight, viewport?.height ?? Infinity, nativeVisible);
+    const keyboardOpen = Number(keyboardState.__notelinKeyboardInset || 0) / density > 100
+      || window.innerHeight - (viewport?.height ?? window.innerHeight) > 100;
+    dialog.classList.toggle('keyboard-open', keyboardOpen);
+    dialog.style.setProperty('--modal-visible-height', `${Math.max(120, visible)}px`);
+  };
+  window.addEventListener('notelin-keyboard-inset', fitKeyboard);
+  window.visualViewport?.addEventListener('resize', fitKeyboard);
+  dialog.addEventListener('close', () => {
+    window.removeEventListener('notelin-keyboard-inset', fitKeyboard);
+    window.visualViewport?.removeEventListener('resize', fitKeyboard);
+    dialog.remove();
+  });
   dialog.addEventListener('click', e => { if (e.target === dialog) { const r = dialog.getBoundingClientRect(); const m = e as MouseEvent; if (m.clientX < r.left || m.clientX > r.right || m.clientY < r.top || m.clientY > r.bottom) dialog.close(); } });
   dialog.querySelector('form')!.addEventListener('submit', async e => {
     e.preventDefault(); const btn = dialog.querySelector<HTMLButtonElement>('[type=submit]')!;
@@ -25,7 +43,7 @@ export function modal(title: string, content: string, submitLabel: string, submi
     try { await submit(new FormData(e.target as HTMLFormElement), dialog); dialog.close(); }
     catch (error) { report(error); } finally { btn.disabled = false; }
   });
-  document.body.append(dialog); dialog.showModal(); trackDialog(dialog); return dialog;
+  document.body.append(dialog); dialog.showModal(); fitKeyboard(); trackDialog(dialog); return dialog;
 }
 export function confirmAction(title: string, description: string, label: string, action: () => Promise<void>) {
   return modal(title, `<p class="dialog-description">${escape(description)}</p>`, label, action);

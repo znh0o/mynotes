@@ -3,6 +3,9 @@ package app.notelin.android;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Color;
+import android.graphics.Point;
+import android.graphics.Rect;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.MotionEvent;
 import android.view.View;
@@ -16,6 +19,7 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     private boolean dark;
     private boolean stylusButtonDown;
+    private int keyboardInset = -1;
 
     @Override public void onCreate(Bundle state) {
         registerPlugin(NotelinDevicePlugin.class);
@@ -30,6 +34,23 @@ public class MainActivity extends BridgeActivity {
             Insets safe = insets.getInsets(safeTypes);
             Insets keyboard = insets.getInsets(WindowInsetsCompat.Type.ime());
             view.setPadding(safe.left, safe.top, safe.right, Math.max(safe.bottom, keyboard.bottom));
+            if (keyboard.bottom != keyboardInset && bridge != null) {
+                keyboardInset = keyboard.bottom;
+                int windowHeight;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    Rect bounds = getWindowManager().getCurrentWindowMetrics().getBounds();
+                    windowHeight = bounds.height();
+                } else {
+                    Point size = new Point();
+                    getWindowManager().getDefaultDisplay().getRealSize(size);
+                    windowHeight = size.y;
+                }
+                int usableHeight = Math.max(0, windowHeight - keyboard.bottom - safe.top);
+                bridge.getWebView().evaluateJavascript(
+                    "window.__notelinKeyboardInset=" + keyboard.bottom +
+                    ";window.__notelinKeyboardUsableHeight=" + usableHeight +
+                    ";window.dispatchEvent(new Event('notelin-keyboard-inset'))", null);
+            }
             return insets;
         });
         if (bridge != null) bridge.getWebView().setOverScrollMode(View.OVER_SCROLL_NEVER);
