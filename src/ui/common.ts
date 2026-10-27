@@ -28,6 +28,7 @@ export function modal(title: string, content: string, submitLabel: string, submi
       || window.innerHeight - (viewport?.height ?? window.innerHeight) > 100;
     dialog.classList.toggle('keyboard-open', keyboardOpen);
     dialog.style.setProperty('--modal-visible-height', `${Math.max(120, visible)}px`);
+    dialog.style.setProperty('--modal-center-y', `${(viewport?.offsetTop ?? 0) + visible / 2}px`);
   };
   window.addEventListener('notelin-keyboard-inset', fitKeyboard);
   window.visualViewport?.addEventListener('resize', fitKeyboard);

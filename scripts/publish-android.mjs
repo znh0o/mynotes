@@ -36,7 +36,7 @@ if (!release) {
   const revision = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
   release = await api('/releases', 'POST', {
     tag_name: tag, target_commitish: revision, name: `Notelin ${version} — Android`, draft: true, prerelease: false,
-    body: 'Android 설치형 Notelin입니다.\n\n- 새 노트 이름 입력을 Android 입력창으로 변경해 웹 입력창이 키보드 위로 밀리는 문제 대응\n- 이름 입력 중에는 시스템 상태바를 잠시 표시하고, 입력이 끝나면 원래 화면으로 복귀\n- 기존 노트·필기·PDF 편집·백업·업데이트 기능 유지\n\n기존 PWA 노트는 PWA의 설정 → 전체 백업 후 APK의 백업 파일 복원으로 옮겨 주세요. 첫 설치와 업데이트의 마지막 확인은 Android 시스템에서 진행합니다.',
+    body: 'Android 설치형 Notelin입니다.\n\n- 키보드 높이가 Android와 WebView에서 중복 적용되지 않도록 화면 여백 수정\n- 새 노트 이름, 노트 검색, 폴더 이름 등 기존 입력 화면 유지\n- 키보드를 열어도 새 노트의 표지·속지 설정 유지\n- 기존 노트·필기·PDF 편집·백업·업데이트 기능 유지\n\n기존 PWA 노트는 PWA의 설정 → 전체 백업 후 APK의 백업 파일 복원으로 옮겨 주세요. 첫 설치와 업데이트의 마지막 확인은 Android 시스템에서 진행합니다.',
   });
 }
 for (const [assetName, content, type] of [[name, bytes, 'application/vnd.android.package-archive'], [`${name}.sha256`, Buffer.from(checksum), 'text/plain'], ['Notelin.apk', bytes, 'application/vnd.android.package-archive']]) {

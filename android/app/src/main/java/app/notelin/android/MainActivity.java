@@ -19,7 +19,6 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     private boolean dark;
     private boolean stylusButtonDown;
-    private boolean titleInputOpen;
     private int keyboardInset = -1;
 
     @Override public void onCreate(Bundle state) {
@@ -34,7 +33,10 @@ public class MainActivity extends BridgeActivity {
             if (!isTablet()) safeTypes |= WindowInsetsCompat.Type.statusBars();
             Insets safe = insets.getInsets(safeTypes);
             Insets keyboard = insets.getInsets(WindowInsetsCompat.Type.ime());
-            view.setPadding(safe.left, safe.top, safe.right, Math.max(safe.bottom, keyboard.bottom));
+            // WebView and adjustResize already account for the IME. Padding the
+            // root by the IME height again leaves almost no room for web inputs.
+            view.setPadding(safe.left, safe.top, safe.right,
+                insets.isVisible(WindowInsetsCompat.Type.ime()) ? 0 : safe.bottom);
             if (keyboard.bottom != keyboardInset && bridge != null) {
                 keyboardInset = keyboard.bottom;
                 int windowHeight;
@@ -52,7 +54,9 @@ public class MainActivity extends BridgeActivity {
                     ";window.__notelinKeyboardUsableHeight=" + usableHeight +
                     ";window.dispatchEvent(new Event('notelin-keyboard-inset'))", null);
             }
-            return insets;
+            return new WindowInsetsCompat.Builder(insets)
+                .setInsets(safeTypes, Insets.NONE)
+                .build();
         });
         if (bridge != null) bridge.getWebView().setOverScrollMode(View.OVER_SCROLL_NEVER);
         applyChrome();
@@ -105,7 +109,6 @@ public class MainActivity extends BridgeActivity {
     private boolean isTablet() { return getResources().getConfiguration().smallestScreenWidthDp >= 600; }
 
     public void setDarkChrome(boolean value) { dark = value; applyChrome(); }
-    public void setTitleInputOpen(boolean value) { titleInputOpen = value; applyChrome(); }
 
     private void applyChrome() {
         WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
@@ -115,7 +118,7 @@ public class MainActivity extends BridgeActivity {
         // Hiding navigation bars makes Android consume the first edge gesture
         // to reveal system controls. Keep Back available on the first gesture.
         controller.show(WindowInsetsCompat.Type.navigationBars());
-        if (isTablet() && !titleInputOpen) controller.hide(WindowInsetsCompat.Type.statusBars());
+        if (isTablet()) controller.hide(WindowInsetsCompat.Type.statusBars());
         else controller.show(WindowInsetsCompat.Type.statusBars());
         getWindow().getDecorView().setBackgroundColor(Color.parseColor(dark ? "#0e1624" : "#f4f7ff"));
         ViewCompat.requestApplyInsets(findViewById(android.R.id.content));

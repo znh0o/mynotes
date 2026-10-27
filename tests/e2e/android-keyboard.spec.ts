@@ -16,11 +16,12 @@ test('new note remains usable when a landscape keyboard covers the lower screen'
     dispatchEvent(new Event('notelin-keyboard-inset'));
   });
   await expect(dialog).toHaveClass(/keyboard-open/);
-  await expect(dialog.locator('.new-note-options')).toBeHidden();
+  await expect(dialog.locator('.new-note-options')).toBeVisible();
+  await expect(dialog.locator('[name=paper][value=grid]')).toBeChecked();
   const bounds = await dialog.boundingBox();
   expect(bounds).not.toBeNull();
-  expect(bounds!.y).toBeLessThan(20);
-  expect(bounds!.y + bounds!.height).toBeLessThan(470);
+  expect(bounds!.y).toBeGreaterThanOrEqual(0);
+  expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(470);
   await title.fill('키보드 화면 검증');
   await page.getByRole('button', { name: '노트 만들기', exact: true }).click();
   await expect(page.locator('.page-loading')).toBeHidden();

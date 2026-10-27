@@ -1,55 +1,22 @@
-/* Keep the note form usable above the on-screen keyboard on landscape tablets. */
-.native-note-title {
-  width: 100%;
-  min-height: 40px;
-  padding: 11px 12px;
-  border: 1px solid #cfdef4;
-  border-radius: 7px;
-  background: #fdfefe;
-  color: #35557e;
-  text-align: left;
-  font-size: 12px;
-}
-
-.native-note-title::after {
-  content: '수정';
-  float: right;
-  color: #648bbd;
-}
-
-:root[data-theme=dark] .native-note-title {
-  background: var(--night-soft);
-  color: var(--night-text);
-  border-color: #3a4e6c;
-}
-
+/* Keep the same dialog above the keyboard without replacing or hiding fields. */
 .modal.keyboard-open {
-  top: 8px;
+  top: var(--modal-center-y, 50dvh);
   bottom: auto;
   max-height: calc(var(--modal-visible-height, 100dvh) - 16px);
   margin-top: 0;
   margin-bottom: 0;
+  transform: translateY(-50%);
 }
 
-.new-note-dialog.keyboard-open .new-note-options {
-  display: none;
+.modal.keyboard-open header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: inherit;
 }
 
-.new-note-dialog.keyboard-open header {
-  padding-top: 12px;
-  padding-bottom: 8px;
-}
-
-.new-note-dialog.keyboard-open .modal-body {
-  padding-top: 4px;
-  padding-bottom: 0;
-}
-
-.new-note-dialog.keyboard-open .modal-body > .form-label {
-  margin-bottom: 12px;
-}
-
-.new-note-dialog.keyboard-open footer {
-  padding-top: 10px;
-  padding-bottom: 10px;
+.modal.keyboard-open footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
 }
