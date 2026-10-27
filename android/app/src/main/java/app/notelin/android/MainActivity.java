@@ -19,6 +19,7 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     private boolean dark;
     private boolean stylusButtonDown;
+    private boolean titleInputOpen;
     private int keyboardInset = -1;
 
     @Override public void onCreate(Bundle state) {
@@ -104,6 +105,7 @@ public class MainActivity extends BridgeActivity {
     private boolean isTablet() { return getResources().getConfiguration().smallestScreenWidthDp >= 600; }
 
     public void setDarkChrome(boolean value) { dark = value; applyChrome(); }
+    public void setTitleInputOpen(boolean value) { titleInputOpen = value; applyChrome(); }
 
     private void applyChrome() {
         WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
@@ -113,7 +115,7 @@ public class MainActivity extends BridgeActivity {
         // Hiding navigation bars makes Android consume the first edge gesture
         // to reveal system controls. Keep Back available on the first gesture.
         controller.show(WindowInsetsCompat.Type.navigationBars());
-        if (isTablet()) controller.hide(WindowInsetsCompat.Type.statusBars());
+        if (isTablet() && !titleInputOpen) controller.hide(WindowInsetsCompat.Type.statusBars());
         else controller.show(WindowInsetsCompat.Type.statusBars());
         getWindow().getDecorView().setBackgroundColor(Color.parseColor(dark ? "#0e1624" : "#f4f7ff"));
         ViewCompat.requestApplyInsets(findViewById(android.R.id.content));

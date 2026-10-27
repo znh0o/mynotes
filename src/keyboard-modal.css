@@ -1,4 +1,28 @@
 /* Keep the note form usable above the on-screen keyboard on landscape tablets. */
+.native-note-title {
+  width: 100%;
+  min-height: 40px;
+  padding: 11px 12px;
+  border: 1px solid #cfdef4;
+  border-radius: 7px;
+  background: #fdfefe;
+  color: #35557e;
+  text-align: left;
+  font-size: 12px;
+}
+
+.native-note-title::after {
+  content: '수정';
+  float: right;
+  color: #648bbd;
+}
+
+:root[data-theme=dark] .native-note-title {
+  background: var(--night-soft);
+  color: var(--night-text);
+  border-color: #3a4e6c;
+}
+
 .modal.keyboard-open {
   top: 8px;
   bottom: auto;

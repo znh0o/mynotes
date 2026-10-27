@@ -6,7 +6,15 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.provider.OpenableColumns;
 import android.util.Base64;
+import android.view.WindowManager;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
+import android.content.Context;
+import android.text.InputType;
+import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.Toast;
+import androidx.appcompat.app.AlertDialog;
 import androidx.activity.result.ActivityResult;
 import androidx.core.content.IntentCompat;
 import com.getcapacitor.JSArray;
@@ -42,6 +50,7 @@ public class NotelinDevicePlugin extends Plugin {
     private final Set<String> receiving = new HashSet<>();
     private File exportDirectory, incomingDirectory;
     private boolean pickerOpen;
+    private boolean titlePromptOpen;
 
     private static class Export {
         File file;
@@ -145,6 +154,54 @@ public class NotelinDevicePlugin extends Plugin {
 
     @PluginMethod public void setAppearance(PluginCall call) {
         getActivity().runOnUiThread(() -> { ((MainActivity) getActivity()).setDarkChrome(call.getBoolean("dark", false)); call.resolve(); });
+    }
+
+    @PluginMethod public void promptNoteTitle(PluginCall call) {
+        getActivity().runOnUiThread(() -> {
+            if (titlePromptOpen) { call.reject("노트 이름 입력창이 이미 열려 있어요."); return; }
+            titlePromptOpen = true;
+            MainActivity activity = (MainActivity) getActivity();
+            activity.setTitleInputOpen(true);
+            try {
+                EditText input = new EditText(activity);
+                input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+                input.setSingleLine(true);
+                input.setImeOptions(EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_FULLSCREEN | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
+                input.setHint("제목 없는 노트");
+                input.setText(call.getString("value", ""));
+                input.setSelection(input.length());
+                LinearLayout frame = new LinearLayout(activity);
+                int padding = Math.round(24 * getContext().getResources().getDisplayMetrics().density);
+                frame.setPadding(padding, padding / 2, padding, 0);
+                frame.addView(input, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                JSObject cancelled = new JSObject(); cancelled.put("cancelled", true);
+                AlertDialog dialog = new AlertDialog.Builder(activity)
+                    .setTitle("노트 이름")
+                    .setView(frame)
+                    .setPositiveButton("적용", (target, which) -> {
+                        JSObject result = new JSObject(); result.put("title", input.getText().toString()); call.resolve(result);
+                    })
+                    .setNegativeButton("취소", (target, which) -> call.resolve(cancelled))
+                    .create();
+                dialog.setOnCancelListener(target -> call.resolve(cancelled));
+                dialog.setOnDismissListener(target -> { titlePromptOpen = false; activity.setTitleInputOpen(false); });
+                input.setOnEditorActionListener((field, action, event) -> {
+                    if (action != EditorInfo.IME_ACTION_DONE) return false;
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
+                    return true;
+                });
+                dialog.show();
+                dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE | WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+                input.requestFocus();
+                input.post(() -> ((InputMethodManager) activity.getSystemService(Context.INPUT_METHOD_SERVICE))
+                    .showSoftInput(input, InputMethodManager.SHOW_IMPLICIT));
+            } catch (Exception error) {
+                titlePromptOpen = false;
+                activity.setTitleInputOpen(false);
+                call.reject(error.getMessage(), error);
+            }
+        });
     }
 
     @PluginMethod public void openUpdates(PluginCall call) {

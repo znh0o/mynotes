@@ -13,6 +13,7 @@ interface NotelinDevicePlugin {
   completeDocument(options: { id: string }): Promise<void>;
   setAppearance(options: { dark: boolean }): Promise<void>;
   openUpdates(): Promise<void>;
+  promptNoteTitle(options: { value: string }): Promise<{ title?: string; cancelled?: boolean }>;
   addListener(event: 'documentReceived' | 'stylusButtonPressed', callback: () => void): Promise<PluginListenerHandle>;
 }
 const device = registerPlugin<NotelinDevicePlugin>('NotelinDevice');
@@ -53,6 +54,10 @@ export function pendingNativeDocuments() { return device.pendingDocuments(); }
 export function completeNativeDocument(id: string) { return device.completeDocument({ id }); }
 export function onNativeDocument(callback: () => void) { return device.addListener('documentReceived', callback); }
 export function openNativeUpdates() { return device.openUpdates(); }
+export async function promptNativeNoteTitle(value: string): Promise<string | null> {
+  const result = await device.promptNoteTitle({ value });
+  return result.cancelled ? null : String(result.title ?? '');
+}
 export async function readNativeDocument(document: NativeDocument): Promise<File> {
   if (!Number.isSafeInteger(document.size) || document.size < 0 || document.size > 150 * 1024 * 1024) throw new Error('PDF는 150MB 이하로 가져올 수 있어요.');
   const parts: ArrayBuffer[] = [];

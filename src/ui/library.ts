@@ -3,6 +3,7 @@ import { covers, createNote, paperNames, uid, type Folder, type Note, type Paper
 import { importPDF, thumbnail } from '../data/pdf';
 import { icon, button, escape, safeColor, modal, toast, run, pickFile, contextMenu, confirmAction, formatDate } from './common';
 import { bindPhoneLibrary } from './phone-chrome';
+import { isNativeApp, promptNativeNoteTitle } from '../platform/native';
 export interface LibraryState { filter: string; query: string; sort: string; list: boolean }
 interface Profile { name: string; school: string; grade: string; classroom: string }
 const emptyProfile = (): Profile => ({ name: '', school: '', grade: '', classroom: '' });
@@ -237,13 +238,26 @@ export class LibraryView {
   }
   private folderId() { return this.folders.some(f => f.id === this.filter) ? this.filter : null; }
   newNote() {
-    const dialog = modal('새 노트', `<label class="form-label">노트 이름<input name="title" placeholder="제목 없는 노트" maxlength="100" /></label><div class="new-note-options"><span class="form-label">표지 색상</span><div class="cover-options">${covers.map((c, i) => `<label style="--cover:${c}"><input type="radio" name="cover" value="${c}" ${i === 0 ? 'checked' : ''} aria-label="표지 색상 ${i + 1}" /><span>${icon('Check', 18)}</span></label>`).join('')}</div><span class="form-label">속지 선택</span><div class="paper-options">${Object.entries(paperNames).map(([p, label]) => `<label><input type="radio" name="paper" value="${p}" ${p === 'lined' ? 'checked' : ''}/><div class="paper-mini ${p}"></div><span>${label}</span></label>`).join('')}</div><div class="form-row"><label class="form-label">페이지 크기<select name="size"><option value="a4">A4</option><option value="a5">A5</option><option value="b5">B5</option></select></label><label class="form-label">방향<select name="orientation"><option value="portrait">세로</option><option value="landscape">가로</option></select></label><label class="form-label">종이 색<input name="paperColor" type="color" value="#fffefb" /></label></div></div>`, '노트 만들기', async data => {
+    const titleField = isNativeApp
+      ? `<div class="form-label">노트 이름<input type="hidden" name="title" value="" /><button class="native-note-title" type="button" data-native-title>제목 없는 노트</button></div>`
+      : `<label class="form-label">노트 이름<input name="title" placeholder="제목 없는 노트" maxlength="100" /></label>`;
+    const dialog = modal('새 노트', `${titleField}<div class="new-note-options"><span class="form-label">표지 색상</span><div class="cover-options">${covers.map((c, i) => `<label style="--cover:${c}"><input type="radio" name="cover" value="${c}" ${i === 0 ? 'checked' : ''} aria-label="표지 색상 ${i + 1}" /><span>${icon('Check', 18)}</span></label>`).join('')}</div><span class="form-label">속지 선택</span><div class="paper-options">${Object.entries(paperNames).map(([p, label]) => `<label><input type="radio" name="paper" value="${p}" ${p === 'lined' ? 'checked' : ''}/><div class="paper-mini ${p}"></div><span>${label}</span></label>`).join('')}</div><div class="form-row"><label class="form-label">페이지 크기<select name="size"><option value="a4">A4</option><option value="a5">A5</option><option value="b5">B5</option></select></label><label class="form-label">방향<select name="orientation"><option value="portrait">세로</option><option value="landscape">가로</option></select></label><label class="form-label">종이 색<input name="paperColor" type="color" value="#fffefb" /></label></div></div>`, '노트 만들기', async data => {
       const size = ({ a4: [794, 1123], a5: [559, 794], b5: [665, 945] } as Record<string, number[]>)[String(data.get('size'))];
       const [width, height] = data.get('orientation') === 'landscape' ? [...size].reverse() : size;
       const { note, page } = createNote(String(data.get('title')).trim() || '제목 없는 노트', String(data.get('cover')), this.folderId(), { paper: data.get('paper') as Paper, paperColor: String(data.get('paperColor')), width, height });
       await persistNew(note, [page]); await this.openNote(note.id);
     });
     dialog.classList.add('new-note-dialog');
+    if (isNativeApp) {
+      const trigger = dialog.querySelector<HTMLButtonElement>('[data-native-title]')!;
+      const field = dialog.querySelector<HTMLInputElement>('[name=title]')!;
+      trigger.addEventListener('click', () => run(async () => {
+        const title = await promptNativeNoteTitle(field.value);
+        if (title === null || !dialog.open) return;
+        field.value = title.slice(0, 100);
+        trigger.textContent = field.value.trim() || '제목 없는 노트';
+      }));
+    }
   }
   private folderDialog(folder?: Folder) {
     modal(folder ? '폴더 이름 변경' : '새 폴더', `<label class="form-label">폴더 이름<input name="name" value="${escape(folder?.name || '')}" placeholder="예: 이번 학기" required maxlength="60" autofocus /></label>`, folder ? '저장' : '폴더 만들기', async data => {
