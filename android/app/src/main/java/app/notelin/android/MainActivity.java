@@ -23,7 +23,11 @@ public class MainActivity extends BridgeActivity {
     private boolean stylusButtonDown;
     private int keyboardInset = -1;
     private StudyBrowserPanel studyBrowser;
+    private StudyBrowserPanel studyAi;
+    private StudyBrowserPanel activeStudyPanel;
     private float studyBrowserRatio = 1f / 5f;
+    private float studyAiRatio = 1f / 5f;
+    private boolean studyPanelOccluded;
 
     @Override public void onCreate(Bundle state) {
         registerPlugin(NotelinDevicePlugin.class);
@@ -32,7 +36,7 @@ public class MainActivity extends BridgeActivity {
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         View content = findViewById(android.R.id.content);
         content.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
-            if (studyBrowser != null && right - left != oldRight - oldLeft) layoutStudyBrowser();
+            if (activeStudyPanel != null && right - left != oldRight - oldLeft) layoutStudyPanel();
         });
         ViewCompat.setOnApplyWindowInsetsListener(content, (view, insets) -> {
             int safeTypes = WindowInsetsCompat.Type.navigationBars() | WindowInsetsCompat.Type.captionBar()
@@ -89,10 +93,10 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void observeStylusButton(MotionEvent event) {
-        if (studyBrowser != null && studyBrowser.getVisibility() == View.VISIBLE) {
+        if (activeStudyPanel != null && activeStudyPanel.getVisibility() == View.VISIBLE) {
             int[] location = new int[2];
-            studyBrowser.getLocationOnScreen(location);
-            if (event.getRawX() >= location[0] && event.getRawX() < location[0] + studyBrowser.getWidth()) {
+            activeStudyPanel.getLocationOnScreen(location);
+            if (event.getRawX() >= location[0] && event.getRawX() < location[0] + activeStudyPanel.getWidth()) {
                 stylusButtonDown = false;
                 return;
             }
@@ -126,61 +130,79 @@ public class MainActivity extends BridgeActivity {
     public void setDarkChrome(boolean value) { dark = value; applyChrome(); }
 
     public void openStudyBrowser(String url) {
-        if (studyBrowser != null) { if (url != null) studyBrowser.openUrl(url); return; }
-        FrameLayout content = findViewById(android.R.id.content);
-        studyBrowser = new StudyBrowserPanel(this, () -> closeStudyBrowser(true), this::resizeStudyBrowser);
-        studyBrowser.setDark(dark);
-        FrameLayout.LayoutParams layout = new FrameLayout.LayoutParams(studyBrowserWidth(),
-            FrameLayout.LayoutParams.MATCH_PARENT, Gravity.RIGHT | Gravity.TOP);
-        content.addView(studyBrowser, layout);
-        studyBrowser.bringToFront();
-        notifyStudyBrowserSize();
+        if (studyBrowser == null) studyBrowser = new StudyBrowserPanel(this, false, () -> closeStudyPanel(true), this::resizeStudyPanel);
+        showStudyPanel(studyBrowser);
         if (url != null) studyBrowser.openUrl(url);
     }
 
-    public void closeStudyBrowser() { closeStudyBrowser(false); }
-    public void setStudyBrowserOccluded(boolean hidden) {
-        if (studyBrowser != null) studyBrowser.setVisibility(hidden ? View.GONE : View.VISIBLE);
+    public void openStudyAI() {
+        boolean firstOpen = studyAi == null;
+        if (firstOpen) studyAi = new StudyBrowserPanel(this, true, () -> closeStudyPanel(true), this::resizeStudyPanel);
+        showStudyPanel(studyAi);
+        if (firstOpen) studyAi.openUrl("https://chatgpt.com/");
     }
 
-    private void closeStudyBrowser(boolean notifyWeb) {
-        if (studyBrowser == null) return;
+    private void showStudyPanel(StudyBrowserPanel panel) {
+        if (activeStudyPanel != null && activeStudyPanel != panel) {
+            activeStudyPanel.hidePanel();
+        }
+        activeStudyPanel = panel;
         FrameLayout content = findViewById(android.R.id.content);
-        content.removeView(studyBrowser);
-        studyBrowser.release();
-        studyBrowser = null;
+        FrameLayout.LayoutParams layout = new FrameLayout.LayoutParams(studyPanelWidth(),
+            FrameLayout.LayoutParams.MATCH_PARENT, Gravity.RIGHT | Gravity.TOP);
+        if (panel.getParent() == null) content.addView(panel, layout); else panel.setLayoutParams(layout);
+        panel.setVisibility(studyPanelOccluded ? View.GONE : View.VISIBLE);
+        panel.setDark(dark);
+        panel.bringToFront();
+        notifyStudyPanelSize();
+    }
+
+    public void closeStudyPanel() { closeStudyPanel(false); }
+    public void setStudyPanelOccluded(boolean hidden) {
+        studyPanelOccluded = hidden;
+        if (activeStudyPanel != null) activeStudyPanel.setVisibility(hidden ? View.GONE : View.VISIBLE);
+    }
+
+    private void closeStudyPanel(boolean notifyWeb) {
+        if (activeStudyPanel == null) return;
+        activeStudyPanel.hidePanel();
+        activeStudyPanel = null;
+        studyPanelOccluded = false;
         if (notifyWeb && bridge != null) bridge.getWebView().evaluateJavascript(
             "window.dispatchEvent(new Event('notelin-study-browser-closed'))", null);
     }
 
-    private int studyBrowserWidth() {
+    private int studyPanelWidth() {
         if (!isTablet()) return FrameLayout.LayoutParams.MATCH_PARENT;
-        return Math.round(studyBrowserAvailableWidth() * studyBrowserRatio);
+        return Math.round(studyBrowserAvailableWidth() * activeStudyRatio());
     }
+
+    private float activeStudyRatio() { return activeStudyPanel == studyAi ? studyAiRatio : studyBrowserRatio; }
 
     private int studyBrowserAvailableWidth() {
         View content = findViewById(android.R.id.content);
         return Math.max(1, content.getWidth() - content.getPaddingLeft() - content.getPaddingRight());
     }
 
-    private void resizeStudyBrowser(int width) {
-        if (studyBrowser == null || !isTablet()) return;
+    private void resizeStudyPanel(int width) {
+        if (activeStudyPanel == null || !isTablet()) return;
         int available = studyBrowserAvailableWidth();
-        studyBrowserRatio = Math.max(.1f, Math.min(.8f, (float) width / available));
-        layoutStudyBrowser();
+        float ratio = Math.max(.1f, Math.min(.8f, (float) width / available));
+        if (activeStudyPanel == studyAi) studyAiRatio = ratio; else studyBrowserRatio = ratio;
+        layoutStudyPanel();
     }
 
-    private void layoutStudyBrowser() {
-        if (studyBrowser == null) return;
-        FrameLayout.LayoutParams layout = (FrameLayout.LayoutParams) studyBrowser.getLayoutParams();
-        layout.width = studyBrowserWidth();
-        studyBrowser.setLayoutParams(layout);
-        notifyStudyBrowserSize();
+    private void layoutStudyPanel() {
+        if (activeStudyPanel == null) return;
+        FrameLayout.LayoutParams layout = (FrameLayout.LayoutParams) activeStudyPanel.getLayoutParams();
+        layout.width = studyPanelWidth();
+        activeStudyPanel.setLayoutParams(layout);
+        notifyStudyPanelSize();
     }
 
-    private void notifyStudyBrowserSize() {
+    private void notifyStudyPanelSize() {
         if (bridge == null) return;
-        float ratio = isTablet() ? studyBrowserRatio : 1;
+        float ratio = isTablet() ? activeStudyRatio() : 1;
         bridge.getWebView().evaluateJavascript("window.dispatchEvent(new CustomEvent('notelin-study-browser-resized',{detail:{ratio:"
             + ratio + "}}))", null);
     }
@@ -197,6 +219,7 @@ public class MainActivity extends BridgeActivity {
         else controller.show(WindowInsetsCompat.Type.statusBars());
         getWindow().getDecorView().setBackgroundColor(Color.parseColor(dark ? "#0e1624" : "#f4f7ff"));
         if (studyBrowser != null) studyBrowser.setDark(dark);
+        if (studyAi != null) studyAi.setDark(dark);
         ViewCompat.requestApplyInsets(findViewById(android.R.id.content));
     }
 
@@ -207,17 +230,22 @@ public class MainActivity extends BridgeActivity {
 
     @Override public void onPause() {
         if (studyBrowser != null) studyBrowser.persistSession();
+        if (studyAi != null) studyAi.persistSession();
         super.onPause();
     }
 
     @Override public void onConfigurationChanged(Configuration configuration) {
         super.onConfigurationChanged(configuration);
         applyChrome();
-        findViewById(android.R.id.content).post(this::layoutStudyBrowser);
+        findViewById(android.R.id.content).post(this::layoutStudyPanel);
     }
 
     @Override public void onDestroy() {
-        closeStudyBrowser();
+        closeStudyPanel();
+        FrameLayout content = findViewById(android.R.id.content);
+        if (studyBrowser != null) { content.removeView(studyBrowser); studyBrowser.release(); }
+        if (studyAi != null) { content.removeView(studyAi); studyAi.release(); }
+        studyBrowser = null; studyAi = null;
         super.onDestroy();
     }
 }

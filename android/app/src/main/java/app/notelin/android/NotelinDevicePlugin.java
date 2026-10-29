@@ -154,12 +154,19 @@ public class NotelinDevicePlugin extends Plugin {
         });
     }
 
-    @PluginMethod public void closeStudyBrowser(PluginCall call) {
-        getActivity().runOnUiThread(() -> { ((MainActivity) getActivity()).closeStudyBrowser(); call.resolve(); });
+    @PluginMethod public void openStudyAI(PluginCall call) {
+        getActivity().runOnUiThread(() -> {
+            try { ((MainActivity) getActivity()).openStudyAI(); call.resolve(); }
+            catch (Exception error) { call.reject("AI 패널을 열지 못했어요.", error); }
+        });
     }
 
-    @PluginMethod public void setStudyBrowserOccluded(PluginCall call) {
-        getActivity().runOnUiThread(() -> { ((MainActivity) getActivity()).setStudyBrowserOccluded(call.getBoolean("hidden", false)); call.resolve(); });
+    @PluginMethod public void closeStudyPanel(PluginCall call) {
+        getActivity().runOnUiThread(() -> { ((MainActivity) getActivity()).closeStudyPanel(); call.resolve(); });
+    }
+
+    @PluginMethod public void setStudyPanelOccluded(PluginCall call) {
+        getActivity().runOnUiThread(() -> { ((MainActivity) getActivity()).setStudyPanelOccluded(call.getBoolean("hidden", false)); call.resolve(); });
     }
 
     @PluginMethod public void openUpdates(PluginCall call) {

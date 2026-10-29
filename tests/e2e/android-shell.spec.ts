@@ -9,7 +9,7 @@ async function nativeBridge(page: Page, pdf = '') {
       ? { ...matchMedia(query), matches: true } as MediaQueryList : matchMedia(query);
     const state = win.nativeTest = {
       listeners: {} as Record<string, (data: unknown) => void>, chunks: [] as string[], exports: [] as string[],
-      cancel: false, updates: 0, updateAvailable: true, browserOpens: 0, browserCloses: 0, browserHidden: false, browserAddresses: [] as string[],
+      cancel: false, updates: 0, updateAvailable: true, browserOpens: 0, aiOpens: 0, browserCloses: 0, browserHidden: false, browserAddresses: [] as string[],
       documents: pdf && !sessionStorage.getItem('native-pdf-consumed') ? [{ id: 'android-pdf', name: 'Android에서 연 PDF.pdf', size: atob(pdf).length }] : [],
     };
     win.androidBridge = {};
@@ -17,7 +17,7 @@ async function nativeBridge(page: Page, pdf = '') {
     win.Capacitor = {
       PluginHeaders: [
         { name: 'App', methods: methods(['addListener', 'removeListener']) },
-        { name: 'NotelinDevice', methods: methods(['addListener', 'removeListener', 'setAppearance', 'pendingDocuments', 'readDocument', 'completeDocument', 'beginExport', 'appendExport', 'finishExport', 'cancelExport', 'openUpdates', 'openStudyBrowser', 'closeStudyBrowser', 'setStudyBrowserOccluded']) },
+        { name: 'NotelinDevice', methods: methods(['addListener', 'removeListener', 'setAppearance', 'pendingDocuments', 'readDocument', 'completeDocument', 'beginExport', 'appendExport', 'finishExport', 'cancelExport', 'openUpdates', 'openStudyBrowser', 'openStudyAI', 'closeStudyPanel', 'setStudyPanelOccluded']) },
         { name: 'NotelinUpdater', methods: methods(['addListener', 'removeListener', 'check', 'install']) },
       ],
       nativeCallback: (_plugin: string, _method: string, options: any, callback: (data: unknown) => void) => {
@@ -35,8 +35,9 @@ async function nativeBridge(page: Page, pdf = '') {
         if (method === 'finishExport') { state.exports.push(btoa(state.chunks.join(''))); return { saved: !state.cancel }; }
         if (method === 'openUpdates') state.updates++;
         if (method === 'openStudyBrowser') { state.browserOpens++; state.browserAddresses.push(options.url || ''); }
-        if (method === 'closeStudyBrowser') state.browserCloses++;
-        if (method === 'setStudyBrowserOccluded') state.browserHidden = options.hidden;
+        if (method === 'openStudyAI') state.aiOpens++;
+        if (method === 'closeStudyPanel') state.browserCloses++;
+        if (method === 'setStudyPanelOccluded') state.browserHidden = options.hidden;
         if (method === 'check') return { available: state.updateAvailable, version: state.updateAvailable ? '2.0.1' : '2.0.0', installedVersion: '2.0.0' };
         if (method === 'install') { state.updates++; state.listeners.downloadProgress?.({ percent: 100 }); return { needsPermission: false }; }
         return {};
@@ -108,7 +109,7 @@ test('Android opens the library without installation UI and routes Back and back
   expect(await page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).length)).toBe(0);
 });
 
-test('AI opens ChatGPT in the shared browser panel and does not toggle it closed', async ({ page }) => {
+test('AI and internet use separate panels and switch without closing the other context', async ({ page }) => {
   await nativeBridge(page);
   await page.goto('./');
   await page.getByRole('button', { name: 'Notelin 시작 가이드 열기', exact: true }).click();
@@ -116,12 +117,28 @@ test('AI opens ChatGPT in the shared browser panel and does not toggle it closed
   const ai = page.getByRole('button', { name: 'AI · ChatGPT 열기', exact: true });
   await expect(ai).toBeVisible();
   await ai.click();
-  await expect(internet).toHaveAttribute('aria-expanded', 'true');
-  await expect.poll(() => page.evaluate(() => (window as any).nativeTest.browserAddresses)).toEqual(['https://chatgpt.com/']);
-  await ai.click();
-  await expect(internet).toHaveAttribute('aria-expanded', 'true');
-  await expect.poll(() => page.evaluate(() => (window as any).nativeTest.browserAddresses)).toEqual(['https://chatgpt.com/', 'https://chatgpt.com/']);
+  await expect(ai).toHaveAttribute('aria-expanded', 'true');
+  await expect(internet).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('.editor-shell')).toHaveAttribute('data-study-panel', 'ai');
+  expect(await page.evaluate(() => (window as any).nativeTest.browserOpens)).toBe(0);
+  expect(await page.evaluate(() => (window as any).nativeTest.aiOpens)).toBe(1);
   await internet.click();
+  await expect(internet).toHaveAttribute('aria-expanded', 'true');
+  await expect(ai).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('.editor-shell')).toHaveAttribute('data-study-panel', 'browser');
+  expect(await page.evaluate(() => (window as any).nativeTest.browserCloses)).toBe(0);
+  await ai.click();
+  await expect(ai).toHaveAttribute('aria-expanded', 'true');
+  await expect(internet).toHaveAttribute('aria-expanded', 'false');
+  expect(await page.evaluate(() => (window as any).nativeTest.browserOpens)).toBe(1);
+  expect(await page.evaluate(() => (window as any).nativeTest.aiOpens)).toBe(2);
+  await ai.click();
+  await expect(ai).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('.editor-shell')).not.toHaveClass(/study-browser-open/);
+  expect(await page.evaluate(() => (window as any).nativeTest.browserCloses)).toBe(1);
+  await ai.click();
+  await page.evaluate(() => dispatchEvent(new Event('notelin-study-browser-closed')));
+  await expect(ai).toHaveAttribute('aria-expanded', 'false');
   await expect(internet).toHaveAttribute('aria-expanded', 'false');
 });
 

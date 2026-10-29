@@ -34,6 +34,9 @@ import java.util.function.IntConsumer;
 /** A separate WebView for web research. It never receives Capacitor's bridge. */
 final class StudyBrowserPanel extends LinearLayout {
     private final MainActivity activity;
+    private final boolean aiMode;
+    private final LinearLayout aiHeader;
+    private final TextView aiTitle, aiBack;
     private final LinearLayout toolbar;
     private final LinearLayout addressRow;
     private final FrameLayout resizeHandle, page;
@@ -50,16 +53,17 @@ final class StudyBrowserPanel extends LinearLayout {
     private LinearLayout bookmarksPanel;
     private int surfaceColor, inkColor, mutedColor;
 
-    StudyBrowserPanel(MainActivity activity, Runnable close, IntConsumer resize) {
+    StudyBrowserPanel(MainActivity activity, boolean aiMode, Runnable close, IntConsumer resize) {
         super(activity);
         this.activity = activity;
+        this.aiMode = aiMode;
         bookmarks = new BrowserBookmarks(activity);
         web = new WebView(activity);
         setOrientation(HORIZONTAL);
         setElevation(dp(12));
 
         resizeHandle = new FrameLayout(activity);
-        resizeHandle.setContentDescription("인터넷 패널 너비 조절");
+        resizeHandle.setContentDescription(aiMode ? "AI 패널 너비 조절" : "인터넷 패널 너비 조절");
         resizeHandle.setFocusable(true);
         grip = new View(activity);
         FrameLayout.LayoutParams gripLayout = new FrameLayout.LayoutParams(dp(3), dp(46), Gravity.CENTER);
@@ -93,11 +97,30 @@ final class StudyBrowserPanel extends LinearLayout {
         LinearLayout body = new LinearLayout(activity);
         body.setOrientation(VERTICAL);
         addView(body, new LayoutParams(0, LayoutParams.MATCH_PARENT, 1));
+        aiHeader = new LinearLayout(activity);
+        aiHeader.setGravity(Gravity.CENTER_VERTICAL);
+        aiHeader.setPadding(dp(3), 0, dp(3), 0);
+        aiHeader.setVisibility(aiMode ? View.VISIBLE : View.GONE);
+        body.addView(aiHeader, new LayoutParams(LayoutParams.MATCH_PARENT, dp(38)));
+        aiBack = headerAction("‹", "AI 이전 화면", () -> {
+            WebView current = activeBrowser();
+            if (current.canGoBack()) current.goBack(); else if (current != web) closePopup(current);
+        });
+        aiTitle = new TextView(activity);
+        aiTitle.setText("ChatGPT");
+        aiTitle.setTextSize(12);
+        aiTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+        aiTitle.setSingleLine(true); aiTitle.setEllipsize(TextUtils.TruncateAt.END);
+        aiHeader.addView(aiTitle, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1));
+        headerAction("↻", "AI 새로고침", () -> { if (activeBrowser().getUrl() != null) activeBrowser().reload(); });
+        headerAction("×", "AI 패널 닫기", close);
         addressRow = new LinearLayout(activity);
+        addressRow.setVisibility(aiMode ? View.GONE : View.VISIBLE);
         addressRow.setPadding(dp(6), dp(6), dp(6), 0);
         body.addView(addressRow, new LayoutParams(LayoutParams.MATCH_PARENT, dp(46)));
 
         toolbar = new LinearLayout(activity);
+        toolbar.setVisibility(aiMode ? View.GONE : View.VISIBLE);
         toolbar.setGravity(Gravity.CENTER_VERTICAL);
         toolbar.setPadding(dp(3), 0, dp(3), 0);
         body.addView(toolbar, new LayoutParams(LayoutParams.MATCH_PARENT, dp(38)));
@@ -144,7 +167,7 @@ final class StudyBrowserPanel extends LinearLayout {
         page.addView(web, new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
 
         placeholder = new TextView(activity);
-        placeholder.setText("필기하면서 필요한 내용을 찾아보세요.\n위 검색창에 검색어나 주소를 입력하세요.");
+        placeholder.setText(aiMode ? "ChatGPT를 불러오는 중…" : "필기하면서 필요한 내용을 찾아보세요.\n위 검색창에 검색어나 주소를 입력하세요.");
         placeholder.setTextSize(13);
         placeholder.setGravity(Gravity.CENTER);
         placeholder.setPadding(dp(14), 0, dp(14), 0);
@@ -164,6 +187,15 @@ final class StudyBrowserPanel extends LinearLayout {
         button.setContentDescription(description);
         button.setOnClickListener(view -> listener.run());
         toolbar.addView(button, new LayoutParams(0, dp(38), 1));
+        actions.add(button);
+        return button;
+    }
+
+    private TextView headerAction(String glyph, String description, Runnable listener) {
+        TextView button = new TextView(activity);
+        button.setText(glyph); button.setTextSize(21); button.setGravity(Gravity.CENTER);
+        button.setContentDescription(description); button.setOnClickListener(view -> listener.run());
+        aiHeader.addView(button, new LayoutParams(dp(32), dp(38)));
         actions.add(button);
         return button;
     }
@@ -204,6 +236,7 @@ final class StudyBrowserPanel extends LinearLayout {
                 placeholder.setVisibility(View.GONE);
                 view.setVisibility(View.VISIBLE);
                 if (!address.hasFocus()) address.setText(isWebAddress(Uri.parse(url)) ? url : "");
+                updateAiTitle(url);
             }
             @Override public void onReceivedError(WebView view, WebResourceRequest request, android.webkit.WebResourceError error) {
                 if (!request.isForMainFrame() || view != activeBrowser()) return;
@@ -305,6 +338,7 @@ final class StudyBrowserPanel extends LinearLayout {
 
     private void showBookmarks() {
         if (bookmarksPanel != null) { closeBookmarks(); return; }
+        hideKeyboard();
         renderBookmarks();
     }
 
@@ -328,7 +362,6 @@ final class StudyBrowserPanel extends LinearLayout {
 
     private void renderBookmarks() {
         closeBookmarks();
-        hideKeyboard();
         bookmarksPanel = new LinearLayout(activity);
         bookmarksPanel.setOrientation(VERTICAL);
         bookmarksPanel.setBackgroundColor(surfaceColor);
@@ -406,8 +439,16 @@ final class StudyBrowserPanel extends LinearLayout {
     private void updateNavigation() {
         WebView current = activeBrowser();
         back.setAlpha(current.canGoBack() || current != web ? 1 : .35f);
+        aiBack.setAlpha(current.canGoBack() || current != web ? 1 : .35f);
         forward.setAlpha(current.canGoForward() ? 1 : .35f);
         bookmarkButton.setText(bookmarks.contains(current.getUrl()) ? "★" : "☆");
+        updateAiTitle(current.getUrl());
+    }
+
+    private void updateAiTitle(String url) {
+        if (!aiMode) return;
+        String host = url == null ? null : Uri.parse(url).getHost();
+        aiTitle.setText(host == null || host.equals("chatgpt.com") || host.endsWith(".chatgpt.com") ? "ChatGPT" : host);
     }
 
     void setDark(boolean dark) {
@@ -417,6 +458,8 @@ final class StudyBrowserPanel extends LinearLayout {
         surfaceColor = surface; inkColor = ink; mutedColor = muted;
         setBackgroundColor(surface);
         toolbar.setBackgroundColor(surface);
+        aiHeader.setBackgroundColor(surface);
+        aiTitle.setTextColor(ink);
         addressRow.setBackgroundColor(surface);
         resizeHandle.setBackgroundColor(Color.parseColor(dark ? "#22344b" : "#eef2f8"));
         GradientDrawable handle = new GradientDrawable();
@@ -435,6 +478,8 @@ final class StudyBrowserPanel extends LinearLayout {
     }
 
     void persistSession() { CookieManager.getInstance().flush(); }
+
+    void hidePanel() { hideKeyboard(); persistSession(); setVisibility(View.GONE); }
 
     void release() {
         hideKeyboard();

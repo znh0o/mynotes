@@ -3,7 +3,7 @@
   border-right: 1px solid #d6dfed;
 }
 
-.editor-header-actions [data-action=study-browser][aria-expanded=true] {
+.editor-header-actions :is([data-action=study-browser],[data-action=study-ai])[aria-expanded=true] {
   color: #2d66b9;
   background: #e6efff;
   border-radius: 7px;
@@ -15,7 +15,7 @@
   letter-spacing: -.3px;
 }
 
-:root[data-theme=dark] .editor-header-actions [data-action=study-browser][aria-expanded=true] {
+:root[data-theme=dark] .editor-header-actions :is([data-action=study-browser],[data-action=study-ai])[aria-expanded=true] {
   color: #c7dbff;
   background: #284467;
 }

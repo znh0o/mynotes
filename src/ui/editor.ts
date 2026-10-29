@@ -17,7 +17,7 @@ import { brushKey, brushProfile, inkTools, isInkTool, type BrushProfile, type In
 import { defaultPenCollection, duplicatePen, isPenKind, penKinds, penNames, type PenCollection, type PenKind, type PenPreset } from '../data/pen-presets';
 import { loadSharedPens, sharedPensKey } from '../data/shared-pens';
 import { bindPhoneEditor } from './phone-chrome';
-import { closeNativeStudyBrowser, isNativeApp, openNativeStudyBrowser, setNativeStudyBrowserOccluded } from '../platform/native';
+import { closeNativeStudyPanel, isNativeApp, openNativeStudyBrowser, openNativeStudyAI, setNativeStudyPanelOccluded } from '../platform/native';
 
 const shapeChoices: { id: Shape; name: string; drawing: string }[] = [
   { id: 'rect', name: '사각형', drawing: '<rect x="8" y="11" width="40" height="30" rx="2" />' },
@@ -73,8 +73,8 @@ export class EditorView {
   private brushTimer?: ReturnType<typeof setTimeout>;
   private brushWrites = Promise.resolve();
   private textEditor!: InlineTextEditor;
-  private studyBrowserOpen = false;
-  private studyBrowserOccluded = false;
+  private studyPanel: 'browser' | 'ai' | null = null;
+  private studyPanelOccluded = false;
   private studyBrowserObserver?: MutationObserver;
   private temporaryNoticeTimer?: ReturnType<typeof setTimeout>;
   constructor(private root: HTMLElement, public note: Note,
@@ -107,8 +107,8 @@ export class EditorView {
     if (isNativeApp) {
       this.root.querySelector('[data-action=search]')!.insertAdjacentHTML('beforebegin',
         button('Globe2', '인터넷 패널', 'study-browser', 'aria-expanded="false"')
-        + '<button class="icon-button study-ai-button" type="button" data-action="study-ai" aria-label="AI · ChatGPT 열기" title="AI · ChatGPT 열기">AI</button>');
-      this.studyBrowserObserver = new MutationObserver(() => this.syncStudyBrowserOverlay());
+        + '<button class="icon-button study-ai-button" type="button" data-action="study-ai" aria-label="AI · ChatGPT 열기" title="AI · ChatGPT 열기" aria-expanded="false">AI</button>');
+      this.studyBrowserObserver = new MutationObserver(() => this.syncStudyPanelOverlay());
       this.studyBrowserObserver.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['open'] });
     }
     if (this.note.temporary) {
@@ -127,7 +127,7 @@ export class EditorView {
       }, 4000);
     }
     bindPhoneEditor(this.root, this.abort.signal);
-    window.addEventListener('notelin-study-browser-closed', () => this.setStudyBrowserOpen(false), { signal: this.abort.signal });
+    window.addEventListener('notelin-study-browser-closed', () => this.setStudyPanel(null), { signal: this.abort.signal });
     window.addEventListener('notelin-study-browser-resized', event => {
       const ratio = (event as CustomEvent<{ ratio: number }>).detail?.ratio;
       if (Number.isFinite(ratio) && ratio >= .1 && ratio <= 1) {
@@ -135,7 +135,7 @@ export class EditorView {
       }
     }, { signal: this.abort.signal });
     window.addEventListener('notelin-native-back', event => {
-      if (this.studyBrowserOpen && !this.studyBrowserOccluded) { event.preventDefault(); run(() => this.toggleStudyBrowser()); }
+      if (this.studyPanel && !this.studyPanelOccluded) { event.preventDefault(); run(() => this.closeStudyPanel()); }
     }, { signal: this.abort.signal });
     if (isNativeApp) window.addEventListener('notelin-native-stylus-button', () => {
       if (!document.querySelector('dialog[open]')) this.togglePenEraser();
@@ -627,8 +627,8 @@ export class EditorView {
       else this.paperSettings();
     }
     if (action === 'search') this.search();
-    if (action === 'study-browser') run(() => this.toggleStudyBrowser());
-    if (action === 'study-ai') run(() => this.openStudyBrowser('https://chatgpt.com/'));
+    if (action === 'study-browser') run(() => this.toggleStudyPanel('browser'));
+    if (action === 'study-ai') run(() => this.toggleStudyPanel('ai'));
     if (action === 'settings') this.settings();
     if (action === 'save') run(async () => { await this.flush(); await this.saveThumbnail(this.page); toast('저장했어요.'); });
     if (action === 'save-to-library') run(async () => {
@@ -1165,32 +1165,36 @@ export class EditorView {
       }
     }, { signal, passive: false });
   }
-  private setStudyBrowserOpen(open: boolean) {
-    this.studyBrowserOpen = open;
-    if (!open) this.studyBrowserOccluded = false;
-    this.root.querySelector('.editor-shell')?.classList.toggle('study-browser-open', open);
-    this.root.querySelector('[data-action=study-browser]')?.setAttribute('aria-expanded', String(open));
+  private setStudyPanel(mode: 'browser' | 'ai' | null) {
+    this.studyPanel = mode;
+    if (!mode) this.studyPanelOccluded = false;
+    const shell = this.root.querySelector<HTMLElement>('.editor-shell');
+    shell?.classList.toggle('study-browser-open', !!mode);
+    if (shell) shell.dataset.studyPanel = mode || 'none';
+    this.root.querySelector('[data-action=study-browser]')?.setAttribute('aria-expanded', String(mode === 'browser'));
+    this.root.querySelector('[data-action=study-ai]')?.setAttribute('aria-expanded', String(mode === 'ai'));
   }
-  private syncStudyBrowserOverlay() {
-    if (!this.studyBrowserOpen) return;
+  private syncStudyPanelOverlay() {
+    if (!this.studyPanel) return;
     const hidden = !!document.querySelector('dialog[open]');
-    if (hidden === this.studyBrowserOccluded) return;
-    this.studyBrowserOccluded = hidden;
-    void setNativeStudyBrowserOccluded(hidden).catch(report);
+    if (hidden === this.studyPanelOccluded) return;
+    this.studyPanelOccluded = hidden;
+    void setNativeStudyPanelOccluded(hidden).catch(report);
   }
-  private async toggleStudyBrowser() {
-    if (this.studyBrowserOpen) {
-      this.setStudyBrowserOpen(false);
-      await closeNativeStudyBrowser();
-    } else {
-      await this.openStudyBrowser();
-    }
+  private async closeStudyPanel() {
+    const previous = this.studyPanel;
+    this.setStudyPanel(null);
+    try { await closeNativeStudyPanel(); }
+    catch (error) { this.setStudyPanel(previous); throw error; }
   }
-  private async openStudyBrowser(url?: string) {
-    const wasOpen = this.studyBrowserOpen;
-    this.setStudyBrowserOpen(true);
-    try { await openNativeStudyBrowser(url); this.syncStudyBrowserOverlay(); }
-    catch (error) { if (!wasOpen) this.setStudyBrowserOpen(false); throw error; }
+  private async toggleStudyPanel(mode: 'browser' | 'ai') {
+    if (this.studyPanel === mode) return this.closeStudyPanel();
+    const previous = this.studyPanel;
+    this.setStudyPanel(mode);
+    try {
+      if (mode === 'ai') await openNativeStudyAI(); else await openNativeStudyBrowser();
+      this.syncStudyPanelOverlay();
+    } catch (error) { this.setStudyPanel(previous); throw error; }
   }
-  destroy() { this.studyBrowserObserver?.disconnect(); if (this.studyBrowserOpen) void closeNativeStudyBrowser().catch(console.error); this.textEditor?.destroy(); this.previews?.destroy(); this.detail?.destroy(); this.companionDetail?.destroy(); this.cancelViewportUpdate(); clearTimeout(this.thumbTimer); clearTimeout(this.temporaryNoticeTimer); clearTimeout(this.companionThumbTimer); clearTimeout(this.brushTimer); clearTimeout(this.penTimer); this.generation++; this.spreadGeneration++; this.engine?.destroy(); this.companionEngine?.destroy(); this.abort.abort(); this.resizeObserver?.disconnect(); }
+  destroy() { this.studyBrowserObserver?.disconnect(); if (this.studyPanel) void closeNativeStudyPanel().catch(console.error); this.textEditor?.destroy(); this.previews?.destroy(); this.detail?.destroy(); this.companionDetail?.destroy(); this.cancelViewportUpdate(); clearTimeout(this.thumbTimer); clearTimeout(this.temporaryNoticeTimer); clearTimeout(this.companionThumbTimer); clearTimeout(this.brushTimer); clearTimeout(this.penTimer); this.generation++; this.spreadGeneration++; this.engine?.destroy(); this.companionEngine?.destroy(); this.abort.abort(); this.resizeObserver?.disconnect(); }
 }

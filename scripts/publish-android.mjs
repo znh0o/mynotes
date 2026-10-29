@@ -36,7 +36,7 @@ if (!release) {
   const revision = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
   release = await api('/releases', 'POST', {
     tag_name: tag, target_commitish: revision, name: `Notelin ${version} — Android`, draft: true, prerelease: false,
-    body: 'Android 설치형 Notelin입니다.\n\n- 인터넷·AI 패널의 기본 너비를 화면의 1/6에서 1/5로 확대\n- 패널 왼쪽 손잡이로 너비 조절 가능\n\n첫 설치와 업데이트의 마지막 확인은 Android 시스템에서 진행합니다.',
+    body: 'Android 설치형 Notelin입니다.\n\n- 인터넷과 AI를 별도의 패널로 분리\n- AI 패널의 주소 입력줄과 인터넷 도구를 숨기고 간결한 ChatGPT 헤더 표시\n- 인터넷 페이지와 AI 대화 화면을 각각 유지하며 전환\n- 인터넷·AI 패널의 너비도 각각 조절\n\n첫 설치와 업데이트의 마지막 확인은 Android 시스템에서 진행합니다.',
   });
 }
 for (const [assetName, content, type] of [[name, bytes, 'application/vnd.android.package-archive'], [`${name}.sha256`, Buffer.from(checksum), 'text/plain'], ['Notelin.apk', bytes, 'application/vnd.android.package-archive']]) {

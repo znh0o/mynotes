@@ -14,8 +14,9 @@ interface NotelinDevicePlugin {
   setAppearance(options: { dark: boolean }): Promise<void>;
   openUpdates(): Promise<void>;
   openStudyBrowser(options: { url?: string }): Promise<void>;
-  closeStudyBrowser(): Promise<void>;
-  setStudyBrowserOccluded(options: { hidden: boolean }): Promise<void>;
+  openStudyAI(): Promise<void>;
+  closeStudyPanel(): Promise<void>;
+  setStudyPanelOccluded(options: { hidden: boolean }): Promise<void>;
   addListener(event: 'documentReceived' | 'stylusButtonPressed', callback: () => void): Promise<PluginListenerHandle>;
 }
 const device = registerPlugin<NotelinDevicePlugin>('NotelinDevice');
@@ -61,8 +62,9 @@ export function completeNativeDocument(id: string) { return device.completeDocum
 export function onNativeDocument(callback: () => void) { return device.addListener('documentReceived', callback); }
 export function openNativeUpdates() { return device.openUpdates(); }
 export function openNativeStudyBrowser(url?: string) { return device.openStudyBrowser(url ? { url } : {}); }
-export function closeNativeStudyBrowser() { return device.closeStudyBrowser(); }
-export function setNativeStudyBrowserOccluded(hidden: boolean) { return device.setStudyBrowserOccluded({ hidden }); }
+export function openNativeStudyAI() { return device.openStudyAI(); }
+export function closeNativeStudyPanel() { return device.closeStudyPanel(); }
+export function setNativeStudyPanelOccluded(hidden: boolean) { return device.setStudyPanelOccluded({ hidden }); }
 export async function readNativeDocument(document: NativeDocument): Promise<File> {
   if (!Number.isSafeInteger(document.size) || document.size < 0 || document.size > 150 * 1024 * 1024) throw new Error('PDF는 150MB 이하로 가져올 수 있어요.');
   const parts: ArrayBuffer[] = [];
