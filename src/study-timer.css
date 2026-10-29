@@ -1,0 +1,47 @@
+.editor-header .study-timer-trigger.is-running{position:relative;color:#fff}
+.editor-header .study-timer-trigger.is-running::after{content:'';position:absolute;right:3px;top:3px;width:5px;height:5px;border-radius:50%;background:#8ce0bb}
+.study-timer-panel{position:fixed;z-index:65;top:48px;right:11px;width:316px;max-width:calc(100vw - 22px);max-height:calc(100dvh - 60px);overflow:auto;padding:18px;border:1px solid #d7e1ee;border-radius:14px;background:#fff;color:#263d5b;box-shadow:0 18px 48px #213b632d;font-size:12px;touch-action:pan-y}
+.study-timer-panel[hidden]{display:none}
+.study-timer-heading,.study-timer-saved-heading{display:flex;align-items:center;justify-content:space-between}
+.study-timer-heading strong{font-size:15px;font-weight:700}
+.study-timer-heading button,.study-timer-saved-heading button,.study-timer-delete{display:inline-flex;align-items:center;justify-content:center;gap:5px;border-radius:7px;color:#6480a4}
+.study-timer-heading button{width:28px;height:28px}
+.study-timer-heading button:hover,.study-timer-saved-heading button:hover,.study-timer-delete:hover{background:#edf3fc;color:#3064b9}
+.study-timer-clock{margin-top:8px;text-align:center;font-size:42px;line-height:1.2;font-weight:650;letter-spacing:-.05em;font-variant-numeric:tabular-nums;color:#254a83}
+.study-timer-status{min-height:19px;margin:2px 0 15px;text-align:center;color:#7187a4;font-size:11px}
+.study-timer-label{display:block;margin-bottom:5px;color:#526985;font-size:11px;font-weight:650}
+.study-timer-name,.study-timer-duration input{box-sizing:border-box;border:1px solid #dbe4ef;border-radius:8px;background:#f9fbfe;color:#263d5b;outline:none}
+.study-timer-name{width:100%;height:36px;padding:0 10px;font:inherit}
+.study-timer-name:focus,.study-timer-duration input:focus{border-color:#6794d8;box-shadow:0 0 0 2px #e1edff}
+.study-timer-duration{display:flex;align-items:flex-end;justify-content:center;gap:8px;margin:12px 0 14px}
+.study-timer-duration label{display:grid;gap:5px;min-width:0;flex:1;text-align:center;color:#6d819c;font-size:10px}
+.study-timer-duration input{width:100%;height:38px;text-align:center;font-size:17px;font-weight:600;font-variant-numeric:tabular-nums}
+.study-timer-duration>span{padding-bottom:11px;color:#8295ad;font-weight:700}
+.study-timer-controls{display:flex;gap:7px}
+.study-timer-controls button{flex:1;min-height:36px;border:1px solid #dce5f1;border-radius:8px;background:#f7f9fd;color:#405d81;font-weight:650}
+.study-timer-controls button:hover{background:#eaf1fc}
+.study-timer-controls .study-timer-main{border-color:#366bc2;background:#366bc2;color:#fff}
+.study-timer-controls .study-timer-main:hover{background:#295cad}
+.study-timer-controls button[hidden]{display:none}
+.study-timer-saved-heading{margin:19px 0 8px;padding-top:14px;border-top:1px solid #e8edf5}
+.study-timer-saved-heading strong{font-size:11px}
+.study-timer-saved-heading button{min-height:27px;padding:0 7px;color:#3268bb;font-size:11px;font-weight:650}
+.study-timer-presets{display:grid;gap:5px;max-height:156px;overflow-y:auto}
+.study-timer-presets>p{margin:6px 0 2px;color:#8394a9;font-size:11px}
+.study-timer-preset{display:flex;align-items:stretch;min-height:37px;border:1px solid #e6ebf3;border-radius:8px;background:#fafbfd}
+.study-timer-preset.selected{border-color:#8aade8;background:#eef5ff}
+.study-timer-preset>button:first-child{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0;flex:1;padding:0 10px;text-align:left}
+.study-timer-preset>button:first-child span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.study-timer-preset small{flex:none;color:#7d92ad;font-variant-numeric:tabular-nums}
+.study-timer-delete{width:33px;flex:none}
+@media(max-width:760px){.study-timer-panel{top:56px}}
+:root[data-theme=dark] .study-timer-panel{border-color:#3b4d66;background:#1b283c;color:#e6edf8;box-shadow:0 18px 48px #07101d99}
+:root[data-theme=dark] .study-timer-clock{color:#a9c8ff}
+:root[data-theme=dark] .study-timer-status,:root[data-theme=dark] .study-timer-label,:root[data-theme=dark] .study-timer-duration label{color:#a2b5cf}
+:root[data-theme=dark] .study-timer-name,:root[data-theme=dark] .study-timer-duration input{border-color:#455773;background:#24344b;color:#edf4ff}
+:root[data-theme=dark] .study-timer-controls button{border-color:#455773;background:#2a3b54;color:#d8e7fa}
+:root[data-theme=dark] .study-timer-controls .study-timer-main{border-color:#5288e1;background:#3976d5;color:#fff}
+:root[data-theme=dark] .study-timer-saved-heading{border-top-color:#384b64}
+:root[data-theme=dark] .study-timer-preset{border-color:#3a4b63;background:#233249}
+:root[data-theme=dark] .study-timer-preset.selected{border-color:#6499ed;background:#2b4670}
+:root[data-theme=dark] .study-timer-heading button:hover,:root[data-theme=dark] .study-timer-saved-heading button:hover,:root[data-theme=dark] .study-timer-delete:hover{background:#344d70;color:#bbd5ff}

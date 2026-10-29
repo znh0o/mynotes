@@ -2,7 +2,7 @@ import { penCollection, type PenCollection } from './pen-presets';
 import { uid } from './model';
 
 type Setting = { key: string; value: unknown };
-const globals = new Set(['eraser-settings', 'two-page-view', 'hold-to-line', 'samsung-pen-button-toggle', 'library-columns', 'user-profile']);
+const globals = new Set(['eraser-settings', 'two-page-view', 'hold-to-line', 'samsung-pen-button-toggle', 'library-columns', 'user-profile', 'study-timer-presets', 'study-timer-state']);
 const emptyPens = (): PenCollection => ({ selectedId: '', presets: [] });
 
 export function restoredSettings(input: unknown, noteIds: Set<string>, remapped: Map<string, string>): Setting[] {

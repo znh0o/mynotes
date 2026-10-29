@@ -17,6 +17,7 @@ import { brushKey, brushProfile, inkTools, isInkTool, type BrushProfile, type In
 import { defaultPenCollection, duplicatePen, isPenKind, penKinds, penNames, type PenCollection, type PenKind, type PenPreset } from '../data/pen-presets';
 import { loadSharedPens, sharedPensKey } from '../data/shared-pens';
 import { bindPhoneEditor } from './phone-chrome';
+import { StudyTimer } from './study-timer';
 import { closeNativeStudyPanel, isNativeApp, openNativeStudyBrowser, openNativeStudyAI, setNativeStudyPanelOccluded, studyAIProvider, studyAILabel, type StudyAIProvider } from '../platform/native';
 
 const shapeChoices: { id: Shape; name: string; drawing: string }[] = [
@@ -78,6 +79,7 @@ export class EditorView {
   private studyPanelOccluded = false;
   private studyBrowserObserver?: MutationObserver;
   private temporaryNoticeTimer?: ReturnType<typeof setTimeout>;
+  private studyTimer?: StudyTimer;
   constructor(private root: HTMLElement, public note: Note,
     private tabs: { id: string; title: string }[], private open: (id: string) => Promise<void>,
     private home: () => Promise<void>, private closeTab: (id: string) => Promise<void>) {
@@ -128,6 +130,8 @@ export class EditorView {
         setTimeout(() => notice.remove(), 250);
       }, 4000);
     }
+    this.studyTimer = new StudyTimer(this.root);
+    await this.studyTimer.start();
     bindPhoneEditor(this.root, this.abort.signal);
     window.addEventListener('notelin-study-browser-closed', () => this.setStudyPanel(null), { signal: this.abort.signal });
     window.addEventListener('notelin-study-browser-resized', event => {
@@ -1204,5 +1208,5 @@ export class EditorView {
       this.syncStudyPanelOverlay();
     } catch (error) { this.setStudyPanel(previous); throw error; }
   }
-  destroy() { this.studyBrowserObserver?.disconnect(); if (this.studyPanel) void closeNativeStudyPanel().catch(console.error); this.textEditor?.destroy(); this.previews?.destroy(); this.detail?.destroy(); this.companionDetail?.destroy(); this.cancelViewportUpdate(); clearTimeout(this.thumbTimer); clearTimeout(this.temporaryNoticeTimer); clearTimeout(this.companionThumbTimer); clearTimeout(this.brushTimer); clearTimeout(this.penTimer); this.generation++; this.spreadGeneration++; this.engine?.destroy(); this.companionEngine?.destroy(); this.abort.abort(); this.resizeObserver?.disconnect(); }
+  destroy() { this.studyTimer?.destroy(); this.studyBrowserObserver?.disconnect(); if (this.studyPanel) void closeNativeStudyPanel().catch(console.error); this.textEditor?.destroy(); this.previews?.destroy(); this.detail?.destroy(); this.companionDetail?.destroy(); this.cancelViewportUpdate(); clearTimeout(this.thumbTimer); clearTimeout(this.temporaryNoticeTimer); clearTimeout(this.companionThumbTimer); clearTimeout(this.brushTimer); clearTimeout(this.penTimer); this.generation++; this.spreadGeneration++; this.engine?.destroy(); this.companionEngine?.destroy(); this.abort.abort(); this.resizeObserver?.disconnect(); }
 }

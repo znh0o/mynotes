@@ -36,7 +36,7 @@ if (!release) {
   const revision = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
   release = await api('/releases', 'POST', {
     tag_name: tag, target_commitish: revision, name: `Notelin ${version} — Android`, draft: true, prerelease: false,
-    body: 'Android 설치형 Notelin입니다.\n\n- 서재 설정에서 AI 서비스를 ChatGPT, Gemini, Claude 중 고를 수 있습니다. 필기 화면의 AI 버튼은 선택한 서비스를 엽니다.\n- 필기 화면의 앱 설정 버튼을 제거하고 속지 설정을 보기 옵션에 배치했습니다.\n- 타이핑 색상을 펜 색과 분리하고 노트별로 기억합니다.\n- 기존 노트, PDF, 필기와 웹 패널 쿠키는 유지합니다.\n\n로그인 유지는 웹사이트의 쿠키와 저장소를 사용합니다. Notelin은 비밀번호를 별도로 저장하지 않습니다. 서비스에 따라 WebView 로그인을 제한할 수 있으며 Gemini와 Claude 로그인은 실제 기기에서 확인이 필요합니다.\n\n첫 설치와 업데이트의 마지막 확인은 Android 시스템에서 진행합니다.',
+    body: 'Android 설치형 Notelin입니다.\n\n- 필기 화면에 타이머를 추가했습니다. 이름과 시간을 지정해 저장하고 다른 노트에서 다시 사용할 수 있습니다.\n- 시작, 일시정지, 계속, 초기화를 지원하며 노트를 바꾸거나 앱을 다시 열어도 실행 시간은 유지됩니다.\n- 기존 노트, PDF, 필기와 웹 패널 로그인 정보는 유지합니다.\n\n타이머 완료 알림은 Notelin이 열려 있을 때 표시됩니다. Android가 앱을 완전히 종료한 상태의 시스템 알림은 지원하지 않습니다.\n\n첫 설치와 업데이트의 마지막 확인은 Android 시스템에서 진행합니다.',
   });
 }
 for (const [assetName, content, type] of [[name, bytes, 'application/vnd.android.package-archive'], [`${name}.sha256`, Buffer.from(checksum), 'text/plain'], ['Notelin.apk', bytes, 'application/vnd.android.package-archive']]) {
