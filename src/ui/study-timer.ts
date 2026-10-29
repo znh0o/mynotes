@@ -38,6 +38,7 @@ export class StudyTimer {
   private selectedId: string | null = null;
   private state: TimerState | null = null;
   private trigger: HTMLButtonElement;
+  private mini: HTMLElement;
   private panel: HTMLElement;
   private interval?: ReturnType<typeof setInterval>;
   private writes = Promise.resolve();
@@ -48,6 +49,8 @@ export class StudyTimer {
     viewButton.insertAdjacentHTML('beforebegin', button('Clock', '타이머', 'timer', 'aria-haspopup="true" aria-expanded="false" aria-controls="study-timer-panel"'));
     this.trigger = root.querySelector<HTMLButtonElement>('[data-action=timer]')!;
     this.trigger.classList.add('study-timer-trigger');
+    root.querySelector('.editor-page-controls')!.insertAdjacentHTML('afterend', `<div class="study-timer-mini" role="group" aria-label="실행 중인 타이머" hidden><button type="button" class="study-timer-mini-time" data-timer-action="open" aria-label="타이머 열기">${icon('Clock', 14)}<span>25:00</span></button><button type="button" class="study-timer-mini-toggle" data-timer-action="mini-toggle" aria-label="일시정지" title="일시정지">${icon('Pause', 14)}</button></div>`);
+    this.mini = root.querySelector<HTMLElement>('.study-timer-mini')!;
     root.querySelector('.editor-header')!.insertAdjacentHTML('beforeend', `<section class="study-timer-panel" id="study-timer-panel" aria-label="타이머" hidden>
       <div class="study-timer-heading"><strong>타이머</strong><button type="button" data-timer-action="close" aria-label="타이머 닫기">${icon('X', 17)}</button></div>
       <div class="study-timer-clock" aria-live="off">25:00</div><div class="study-timer-status" role="status">시간을 정하고 시작하세요</div>
@@ -58,6 +61,7 @@ export class StudyTimer {
     </section>`);
     this.panel = root.querySelector<HTMLElement>('#study-timer-panel')!;
     this.trigger.addEventListener('click', () => this.toggle(), { signal: this.abort.signal });
+    this.mini.addEventListener('click', event => { const action = (event.target as Element).closest<HTMLElement>('[data-timer-action]'); if (action) void this.act(action); }, { signal: this.abort.signal });
     this.panel.addEventListener('click', event => { const action = (event.target as Element).closest<HTMLElement>('[data-timer-action]'); if (action) void this.act(action); }, { signal: this.abort.signal });
     this.panel.addEventListener('input', event => { if ((event.target as Element).matches('.study-timer-duration input')) this.renderClock(); }, { signal: this.abort.signal });
     document.addEventListener('pointerdown', event => {
@@ -94,7 +98,7 @@ export class StudyTimer {
   }
   private toggle() { this.panel.hidden ? this.open() : this.close(); }
   private open() { this.panel.hidden = false; this.trigger.setAttribute('aria-expanded', 'true'); this.tick(); }
-  private close() { this.panel.hidden = true; this.trigger.setAttribute('aria-expanded', 'false'); }
+  private close() { this.panel.hidden = true; this.trigger.setAttribute('aria-expanded', 'false'); this.renderClock(); }
 
   private tick() {
     if (this.state?.endsAt !== null && this.state?.endsAt !== undefined) {
@@ -121,6 +125,12 @@ export class StudyTimer {
     this.trigger.classList.toggle('is-running', running);
     this.trigger.setAttribute('aria-label', running ? `타이머 ${formatTime(remaining)} 남음` : '타이머');
     this.trigger.title = running ? `${state!.name} · ${formatTime(remaining)} 남음` : '타이머';
+    this.mini.hidden = !state || state.finished || !this.panel.hidden;
+    this.mini.querySelector<HTMLElement>('.study-timer-mini-time span')!.textContent = formatTime(remaining);
+    const toggle = this.mini.querySelector<HTMLButtonElement>('.study-timer-mini-toggle')!;
+    toggle.innerHTML = icon(running ? 'Pause' : 'Play', 14);
+    toggle.setAttribute('aria-label', running ? '타이머 일시정지' : '타이머 계속');
+    toggle.title = running ? '타이머 일시정지' : '타이머 계속';
   }
   private renderPresets() {
     const list = this.panel.querySelector<HTMLElement>('.study-timer-presets')!;
@@ -129,6 +139,15 @@ export class StudyTimer {
   private async act(target: HTMLElement) {
     const action = target.dataset.timerAction;
     if (action === 'close') return this.close();
+    if (action === 'open') return this.open();
+    if (action === 'mini-toggle' && this.state) {
+      if (this.state.endsAt) {
+        this.state = { ...this.state, remaining: Math.max(0, Math.ceil((this.state.endsAt - Date.now()) / 1000)), endsAt: null };
+      } else {
+        this.state = { ...this.state, remaining: this.state.remaining || this.state.seconds, endsAt: Date.now() + (this.state.remaining || this.state.seconds) * 1000, finished: false };
+      }
+      this.persist(stateKey, this.state); this.renderClock(); return;
+    }
     if (action === 'select') {
       const preset = this.presets.find(item => item.id === target.dataset.id);
       if (!preset) return;
@@ -168,5 +187,5 @@ export class StudyTimer {
       this.persist(stateKey, this.state); this.renderClock();
     }
   }
-  destroy() { this.abort.abort(); clearInterval(this.interval); this.panel.remove(); this.trigger.remove(); }
+  destroy() { this.abort.abort(); clearInterval(this.interval); this.panel.remove(); this.mini.remove(); this.trigger.remove(); }
 }

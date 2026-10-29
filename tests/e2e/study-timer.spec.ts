@@ -24,6 +24,14 @@ test('named study timers remain available across notes and a running countdown s
   await expect(panel.locator('#study-timer-name')).toHaveValue('국어 복습');
   await panel.locator('[data-timer-action=start]').click();
   await expect(panel.locator('.study-timer-status')).toContainText('진행 중');
+  await panel.getByRole('button', { name: '타이머 닫기' }).click();
+  const compact = page.locator('.study-timer-mini');
+  await expect(compact).toBeVisible();
+  await expect(compact.locator('.study-timer-mini-time')).toContainText(/0:0[1-6]/);
+  await compact.getByRole('button', { name: '타이머 일시정지' }).click();
+  await expect(compact.getByRole('button', { name: '타이머 계속' })).toBeVisible();
+  await compact.getByRole('button', { name: '타이머 계속' }).click();
+  await expect(compact.getByRole('button', { name: '타이머 일시정지' })).toBeVisible();
   await page.getByRole('button', { name: '서재로 돌아가기' }).click();
   await page.getByRole('button', { name: '타이머 둘째 노트 열기' }).click();
   await page.locator('[data-action=timer]').click();
@@ -39,5 +47,11 @@ test('phone document menu can open the timer without covering the writing area',
   await page.getByRole('button', { name: '문서 메뉴' }).click();
   await page.locator('[data-action=timer]').click();
   await expect(page.locator('#study-timer-panel')).toBeVisible();
+  await page.locator('#study-timer-panel [data-timer-action=start]').click();
+  await page.getByRole('button', { name: '타이머 닫기' }).click();
+  await expect(page.locator('.editor-header .study-timer-mini')).toBeVisible();
+  const compact = (await page.locator('.editor-header .study-timer-mini').boundingBox())!;
+  const actions = (await page.locator('.editor-header-actions').boundingBox())!;
+  expect(compact.x + compact.width).toBeLessThanOrEqual(actions.x + 1);
   await expect(page.locator('#paper-live')).toBeVisible();
 });

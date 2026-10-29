@@ -1,5 +1,13 @@
 .editor-header .study-timer-trigger.is-running{position:relative;color:#fff}
 .editor-header .study-timer-trigger.is-running::after{content:'';position:absolute;right:3px;top:3px;width:5px;height:5px;border-radius:50%;background:#8ce0bb}
+.editor-header .study-timer-mini{display:flex;align-items:center;flex:none;align-self:center;height:27px;margin-left:1px;border:1px solid #ffffff55;border-radius:7px;background:#ffffff1b;color:#fff;font-variant-numeric:tabular-nums}
+.editor-header .study-timer-mini[hidden]{display:none}
+.study-timer-mini button{display:inline-flex;align-items:center;justify-content:center;height:100%;color:inherit}
+.study-timer-mini button:hover{background:#ffffff25}
+.study-timer-mini-time{gap:5px;min-width:55px;padding:0 7px;font-size:11px;font-weight:650}
+.study-timer-mini-time svg{flex:none;opacity:.78}
+.study-timer-mini-toggle{width:28px;border-left:1px solid #ffffff45;border-radius:0 6px 6px 0}
+.study-timer-mini-toggle svg{flex:none}
 .study-timer-panel{position:fixed;z-index:65;top:48px;right:11px;width:316px;max-width:calc(100vw - 22px);max-height:calc(100dvh - 60px);overflow:auto;padding:18px;border:1px solid #d7e1ee;border-radius:14px;background:#fff;color:#263d5b;box-shadow:0 18px 48px #213b632d;font-size:12px;touch-action:pan-y}
 .study-timer-panel[hidden]{display:none}
 .study-timer-heading,.study-timer-saved-heading{display:flex;align-items:center;justify-content:space-between}
@@ -34,7 +42,7 @@
 .study-timer-preset>button:first-child span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .study-timer-preset small{flex:none;color:#7d92ad;font-variant-numeric:tabular-nums}
 .study-timer-delete{width:33px;flex:none}
-@media(max-width:760px){.study-timer-panel{top:56px}}
+@media(max-width:760px){.study-timer-panel{top:56px}.editor-header .study-timer-mini{height:30px}.study-timer-mini-time{min-width:43px;gap:0;padding:0 5px;font-size:10px}.study-timer-mini-time svg{display:none}.study-timer-mini-toggle{width:25px}}
 :root[data-theme=dark] .study-timer-panel{border-color:#3b4d66;background:#1b283c;color:#e6edf8;box-shadow:0 18px 48px #07101d99}
 :root[data-theme=dark] .study-timer-clock{color:#a9c8ff}
 :root[data-theme=dark] .study-timer-status,:root[data-theme=dark] .study-timer-label,:root[data-theme=dark] .study-timer-duration label{color:#a2b5cf}
