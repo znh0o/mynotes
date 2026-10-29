@@ -130,7 +130,7 @@ export class EditorView {
         setTimeout(() => notice.remove(), 250);
       }, 4000);
     }
-    this.studyTimer = new StudyTimer(this.root);
+    this.studyTimer = new StudyTimer(this.root, this.note.id);
     await this.studyTimer.start();
     bindPhoneEditor(this.root, this.abort.signal);
     window.addEventListener('notelin-study-browser-closed', () => this.setStudyPanel(null), { signal: this.abort.signal });

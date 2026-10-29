@@ -15,7 +15,7 @@ export function restoredSettings(input: unknown, noteIds: Set<string>, remapped:
       if (value.presets.length) result.push({ key: row.key, value });
     } else if (globals.has(row.key)) result.push({ key: row.key, value: row.value });
     else {
-      const match = /^(note-brush|note-palette|note-shape):([^:]+)(:.*)?$/.exec(row.key);
+      const match = /^(note-brush|note-palette|note-shape|study-timer-state):([^:]+)(:.*)?$/.exec(row.key);
       if (match && noteIds.has(match[2]) && remapped.has(match[2])) result.push({ key: `${match[1]}:${remapped.get(match[2])}${match[3] || ''}`, value: row.value });
     }
   }

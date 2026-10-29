@@ -5,7 +5,7 @@ type Preset = { id: string; name: string; seconds: number };
 type TimerState = { name: string; seconds: number; remaining: number; endsAt: number | null; finished: boolean };
 
 const presetsKey = 'study-timer-presets';
-const stateKey = 'study-timer-state';
+const legacyStateKey = 'study-timer-state';
 const maximumSeconds = 24 * 60 * 60 - 1;
 const validSeconds = (value: unknown): value is number => Number.isInteger(value) && Number(value) > 0 && Number(value) <= maximumSeconds;
 const formatTime = (seconds: number) => {
@@ -43,8 +43,10 @@ export class StudyTimer {
   private interval?: ReturnType<typeof setInterval>;
   private writes = Promise.resolve();
   private abort = new AbortController();
+  private readonly stateKey: string;
 
-  constructor(private root: HTMLElement) {
+  constructor(private root: HTMLElement, noteId: string) {
+    this.stateKey = `study-timer-state:${noteId}`;
     const viewButton = root.querySelector<HTMLElement>('[data-action=view-options]')!;
     viewButton.insertAdjacentHTML('beforebegin', button('Clock', '타이머', 'timer', 'aria-haspopup="true" aria-expanded="false" aria-controls="study-timer-panel"'));
     this.trigger = root.querySelector<HTMLButtonElement>('[data-action=timer]')!;
@@ -72,7 +74,18 @@ export class StudyTimer {
   }
 
   async start() {
-    const [savedPresets, savedState] = await Promise.all([db.settings.get(presetsKey), db.settings.get(stateKey)]);
+    const [savedPresets, ownState] = await Promise.all([db.settings.get(presetsKey), db.settings.get(this.stateKey)]);
+    // Older releases had one global running timer. Transfer it to the first
+    // opened note without duplicating it across every document.
+    const savedState = ownState ?? await db.transaction('rw', db.settings, async () => {
+      const current = await db.settings.get(this.stateKey);
+      if (current) return current;
+      const legacy = await db.settings.get(legacyStateKey);
+      if (!legacy) return undefined;
+      await db.settings.put({ key: this.stateKey, value: legacy.value });
+      await db.settings.delete(legacyStateKey);
+      return legacy;
+    });
     this.presets = Array.isArray(savedPresets?.value) ? savedPresets.value.map(readPreset).filter((preset): preset is Preset => preset !== null).slice(0, 50) : [];
     this.state = readState(savedState?.value);
     if (this.state) this.setInputs(this.state.name, this.state.seconds);
@@ -106,7 +119,7 @@ export class StudyTimer {
       if (remaining === 0) {
         const name = this.state.name;
         this.state = { ...this.state, remaining: 0, endsAt: null, finished: true };
-        this.persist(stateKey, this.state);
+        this.persist(this.stateKey, this.state);
         toast(`${name} 타이머가 끝났어요.`);
         navigator.vibrate?.([150, 100, 150]);
       }
@@ -147,13 +160,13 @@ export class StudyTimer {
       } else {
         this.state = { ...this.state, remaining: this.state.remaining || this.state.seconds, endsAt: Date.now() + (this.state.remaining || this.state.seconds) * 1000, finished: false };
       }
-      this.persist(stateKey, this.state); this.renderClock(); return;
+      this.persist(this.stateKey, this.state); this.renderClock(); return;
     }
     if (action === 'select') {
       const preset = this.presets.find(item => item.id === target.dataset.id);
       if (!preset) return;
       this.selectedId = preset.id; this.setInputs(preset.name, preset.seconds);
-      this.state = null; this.persist(stateKey, null);
+      this.state = null; this.persist(this.stateKey, null);
       this.renderPresets(); this.renderClock(); return;
     }
     if (action === 'delete') {
@@ -173,12 +186,12 @@ export class StudyTimer {
     }
     if (action === 'pause' && this.state?.endsAt) {
       this.state = { ...this.state, remaining: Math.max(0, Math.ceil((this.state.endsAt - Date.now()) / 1000)), endsAt: null };
-      this.persist(stateKey, this.state); this.renderClock(); return;
+      this.persist(this.stateKey, this.state); this.renderClock(); return;
     }
     if (action === 'reset') {
       if (!this.state) return;
       this.state = { ...this.state, remaining: this.state.seconds, endsAt: null, finished: false };
-      this.persist(stateKey, this.state); this.renderClock(); return;
+      this.persist(this.stateKey, this.state); this.renderClock(); return;
     }
     if (action === 'start') {
       const seconds = this.duration();
@@ -187,7 +200,7 @@ export class StudyTimer {
       const resume = this.state && !this.state.finished && !this.state.endsAt && this.state.name === name && this.state.seconds === seconds && this.state.remaining < seconds;
       const remaining = resume ? this.state!.remaining : seconds;
       this.state = { name, seconds, remaining, endsAt: Date.now() + remaining * 1000, finished: false };
-      this.persist(stateKey, this.state); this.renderClock();
+      this.persist(this.stateKey, this.state); this.renderClock();
     }
   }
   destroy() { this.abort.abort(); clearInterval(this.interval); this.panel.remove(); this.mini.remove(); this.trigger.remove(); }
