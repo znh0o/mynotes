@@ -127,6 +127,12 @@ export class EditorView {
     }
     bindPhoneEditor(this.root, this.abort.signal);
     window.addEventListener('notelin-study-browser-closed', () => this.setStudyBrowserOpen(false), { signal: this.abort.signal });
+    window.addEventListener('notelin-study-browser-resized', event => {
+      const ratio = (event as CustomEvent<{ ratio: number }>).detail?.ratio;
+      if (Number.isFinite(ratio) && ratio >= .1 && ratio <= 1) {
+        this.root.querySelector<HTMLElement>('.editor-shell')?.style.setProperty('--study-browser-width', `${ratio * 100}vw`);
+      }
+    }, { signal: this.abort.signal });
     window.addEventListener('notelin-native-back', event => {
       if (this.studyBrowserOpen && !this.studyBrowserOccluded) { event.preventDefault(); run(() => this.toggleStudyBrowser()); }
     }, { signal: this.abort.signal });

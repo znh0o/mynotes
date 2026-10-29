@@ -23,6 +23,7 @@ public class MainActivity extends BridgeActivity {
     private boolean stylusButtonDown;
     private int keyboardInset = -1;
     private StudyBrowserPanel studyBrowser;
+    private float studyBrowserRatio = 1f / 6f;
 
     @Override public void onCreate(Bundle state) {
         registerPlugin(NotelinDevicePlugin.class);
@@ -30,6 +31,9 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(state);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         View content = findViewById(android.R.id.content);
+        content.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
+            if (studyBrowser != null && right - left != oldRight - oldLeft) layoutStudyBrowser();
+        });
         ViewCompat.setOnApplyWindowInsetsListener(content, (view, insets) -> {
             int safeTypes = WindowInsetsCompat.Type.navigationBars() | WindowInsetsCompat.Type.captionBar()
                 | WindowInsetsCompat.Type.displayCutout();
@@ -124,12 +128,13 @@ public class MainActivity extends BridgeActivity {
     public void openStudyBrowser() {
         if (studyBrowser != null) return;
         FrameLayout content = findViewById(android.R.id.content);
-        studyBrowser = new StudyBrowserPanel(this, () -> closeStudyBrowser(true));
+        studyBrowser = new StudyBrowserPanel(this, () -> closeStudyBrowser(true), this::resizeStudyBrowser);
         studyBrowser.setDark(dark);
         FrameLayout.LayoutParams layout = new FrameLayout.LayoutParams(studyBrowserWidth(),
             FrameLayout.LayoutParams.MATCH_PARENT, Gravity.RIGHT | Gravity.TOP);
         content.addView(studyBrowser, layout);
         studyBrowser.bringToFront();
+        notifyStudyBrowserSize();
     }
 
     public void closeStudyBrowser() { closeStudyBrowser(false); }
@@ -148,10 +153,35 @@ public class MainActivity extends BridgeActivity {
     }
 
     private int studyBrowserWidth() {
-        int width = getResources().getConfiguration().screenWidthDp;
-        if (!isTablet() || width < 900) return FrameLayout.LayoutParams.MATCH_PARENT;
-        int browserDp = Math.min(600, Math.max(360, Math.round(width * .4f)));
-        return Math.round(browserDp * getResources().getDisplayMetrics().density);
+        if (!isTablet()) return FrameLayout.LayoutParams.MATCH_PARENT;
+        return Math.round(studyBrowserAvailableWidth() * studyBrowserRatio);
+    }
+
+    private int studyBrowserAvailableWidth() {
+        View content = findViewById(android.R.id.content);
+        return Math.max(1, content.getWidth() - content.getPaddingLeft() - content.getPaddingRight());
+    }
+
+    private void resizeStudyBrowser(int width) {
+        if (studyBrowser == null || !isTablet()) return;
+        int available = studyBrowserAvailableWidth();
+        studyBrowserRatio = Math.max(.1f, Math.min(.8f, (float) width / available));
+        layoutStudyBrowser();
+    }
+
+    private void layoutStudyBrowser() {
+        if (studyBrowser == null) return;
+        FrameLayout.LayoutParams layout = (FrameLayout.LayoutParams) studyBrowser.getLayoutParams();
+        layout.width = studyBrowserWidth();
+        studyBrowser.setLayoutParams(layout);
+        notifyStudyBrowserSize();
+    }
+
+    private void notifyStudyBrowserSize() {
+        if (bridge == null) return;
+        float ratio = isTablet() ? studyBrowserRatio : 1;
+        bridge.getWebView().evaluateJavascript("window.dispatchEvent(new CustomEvent('notelin-study-browser-resized',{detail:{ratio:"
+            + ratio + "}}))", null);
     }
 
     private void applyChrome() {
@@ -177,11 +207,7 @@ public class MainActivity extends BridgeActivity {
     @Override public void onConfigurationChanged(Configuration configuration) {
         super.onConfigurationChanged(configuration);
         applyChrome();
-        if (studyBrowser != null) {
-            FrameLayout.LayoutParams layout = (FrameLayout.LayoutParams) studyBrowser.getLayoutParams();
-            layout.width = studyBrowserWidth();
-            studyBrowser.setLayoutParams(layout);
-        }
+        findViewById(android.R.id.content).post(this::layoutStudyBrowser);
     }
 
     @Override public void onDestroy() {

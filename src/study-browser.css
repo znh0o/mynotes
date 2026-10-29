@@ -1,13 +1,6 @@
 :root[data-device-ui=tablet] .editor-shell.study-browser-open {
-  width: calc(100% - clamp(360px, 40vw, 600px));
+  width: calc(100% - var(--study-browser-width, 16.666667vw));
   border-right: 1px solid #d6dfed;
-}
-
-@media (max-width: 899px) {
-  :root[data-device-ui=tablet] .editor-shell.study-browser-open {
-    width: 100%;
-    border-right: 0;
-  }
 }
 
 .editor-header-actions [data-action=study-browser][aria-expanded=true] {
