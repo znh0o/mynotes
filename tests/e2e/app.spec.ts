@@ -95,8 +95,8 @@ test('installable PWA, offline PDF annotation, export and backup restore', async
   const restoreChooser = page.waitForEvent('filechooser'); await page.getByRole('button', { name: '백업 파일 복원', exact: true }).click();
   await (await restoreChooser).setFiles(backupPath!);
   await expect(page.locator('h1')).toContainText('나의 서재');
-  expect((await records(page, 'notes')).filter(n => n.title.includes('(복원)'))).toHaveLength(2);
-  expect((await records(page, 'assets')).length).toBe(2);
+  await expect.poll(async () => (await records(page, 'notes')).filter(n => n.title.includes('(복원)')).length).toBe(2);
+  await expect.poll(async () => (await records(page, 'assets')).length).toBe(2);
   expect(errors).toEqual([]);
 });
 
