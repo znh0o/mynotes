@@ -17,6 +17,22 @@ async function items(page: Page) {
   });
 }
 
+test('typed text keeps its own color without changing the saved pen', async ({ page }) => {
+  await create(page);
+  const penColor = await page.locator('.pen-tool').evaluate(button => (button as HTMLElement).style.getPropertyValue('--pen-color'));
+  await page.getByRole('button', { name: '텍스트', exact: true }).click();
+  await page.getByRole('button', { name: '기본 색상 3', exact: true }).click();
+  await page.getByRole('textbox', { name: '페이지에 글 입력' }).fill('별도 글자 색');
+  await page.getByRole('button', { name: '입력 완료', exact: true }).click();
+  await expect.poll(async () => (await items(page)).find(item => item.kind === 'text')?.color).toBe('#cf7d85');
+  await page.getByRole('button', { name: '펜', exact: true }).click();
+  expect(await page.locator('.pen-tool').evaluate(button => (button as HTMLElement).style.getPropertyValue('--pen-color'))).toBe(penColor);
+  await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).click();
+  await page.getByRole('button', { name: '타이핑과 직선 열기', exact: true }).click();
+  await page.getByRole('button', { name: '텍스트', exact: true }).click();
+  await expect(page.getByRole('button', { name: '기본 색상 3', exact: true })).toHaveClass(/active/);
+});
+
 test('type directly on paper, format, move, resize, re-edit, undo and reopen', async ({ page }) => {
   await create(page); await page.getByRole('button', { name: '텍스트', exact: true }).click();
   await page.getByRole('combobox', { name: '입력 방식', exact: true }).selectOption('box');
@@ -64,11 +80,13 @@ test('type directly on paper, format, move, resize, re-edit, undo and reopen', a
   const pdf = await PDFDocument.load(await readFile((await (await download).path())!));
   const images = pdf.context.enumerateIndirectObjects().flatMap(([, object]) => object instanceof PDFRawStream && object.dict.get(PDFName.of('Subtype'))?.toString() === '/Image' ? [object] : []);
   expect(images.some(image => Number(image.dict.get(PDFName.of('Width'))?.toString()) >= current.w * 3.9)).toBe(true);
-  await page.getByRole('button', { name: '노트 설정', exact: true }).click();
+  await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).click();
+  await page.getByRole('button', { name: '설정 및 백업', exact: true }).click();
   const backup = page.waitForEvent('download'); await page.getByRole('button', { name: '전체 백업', exact: true }).click();
   const saved = JSON.parse(await readFile((await (await backup).path())!, 'utf8'));
   expect(saved.pages.flatMap((p: any) => p.items).find((i: any) => i.id === current.id)).toMatchObject({ text: current.text, bold: true, italic: true, wrap: true, align: 'center' });
   await page.getByRole('button', { name: '완료', exact: true }).click();
+  await page.getByRole('button', { name: '타이핑과 직선 열기', exact: true }).click();
   await page.screenshot({ path: '../MyNotes-inline-typing.png' });
 });
 

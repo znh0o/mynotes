@@ -162,9 +162,11 @@ public class NotelinDevicePlugin extends Plugin {
     @PluginMethod public void openStudyAI(PluginCall call) {
         String noteId = call.getString("noteId");
         if (noteId == null || noteId.trim().isEmpty() || noteId.length() > 200) { call.reject("AI를 열 노트를 확인하지 못했어요."); return; }
+        String provider = call.getString("provider", "chatgpt");
+        if (!provider.equals("chatgpt") && !provider.equals("gemini") && !provider.equals("claude")) { call.reject("지원하지 않는 AI 서비스예요."); return; }
         getActivity().runOnUiThread(() -> {
             try {
-                ((MainActivity) getActivity()).openStudyAI(noteId);
+                ((MainActivity) getActivity()).openStudyAI(noteId, provider);
                 call.resolve();
             }
             catch (Exception error) { call.reject("AI 패널을 열지 못했어요.", error); }

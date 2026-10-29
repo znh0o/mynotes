@@ -64,6 +64,7 @@ final class StudyBrowserPanel extends LinearLayout {
     private int surfaceColor, inkColor, mutedColor;
     private boolean panelOnLeft;
     private Consumer<String> pageListener = url -> {};
+    private String aiProviderLabel = "ChatGPT";
 
     StudyBrowserPanel(MainActivity activity, boolean aiMode, Runnable close, IntConsumer resize) {
         super(activity);
@@ -407,6 +408,13 @@ final class StudyBrowserPanel extends LinearLayout {
         navigate(url);
     }
 
+    void setAiProvider(String label) {
+        if (!aiMode) return;
+        aiProviderLabel = label;
+        aiTitle.setText(label);
+        placeholder.setText(label + "를 불러오는 중…");
+    }
+
     private void closeBookmarks() {
         if (bookmarksPanel != null) page.removeView(bookmarksPanel);
         bookmarksPanel = null;
@@ -512,8 +520,7 @@ final class StudyBrowserPanel extends LinearLayout {
 
     private void updateAiTitle(String url) {
         if (!aiMode) return;
-        String host = url == null ? null : Uri.parse(url).getHost();
-        aiTitle.setText(host == null || host.equals("chatgpt.com") || host.endsWith(".chatgpt.com") ? "ChatGPT" : host);
+        aiTitle.setText(aiProviderLabel);
     }
 
     void setDark(boolean dark) {

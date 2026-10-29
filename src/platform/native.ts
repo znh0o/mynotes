@@ -4,6 +4,16 @@ import { App } from '@capacitor/app';
 export const isNativeApp = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
 export interface NativeDocument { id: string; name: string; size: number }
 export type StudyPanelSide = 'left' | 'right';
+export type StudyAIProvider = 'chatgpt' | 'gemini' | 'claude';
+export const studyAIProviders: { id: StudyAIProvider; label: string }[] = [
+  { id: 'chatgpt', label: 'ChatGPT' }, { id: 'gemini', label: 'Gemini' }, { id: 'claude', label: 'Claude' },
+];
+export function studyAIProvider(value: unknown): StudyAIProvider {
+  return studyAIProviders.find(provider => provider.id === value)?.id || 'chatgpt';
+}
+export function studyAILabel(provider: StudyAIProvider) {
+  return studyAIProviders.find(item => item.id === provider)!.label;
+}
 interface NotelinDevicePlugin {
   beginExport(options: { name: string; mimeType: string }): Promise<{ id: string }>;
   appendExport(options: { id: string; index: number; data: string }): Promise<void>;
@@ -15,7 +25,7 @@ interface NotelinDevicePlugin {
   setAppearance(options: { dark: boolean }): Promise<void>;
   openUpdates(): Promise<void>;
   openStudyBrowser(options: { noteId: string; url?: string }): Promise<void>;
-  openStudyAI(options: { noteId: string }): Promise<void>;
+  openStudyAI(options: { noteId: string; provider: StudyAIProvider }): Promise<void>;
   closeStudyPanel(): Promise<void>;
   setStudyPanelOccluded(options: { hidden: boolean }): Promise<void>;
   getStudyPanelSettings(): Promise<{ side: StudyPanelSide }>;
@@ -68,7 +78,7 @@ export function completeNativeDocument(id: string) { return device.completeDocum
 export function onNativeDocument(callback: () => void) { return device.addListener('documentReceived', callback); }
 export function openNativeUpdates() { return device.openUpdates(); }
 export function openNativeStudyBrowser(noteId: string, url?: string) { return device.openStudyBrowser({ noteId, ...(url ? { url } : {}) }); }
-export function openNativeStudyAI(noteId: string) { return device.openStudyAI({ noteId }); }
+export function openNativeStudyAI(noteId: string, provider: StudyAIProvider) { return device.openStudyAI({ noteId, provider }); }
 export function closeNativeStudyPanel() { return device.closeStudyPanel(); }
 export function setNativeStudyPanelOccluded(hidden: boolean) { return device.setStudyPanelOccluded({ hidden }); }
 export function getStudyPanelSide(): StudyPanelSide { return document.documentElement.dataset.studyPanelSide === 'left' ? 'left' : 'right'; }

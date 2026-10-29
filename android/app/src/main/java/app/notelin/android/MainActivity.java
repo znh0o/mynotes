@@ -270,11 +270,19 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    public void openStudyAI(String noteId) {
+    private String studyAiProvider;
+
+    public void openStudyAI(String noteId, String provider) {
         boolean firstOpen = studyAi == null;
         if (firstOpen) studyAi = new StudyBrowserPanel(this, true, () -> closeStudyPanel(true), this::resizeStudyPanel);
         showStudyPanel(studyAi);
-        if (firstOpen) studyAi.openUrl("https://chatgpt.com/");
+        if (firstOpen || !provider.equals(studyAiProvider)) {
+            studyAiProvider = provider;
+            String label = provider.equals("gemini") ? "Gemini" : provider.equals("claude") ? "Claude" : "ChatGPT";
+            String url = provider.equals("gemini") ? "https://gemini.google.com/app" : provider.equals("claude") ? "https://claude.ai/" : "https://chatgpt.com/";
+            studyAi.setAiProvider(label);
+            studyAi.openUrl(url);
+        }
     }
 
     private void showStudyPanel(StudyBrowserPanel panel) {

@@ -69,7 +69,8 @@ test('settings can check, download and apply a real worker update without losing
     await page.mouse.move(canvas!.x + 100, canvas!.y + 180); await page.mouse.down();
     await page.mouse.move(canvas!.x + 250, canvas!.y + 200, { steps: 15 }); await page.mouse.up();
     release = 2;
-    await page.getByRole('button', { name: '노트 설정', exact: true }).click();
+    await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).click();
+    await page.getByRole('button', { name: '설정 및 백업', exact: true }).click();
     failEveryWorker = true;
     await check.click();
     await expect(page.locator('#update-status')).toContainText('업데이트 파일을 받지 못했어요');

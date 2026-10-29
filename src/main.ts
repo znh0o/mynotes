@@ -13,7 +13,7 @@ import { version as appVersion } from '../package.json';
 import { installAppZoomGuard } from './ui/app-zoom';
 import { getAppearance, setAppearance, type Appearance } from './ui/appearance';
 import { installDeviceUI } from './ui/device-ui';
-import { isNativeApp, initializeNativeShell, pendingNativeDocuments, readNativeDocument, completeNativeDocument, onNativeDocument, openNativeUpdates, getStudyPanelSide, setStudyPanelSide, type StudyPanelSide, clearStudyLoginCookies } from './platform/native';
+import { isNativeApp, initializeNativeShell, pendingNativeDocuments, readNativeDocument, completeNativeDocument, onNativeDocument, openNativeUpdates, getStudyPanelSide, setStudyPanelSide, type StudyPanelSide, clearStudyLoginCookies, studyAIProvider, studyAIProviders } from './platform/native';
 import { checkNativeUpdate, installNativeUpdate, onNativeUpdateProgress, type NativeUpdate } from './platform/native-updates';
 
 installAppZoomGuard();
@@ -154,7 +154,7 @@ async function renderRoute(route: AppRoute, direction: Direction) {
     const existing = tabs.find(t => t.id === note!.id);
     if (existing) existing.title = note!.title; else tabs.push({ id: note!.id, title: note!.title });
     await db.notes.update(note!.id, { opened: Date.now() });
-    editor = new EditorView(root, note!, tabs, open, home, closeTab, settings); await editor.start(); window.scrollTo(0, 0);
+    editor = new EditorView(root, note!, tabs, open, home, closeTab); await editor.start(); window.scrollTo(0, 0);
   }
   slidePreviousView(root, previous, wasEditor && route.screen === 'note' ? 'none' : direction, oldScroll);
 }
@@ -184,6 +184,16 @@ function settings() {
       panelSection.className = 'settings-section study-panel-section';
       panelSection.innerHTML = `<h3>${icon('PanelRight', 18)} 인터넷 · AI 패널 위치</h3><p class="muted">필기 화면에서 패널을 열 위치를 선택하세요.</p><div class="study-panel-side-options" role="group" aria-label="인터넷 · AI 패널 위치">${(['left', 'right'] as const).map(side => `<button type="button" data-panel-side="${side}" aria-pressed="${getStudyPanelSide() === side}">${icon(side === 'left' ? 'PanelLeft' : 'PanelRight', 20)}<span>${side === 'left' ? '왼쪽' : '오른쪽'}</span></button>`).join('')}</div>`;
       browserSection.after(panelSection);
+      const aiSection = document.createElement('section');
+      aiSection.className = 'settings-section study-ai-section';
+      const savedAI = studyAIProvider((await db.settings.get('study-ai-provider'))?.value);
+      aiSection.innerHTML = `<h3>${icon('Globe2', 18)} AI 서비스</h3><p class="muted">필기 화면에서 AI 버튼을 누르면 선택한 서비스를 열어요.</p><div class="study-ai-options" role="group" aria-label="AI 서비스 선택">${studyAIProviders.map(provider => `<button type="button" data-ai-provider="${provider.id}" aria-pressed="${savedAI === provider.id}">${provider.label}</button>`).join('')}</div>`;
+      panelSection.after(aiSection);
+      aiSection.querySelectorAll<HTMLButtonElement>('[data-ai-provider]').forEach(button => button.addEventListener('click', () => run(async () => {
+        const selected = studyAIProvider(button.dataset.aiProvider);
+        await db.settings.put({ key: 'study-ai-provider', value: selected });
+        aiSection.querySelectorAll('[data-ai-provider]').forEach(item => item.setAttribute('aria-pressed', String((item as HTMLElement).dataset.aiProvider === selected)));
+      })));
       panelSection.querySelectorAll<HTMLButtonElement>('[data-panel-side]').forEach(button => button.addEventListener('click', () => run(async () => {
         const buttons = panelSection.querySelectorAll<HTMLButtonElement>('[data-panel-side]');
         buttons.forEach(item => { item.disabled = true; });

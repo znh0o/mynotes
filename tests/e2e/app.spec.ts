@@ -87,7 +87,8 @@ test('installable PWA, offline PDF annotation, export and backup restore', async
   // Original text plus handwriting must remain vector, with no full-page PNG overlay.
   const bitmaps = result.context.enumerateIndirectObjects().filter(([, object]) => object instanceof PDFRawStream && object.dict.get(PDFName.of('Subtype'))?.toString() === '/Image');
   expect(bitmaps).toHaveLength(0);
-  await page.getByRole('button', { name: '노트 설정', exact: true }).click();
+  await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).click();
+  await page.getByRole('button', { name: '설정 및 백업', exact: true }).click();
   const backupEvent = page.waitForEvent('download'); await page.getByRole('button', { name: '전체 백업', exact: true }).click();
   const backupDownload = await backupEvent, backupPath = await backupDownload.path();
   const backupData = JSON.parse(await readFile(backupPath!, 'utf8')); expect(backupData.assets).toHaveLength(1);

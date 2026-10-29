@@ -32,7 +32,8 @@ test('appearance follows the device, remembers an override and leaves document c
   await page.getByRole('button', { name: '펜', exact: true }).click();
   await page.screenshot({ path: '../Notelin-dark-editor.png' });
   await page.getByRole('button', { name: '펜 메뉴 닫기' }).click();
-  await page.getByRole('button', { name: '노트 설정', exact: true }).click();
+  await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).click();
+  await page.getByRole('button', { name: '설정 및 백업', exact: true }).click();
   await page.getByRole('button', { name: '기기 설정', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   await page.emulateMedia({ colorScheme: 'dark' });

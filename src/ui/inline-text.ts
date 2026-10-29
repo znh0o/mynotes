@@ -17,6 +17,7 @@ export class InlineTextEditor {
   private carets = new Map<string, number>();
   mode: 'document' | 'box' = 'document';
   private defaults = { size: 22, bold: false, italic: false, align: 'left' as TextItem['align'] };
+  private defaultColor = '#30445e';
   constructor(private surface: HTMLElement, shell: HTMLElement, private engine: InkEngine,
     private overflow: (head: TextItem, tail: string) => void, private styleChanged: () => void = () => {}) {
     this.mirror.className = 'text-layout-mirror'; this.mirror.setAttribute('aria-hidden', 'true'); document.body.append(this.mirror);
@@ -71,7 +72,7 @@ export class InlineTextEditor {
     }, { signal });
     document.addEventListener('pointerdown', event => {
       if (!this.draft || !(event.target instanceof Element)) return;
-      if (event.target.closest('.inline-text-box,.inline-text-toolbar,.ink-toolbar')) return;
+      if (event.target.closest('.inline-text-box,.inline-text-toolbar,.ink-toolbar,.color-picker-dialog')) return;
       this.finish();
     }, { signal, capture: true });
     document.addEventListener('keydown', event => {
@@ -85,6 +86,7 @@ export class InlineTextEditor {
   }
   get active() { return !!this.draft; }
   get size() { return this.draft?.size ?? this.defaults.size; }
+  get color() { return this.draft?.color ?? this.defaultColor; }
   setSize(value: number) {
     if (!Number.isFinite(value)) return;
     const size = Math.max(10, Math.min(100, Math.round(value)));
@@ -107,7 +109,7 @@ export class InlineTextEditor {
     const y = body ? frame.y : item?.y ?? Math.max(16, Math.min(point?.y ?? 80, page.height - 60));
     const surface = this.surface.getBoundingClientRect(), viewport = this.surface.closest('.paper-viewport')!.getBoundingClientRect();
     const visibleWidth = Math.max(100, (Math.min(surface.right, viewport.right) - surface.left - x * this.scale - 24) / this.scale);
-    this.draft = item ? { ...item, wrap: true, w: Math.max(100, Math.min(item.w, page.width - x - 16)) } : { id: uid(), kind: 'text', x, y, w: Math.min(560, visibleWidth, page.width - x - 24), h: 40, text: '', color: this.engine.options.color, wrap: true, ...this.defaults };
+    this.draft = item ? { ...item, wrap: true, w: Math.max(100, Math.min(item.w, page.width - x - 16)) } : { id: uid(), kind: 'text', x, y, w: Math.min(560, visibleWidth, page.width - x - 24), h: 40, text: '', color: this.defaultColor, wrap: true, ...this.defaults };
     if (body) Object.assign(this.draft, { ...frame, textMode: 'document' });
     this.engine.beginText(this.draft.id);
     this.box = document.createElement('div'); this.box.className = `inline-text-box${body ? ' document-text-box' : ''}`;
@@ -141,10 +143,15 @@ export class InlineTextEditor {
     this.input.focus({ preventScroll: true });
     this.ensureCaretVisible();
   }
-  setColor(color: string) { if (this.draft) { this.draft.color = color; this.sync(); this.publish(); } }
+  setColor(color: string) {
+    this.defaultColor = color;
+    if (this.draft) { this.draft.color = color; this.sync(); this.publish(); }
+    else this.styleChanged();
+  }
   private sync() {
     const item = this.draft; if (!item || !this.input || !this.box) return;
     this.defaults = { size: item.size, bold: !!item.bold, italic: !!item.italic, align: item.align ?? 'left' };
+    this.defaultColor = item.color;
     Object.assign(this.box.style, { left: `${item.x}px`, top: `${item.y}px`, width: `${item.w}px` });
     Object.assign(this.input.style, { fontFamily: '"Segoe UI", "Malgun Gothic", sans-serif', fontSize: `${item.size}px`, fontWeight: item.bold ? '700' : '400', fontStyle: item.italic ? 'italic' : 'normal', lineHeight: '1.55', color: item.color, textAlign: item.align ?? 'left' });
     // Measure in a separate DOM element. Collapsing the focused textarea to

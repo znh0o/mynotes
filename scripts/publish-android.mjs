@@ -36,7 +36,7 @@ if (!release) {
   const revision = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
   release = await api('/releases', 'POST', {
     tag_name: tag, target_commitish: revision, name: `Notelin ${version} — Android`, draft: true, prerelease: false,
-    body: 'Android 설치형 Notelin입니다.\n\n- ChatGPT와 인증 페이지에서는 제3자 쿠키를 허용해 기존 로그인 호환성을 복원했습니다. 다른 웹사이트는 기본 차단을 유지합니다. 기존 쿠키나 로그인 정보는 삭제하지 않습니다.\n- 2.0.17의 HTTPS, SSL, Safe Browsing, 파일 접근 보호와 사진 첨부 수정은 유지합니다.\n- 노트, PDF와 필기 데이터는 그대로 유지합니다.\n\n로그인 유지는 웹사이트의 쿠키와 저장소를 사용합니다. Notelin은 비밀번호를 별도로 저장하지 않습니다. 사이트 자체가 WebView 로그인을 제한할 수 있으며 실제 기기에서 로그인 확인이 필요합니다.\n\n첫 설치와 업데이트의 마지막 확인은 Android 시스템에서 진행합니다.',
+    body: 'Android 설치형 Notelin입니다.\n\n- 서재 설정에서 AI 서비스를 ChatGPT, Gemini, Claude 중 고를 수 있습니다. 필기 화면의 AI 버튼은 선택한 서비스를 엽니다.\n- 필기 화면의 앱 설정 버튼을 제거하고 속지 설정을 보기 옵션에 배치했습니다.\n- 타이핑 색상을 펜 색과 분리하고 노트별로 기억합니다.\n- 기존 노트, PDF, 필기와 웹 패널 쿠키는 유지합니다.\n\n로그인 유지는 웹사이트의 쿠키와 저장소를 사용합니다. Notelin은 비밀번호를 별도로 저장하지 않습니다. 서비스에 따라 WebView 로그인을 제한할 수 있으며 Gemini와 Claude 로그인은 실제 기기에서 확인이 필요합니다.\n\n첫 설치와 업데이트의 마지막 확인은 Android 시스템에서 진행합니다.',
   });
 }
 for (const [assetName, content, type] of [[name, bytes, 'application/vnd.android.package-archive'], [`${name}.sha256`, Buffer.from(checksum), 'text/plain'], ['Notelin.apk', bytes, 'application/vnd.android.package-archive']]) {

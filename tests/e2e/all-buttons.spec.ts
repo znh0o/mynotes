@@ -25,10 +25,9 @@ for (const pointer of ['pen', 'touch'] as const) test(`every button path respond
   await expect(page.locator('.pen-tool')).toHaveAttribute('aria-pressed', 'true');
   await tap('필기 옵션'); await expect(page.getByRole('dialog')).toBeVisible();
   await tap('필기 옵션 닫기'); await expect(page.getByRole('dialog')).toHaveCount(0);
-  await tap('필기 옵션'); await tap('속지 설정'); await expect(page.getByRole('dialog')).toBeVisible();
+  await tap('보기 옵션'); await tap('속지 설정'); await expect(page.getByRole('dialog')).toBeVisible();
   await tap('적용'); await expect(page.getByRole('dialog')).toHaveCount(0);
-  await tap('노트 설정'); await expect(page.getByRole('dialog')).toBeVisible();
-  await tap('완료'); await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '노트 설정' })).toHaveCount(0);
   await tap('서재로 돌아가기'); await expect(page.locator('#library-title')).toBeVisible();
   await expect(page.locator('.app-slide-layer')).toHaveCount(0);
   await tap(`짧은 ${pointer} 탭 메뉴`); await expect(page.getByRole('menu')).toBeVisible();

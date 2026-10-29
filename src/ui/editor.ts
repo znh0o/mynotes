@@ -17,7 +17,7 @@ import { brushKey, brushProfile, inkTools, isInkTool, type BrushProfile, type In
 import { defaultPenCollection, duplicatePen, isPenKind, penKinds, penNames, type PenCollection, type PenKind, type PenPreset } from '../data/pen-presets';
 import { loadSharedPens, sharedPensKey } from '../data/shared-pens';
 import { bindPhoneEditor } from './phone-chrome';
-import { closeNativeStudyPanel, isNativeApp, openNativeStudyBrowser, openNativeStudyAI, setNativeStudyPanelOccluded } from '../platform/native';
+import { closeNativeStudyPanel, isNativeApp, openNativeStudyBrowser, openNativeStudyAI, setNativeStudyPanelOccluded, studyAIProvider, studyAILabel, type StudyAIProvider } from '../platform/native';
 
 const shapeChoices: { id: Shape; name: string; drawing: string }[] = [
   { id: 'rect', name: '사각형', drawing: '<rect x="8" y="11" width="40" height="30" rx="2" />' },
@@ -74,29 +74,31 @@ export class EditorView {
   private brushWrites = Promise.resolve();
   private textEditor!: InlineTextEditor;
   private studyPanel: 'browser' | 'ai' | null = null;
+  private aiProvider: StudyAIProvider = 'chatgpt';
   private studyPanelOccluded = false;
   private studyBrowserObserver?: MutationObserver;
   private temporaryNoticeTimer?: ReturnType<typeof setTimeout>;
   constructor(private root: HTMLElement, public note: Note,
     private tabs: { id: string; title: string }[], private open: (id: string) => Promise<void>,
-    private home: () => Promise<void>, private closeTab: (id: string) => Promise<void>, private settings: () => void) {
+    private home: () => Promise<void>, private closeTab: (id: string) => Promise<void>) {
     this.queue = new SaveQueue(db, state => {
       const el = this.root.querySelector<HTMLElement>('#save-status');
       if (el) { el.innerHTML = `${icon(state.startsWith('저장 실패') ? 'WifiOff' : 'Check', 13)} ${escape(state)}`; el.title = `${state} · 지금 저장`; el.classList.toggle('save-error', state.startsWith('저장 실패')); }
     });
   }
   async start() {
-    const [pencilSetting, lineSetting, eraserSetting, penButtonSetting, spreadSetting, paletteSetting, shapeSetting, ...brushSettings] = await db.settings.bulkGet([
-      'pencil-darkness', 'hold-to-line', 'eraser-settings', 'samsung-pen-button-toggle', 'two-page-view', `note-palette:${this.note.id}`, `note-shape:${this.note.id}`,
+    const [pencilSetting, lineSetting, eraserSetting, penButtonSetting, spreadSetting, paletteSetting, shapeSetting, aiSetting, textColorSetting, ...brushSettings] = await db.settings.bulkGet([
+      'pencil-darkness', 'hold-to-line', 'eraser-settings', 'samsung-pen-button-toggle', 'two-page-view', `note-palette:${this.note.id}`, `note-shape:${this.note.id}`, 'study-ai-provider', `note-text-color:${this.note.id}`,
       ...inkTools.map(brushKey), ...inkTools.map(tool => `note-brush:${this.note.id}:${tool}`),
     ]);
     inkTools.forEach((tool, index) => this.brushes[tool] = brushProfile(tool, brushSettings[index + inkTools.length]?.value ?? brushSettings[index]?.value, pencilSetting?.value));
     this.pens = await loadSharedPens(this.note.id, defaultPenCollection(this.brushes));
+    this.aiProvider = studyAIProvider(aiSetting?.value);
     this.twoPage = spreadSetting?.value === true;
     if (Array.isArray(paletteSetting?.value) && paletteSetting.value.length === 5 && paletteSetting.value.every((color: unknown) => typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color))) this.palette = paletteSetting.value;
     document.title = `${this.note.title} · Notelin`;
     this.root.innerHTML = `<div class="editor-shell">
-      <header class="editor-header"><button class="editor-home" data-action="home" aria-label="서재로 돌아가기">${icon('ChevronLeft', 19)}<span class="brand-mark small">${icon('PenLine', 18)}</span><span>서재</span></button><div class="open-tabs">${this.tabs.map(t => `<div class="note-tab ${t.id === this.note.id ? 'active' : ''}"><button data-action="tab" data-id="${t.id}">${icon('BookOpen', 15)}<span>${escape(t.title)}</span></button><button data-action="close-tab" data-id="${t.id}" aria-label="${escape(t.title)} 탭 닫기">${icon('X', 13)}</button></div>`).join('')}</div><div class="editor-page-controls">${button('ChevronLeft', '이전 페이지', 'prev-page')}<button class="page-position" data-action="goto-page">1 / ${this.note.pageIds.length}</button>${button('ChevronRight', '다음 페이지', 'next-page')}</div><div class="editor-header-actions"><button class="save-indicator" id="save-status" data-action="save" title="지금 저장">${icon('Check', 13)} 모든 변경사항 저장됨</button>${button('Search', '노트 내 텍스트 검색', 'search')}${button('Download', 'PDF 내보내기', 'export')}${button('BookOpen', '보기 옵션', 'view-options', 'aria-haspopup="true" aria-expanded="false" aria-controls="view-options-panel"')}${button('MoreHorizontal', '문서 메뉴', 'phone-document-menu', 'aria-haspopup="dialog" aria-expanded="false" aria-controls="phone-document-panel"')}${button('MoreHorizontal', '노트 설정', 'settings')}</div><div class="view-options-panel" id="view-options-panel" hidden><div class="view-panel-heading">페이지 보기</div><button class="view-layout-button" type="button" data-action="two-page" aria-pressed="false">${icon('BookOpen', 19)}<span><strong>두 페이지</strong><small>양쪽 페이지에 바로 필기</small></span><span class="view-layout-check">${icon('Check', 15)}</span></button><div class="view-panel-divider"></div><div class="view-panel-heading">배율</div><div class="view-zoom-controls">${button('Minus', '축소', 'zoom-out')}<button id="zoom-value" data-action="fit">80%</button>${button('Plus', '확대', 'zoom-in')}</div><button class="view-fit-button" data-action="fit">화면에 맞춤</button><div class="view-panel-paper" id="paper-description">A4 · 줄노트</div></div></header>
+      <header class="editor-header"><button class="editor-home" data-action="home" aria-label="서재로 돌아가기">${icon('ChevronLeft', 19)}<span class="brand-mark small">${icon('PenLine', 18)}</span><span>서재</span></button><div class="open-tabs">${this.tabs.map(t => `<div class="note-tab ${t.id === this.note.id ? 'active' : ''}"><button data-action="tab" data-id="${t.id}">${icon('BookOpen', 15)}<span>${escape(t.title)}</span></button><button data-action="close-tab" data-id="${t.id}" aria-label="${escape(t.title)} 탭 닫기">${icon('X', 13)}</button></div>`).join('')}</div><div class="editor-page-controls">${button('ChevronLeft', '이전 페이지', 'prev-page')}<button class="page-position" data-action="goto-page">1 / ${this.note.pageIds.length}</button>${button('ChevronRight', '다음 페이지', 'next-page')}</div><div class="editor-header-actions"><button class="save-indicator" id="save-status" data-action="save" title="지금 저장">${icon('Check', 13)} 모든 변경사항 저장됨</button>${button('Search', '노트 내 텍스트 검색', 'search')}${button('Download', 'PDF 내보내기', 'export')}${button('BookOpen', '보기 옵션', 'view-options', 'aria-haspopup="true" aria-expanded="false" aria-controls="view-options-panel"')}${button('MoreHorizontal', '문서 메뉴', 'phone-document-menu', 'aria-haspopup="dialog" aria-expanded="false" aria-controls="phone-document-panel"')}</div><div class="view-options-panel" id="view-options-panel" hidden><div class="view-panel-heading">페이지 보기</div><button class="view-layout-button" type="button" data-action="two-page" aria-pressed="false">${icon('BookOpen', 19)}<span><strong>두 페이지</strong><small>양쪽 페이지에 바로 필기</small></span><span class="view-layout-check">${icon('Check', 15)}</span></button><div class="view-panel-divider"></div><div class="view-panel-heading">배율</div><div class="view-zoom-controls">${button('Minus', '축소', 'zoom-out')}<button id="zoom-value" data-action="fit">80%</button>${button('Plus', '확대', 'zoom-in')}</div><button class="view-fit-button" data-action="fit">화면에 맞춤</button><div class="view-panel-paper" id="paper-description">A4 · 줄노트</div><button class="view-fit-button" type="button" data-action="paper">속지 설정</button></div></header>
       <div class="ink-toolbar" role="toolbar" aria-label="필기 도구"><div class="toolbar-tools"><div class="tool-group editor-utility">${button('PanelLeft', '페이지 목록', 'sidebar', 'aria-expanded="false" aria-controls="page-sidebar"')}<span class="toolbar-separator"></span>${button('Undo2', '실행 취소 (Ctrl+Z)', 'undo', 'disabled')}${button('Redo2', '다시 실행 (Ctrl+Shift+Z)', 'redo', 'disabled')}</div><div class="tool-group drawing-tools"><button class="tool-button pen-tool active" data-action="pen-menu" aria-label="펜" aria-haspopup="dialog" aria-expanded="false" aria-pressed="true" title="펜">${icon('PenLine', 22)}<span>펜</span></button>${([['highlighter', 'Highlighter', '형광펜'], ['eraser', 'Eraser', '지우개'], ['lasso', 'Lasso', '올가미'], ['shape', 'Shapes', '도형'], ['text', 'Type', '텍스트'], ['image', 'Image', '이미지'], ['hand', 'Hand', '이동']] as const).map(([tool, i, label]) => `<button class="tool-button" data-action="tool" data-id="${tool}" aria-label="${label}" aria-pressed="false" title="${label}">${icon(i, 22)}<span>${label}</span></button>`).join('')}</div></div><div class="ink-style-controls"><div class="color-palette">${this.palette.map((c, n) => `<button class="color-swatch ${c === this.engine?.options.color || !this.engine && n === 0 ? 'active' : ''}" style="--color:${c}" data-action="color" data-id="${c}" title="기본 색상 ${n + 1}" aria-label="기본 색상 ${n + 1}"></button>`).join('')}<button class="palette-edit" type="button" data-action="palette-edit" aria-label="기본 색상 편집" title="기본 색상 편집">${icon('Pencil', 14)}</button><button class="custom-color" type="button" data-action="custom-color" title="색상 선택" aria-label="색상 선택">${icon('Plus', 15)}</button></div><div class="pen-width-control"><label id="width-label" for="ink-width">굵기</label><div class="pencil-mode-picker" hidden><button type="button" id="ink-adjustment" class="pencil-mode-trigger" data-action="pencil-mode-menu" aria-label="연필 조절 항목: 굵기" aria-expanded="false" aria-controls="pencil-mode-menu"><span>굵기</span>${icon('ChevronDown', 13)}</button><div class="pencil-mode-menu" id="pencil-mode-menu" role="group" aria-label="연필 조절 항목" hidden><span class="pencil-mode-heading">연필 조절</span><button type="button" data-action="pencil-mode" data-id="width" aria-pressed="true"><span><strong>굵기</strong><small>선의 두께</small></span>${icon('Check', 15)}</button><button type="button" data-action="pencil-mode" data-id="darkness" aria-pressed="false"><span><strong>진하기</strong><small>흑연의 농도</small></span>${icon('Check', 15)}</button></div></div><span id="width-preview" aria-hidden="true"></span><button type="button" data-action="pen-thinner" aria-label="펜 굵기 줄이기" title="펜 굵기 줄이기">${icon('Minus', 15)}</button><input id="ink-width" type="range" min="0.5" max="20" step="0.5" value="3" aria-label="펜 굵기" /><button type="button" data-action="pen-thicker" aria-label="펜 굵기 늘리기" title="펜 굵기 늘리기">${icon('Plus', 15)}</button><output id="width-value" for="ink-width">3.0</output></div></div><div class="editor-options">${button('Settings2', '필기 옵션', 'writing-options', 'aria-haspopup="dialog" aria-expanded="false" aria-controls="writing-options-panel"')}</div></div>
       <div class="editor-body"><aside class="page-sidebar" id="page-sidebar" hidden><div class="page-sidebar-heading"><strong>페이지</strong><span>${this.note.pageIds.length}</span>${button('Plus', '페이지 추가', 'add-page')}</div><div id="page-thumbnails"></div><button class="add-page-button" data-action="add-page">${icon('Plus', 17)} 페이지 추가</button></aside>
         <main class="paper-viewport" aria-label="필기 작업 공간"><div class="paper-stage"><div class="paper-sizing"><div class="paper-surface"><canvas id="paper-background" aria-hidden="true"></canvas><canvas id="paper-ink" aria-hidden="true"></canvas><canvas id="paper-live" aria-label="필기 캔버스"></canvas></div><span class="spread-page-number" hidden></span></div><div class="spread-companion" role="group" aria-label="인접 페이지" hidden><canvas class="spread-background" aria-hidden="true"></canvas><canvas class="spread-ink" aria-hidden="true"></canvas><canvas class="spread-live" aria-label="인접 페이지 필기 캔버스"></canvas><span class="spread-page-number"></span></div><button class="spread-empty" type="button" data-action="add-page" hidden>${icon('Plus', 22)}<span>페이지 추가</span></button></div><div class="page-loading" hidden>페이지를 불러오는 중…</div></main>
@@ -107,7 +109,7 @@ export class EditorView {
     if (isNativeApp) {
       this.root.querySelector('[data-action=search]')!.insertAdjacentHTML('beforebegin',
         button('Globe2', '인터넷 패널', 'study-browser', 'aria-expanded="false"')
-        + '<button class="icon-button study-ai-button" type="button" data-action="study-ai" aria-label="AI · ChatGPT 열기" title="AI · ChatGPT 열기" aria-expanded="false">AI</button>');
+        + `<button class="icon-button study-ai-button" type="button" data-action="study-ai" aria-label="AI · ${studyAILabel(this.aiProvider)} 열기" title="AI · ${studyAILabel(this.aiProvider)} 열기" aria-expanded="false">AI</button>`);
       this.studyBrowserObserver = new MutationObserver(() => this.syncStudyPanelOverlay());
       this.studyBrowserObserver.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['open'] });
     }
@@ -166,7 +168,8 @@ export class EditorView {
       ? penButtonSetting.value : /SamsungBrowser\//.test(navigator.userAgent);
     if (shapeChoices.some(choice => choice.id === shapeSetting?.value)) this.engine.options.shape = shapeSetting!.value as Shape;
     this.textEditor = new InlineTextEditor(this.root.querySelector('.paper-surface')!, this.root.querySelector('.editor-shell')!, this.engine,
-      (head, tail) => this.continueTyping(head, tail), () => this.syncInkControl());
+      (head, tail) => this.continueTyping(head, tail), () => { this.syncInkControl(); this.syncColor(); });
+    if (typeof textColorSetting?.value === 'string' && /^#[0-9a-f]{6}$/i.test(textColorSetting.value)) this.textEditor.setColor(textColorSetting.value);
     if (typeof lineSetting?.value === 'boolean') this.engine.options.holdToLine = lineSetting.value;
     const eraser = eraserSetting?.value as { partial?: boolean; size?: number } | undefined;
     if (typeof eraser?.partial === 'boolean') this.engine.options.partialEraser = eraser.partial;
@@ -488,7 +491,7 @@ export class EditorView {
   private click(e: Event) {
     const target = (e.target as Element).closest<HTMLElement>('[data-action]'); if (!target) return;
     const { action, id } = target.dataset;
-    if (action && !['color', 'pen-thinner', 'pen-thicker', 'pencil-mode-menu', 'pencil-mode'].includes(action)) this.textEditor.finish();
+    if (action && !['color', 'custom-color', 'palette-edit', 'pen-thinner', 'pen-thicker', 'pencil-mode-menu', 'pencil-mode'].includes(action)) this.textEditor.finish();
     if (action === 'home') run(this.home);
     if (action === 'retry-page') run(() => this.showPage(this.index));
     if (action === 'tab' && id !== this.note.id) run(() => this.open(id!));
@@ -571,11 +574,11 @@ export class EditorView {
       this.root.querySelector<HTMLElement>('#eraser-picker')?.hidePopover(); this.engine.cancel(); showPenCheck();
     }
     if (action === 'color') this.setColor(id!);
-    if (action === 'palette-edit') openColorPicker(this.engine.options.color, this.palette, async (color, palette) => {
+    if (action === 'palette-edit') openColorPicker(this.activeColor(), this.palette, async (color, palette) => {
       this.palette = palette!; this.renderPalette(); this.setColor(color);
       await db.settings.put({ key: `note-palette:${this.note.id}`, value: this.palette });
     }, target);
-    if (action === 'custom-color') openColorPicker(this.engine.options.color, undefined, color => this.setColor(color), target);
+    if (action === 'custom-color') openColorPicker(this.activeColor(), undefined, color => this.setColor(color), target);
     if (action === 'pencil-mode-menu') {
       const menu = this.root.querySelector<HTMLElement>('#pencil-mode-menu')!;
       menu.hidden = !menu.hidden; target.setAttribute('aria-expanded', String(!menu.hidden));
@@ -609,7 +612,7 @@ export class EditorView {
     if (action === 'page-menu') this.pageMenu(target, Number(id));
     if (action === 'writing-options') {
       const panel = document.createElement('dialog'); panel.className = 'writing-options-panel'; panel.id = 'writing-options-panel'; panel.setAttribute('aria-label', '필기 옵션');
-      panel.innerHTML = `<div class="writing-options-heading"><strong>필기 옵션</strong>${button('X', '필기 옵션 닫기', 'close-writing-options')}</div><p id="tool-hint">${escape(this.toolHint)}</p><div id="context-options">${this.contextOptions()}</div><label class="finger-switch"><input id="hold-to-line" type="checkbox" ${this.engine.options.holdToLine ? 'checked' : ''}/><span></span>길게 멈추면 직선으로</label><label class="finger-switch"><input id="finger-drawing" type="checkbox" ${this.engine.options.fingerDrawing ? 'checked' : ''}/><span></span>손가락 필기</label><button class="text-button" data-action="paper">${icon('LayoutTemplate', 15)} 속지 설정</button>`;
+      panel.innerHTML = `<div class="writing-options-heading"><strong>필기 옵션</strong>${button('X', '필기 옵션 닫기', 'close-writing-options')}</div><p id="tool-hint">${escape(this.toolHint)}</p><div id="context-options">${this.contextOptions()}</div><label class="finger-switch"><input id="hold-to-line" type="checkbox" ${this.engine.options.holdToLine ? 'checked' : ''}/><span></span>길게 멈추면 직선으로</label><label class="finger-switch"><input id="finger-drawing" type="checkbox" ${this.engine.options.fingerDrawing ? 'checked' : ''}/><span></span>손가락 필기</label>`;
       this.root.querySelector('.editor-options')!.append(panel);
       panel.style.top = `${this.root.querySelector('.ink-toolbar')!.getBoundingClientRect().bottom + 8}px`;
       panel.addEventListener('close', () => { panel.remove(); target.setAttribute('aria-expanded', 'false'); }, { once: true });
@@ -622,16 +625,12 @@ export class EditorView {
     }
     if (action === 'close-writing-options') this.root.querySelector<HTMLDialogElement>('#writing-options-panel')!.close();
     if (action === 'paper') {
-      const panel = this.root.querySelector<HTMLDialogElement>('#writing-options-panel');
-      // Let the options dialog release its history entry before opening paper
-      // settings, so closing both never leaves an extra invisible Back step.
-      if (panel?.open) { panel.addEventListener('close', () => this.paperSettings(), { once: true }); panel.close(); }
-      else this.paperSettings();
+      this.closeViewOptions();
+      this.paperSettings();
     }
     if (action === 'search') this.search();
     if (action === 'study-browser') run(() => this.toggleStudyPanel('browser'));
     if (action === 'study-ai') run(() => this.toggleStudyPanel('ai'));
-    if (action === 'settings') this.settings();
     if (action === 'save') run(async () => { await this.flush(); await this.saveThumbnail(this.page); toast('저장했어요.'); });
     if (action === 'save-to-library') run(async () => {
       target.setAttribute('disabled', '');
@@ -677,12 +676,18 @@ export class EditorView {
   }
   private setColor(color: string) {
     if (!/^#[0-9a-f]{6}$/i.test(color)) return;
+    if (this.engine.options.tool === 'text') {
+      this.textEditor.setColor(color);
+      this.syncColor();
+      void db.settings.put({ key: `note-text-color:${this.note.id}`, value: color }).catch(report);
+      return;
+    }
     this.engine.options.color = color;
-    this.textEditor?.setColor(color);
     this.syncColor(); this.rememberBrush();
   }
+  private activeColor() { return this.engine.options.tool === 'text' ? this.textEditor.color : this.engine.options.color; }
   private syncColor() {
-    const color = this.engine.options.color;
+    const color = this.activeColor();
     this.root.querySelector<HTMLElement>('#width-preview')!.style.backgroundColor = color;
     const paletteMatch = this.palette.some(swatch => swatch.toLowerCase() === color.toLowerCase());
     this.root.querySelectorAll<HTMLElement>('[data-action=color]').forEach(e => e.classList.toggle('active', e.dataset.id?.toLowerCase() === color.toLowerCase()));
@@ -983,7 +988,7 @@ export class EditorView {
     penButton.innerHTML = `${icon(current.tool === 'pen' ? 'PenLine' : current.tool === 'fountain' ? 'Feather' : 'Pencil', 22)}<span>펜</span>`;
     penButton.style.setProperty('--pen-color', current.color);
     this.viewport.classList.toggle('hand-mode', tool === 'hand');
-    if (isInkTool(tool)) this.restoreBrush(tool); else this.syncInkControl();
+    if (isInkTool(tool)) this.restoreBrush(tool); else { this.syncColor(); this.syncInkControl(); }
     const hints: Record<Tool, string> = { pen: '볼펜 · 일정한 굵기 · 선 끝에서 0.6초 멈추면 직선으로', fountain: '만년필 · 필압과 펜촉 방향에 따라 달라지는 굵기', pencil: '연필 · 굵기와 진하기를 직접 조절 · 필압과 관계없이 고정', highlighter: '형광펜 · 펜과 별도 굵기 · 4~32', eraser: '지우개 · 원으로 지우는 범위 표시 · S펜 버튼 안내는 지우개 설정에서', lasso: '올가미 · 둘러싸서 선택한 다음 드래그로 이동', shape: '도형 · 드래그로 반듯한 도형 그리기', text: '타이핑 · 손글씨와 관계없이 페이지 여백 안에서 이어 쓰기 · 본문과 별도 글상자 전환', image: '사진 · 팝업에서 추가 · 사진을 눌러 이동하고 모서리로 크기 조절', hand: '이동 · 드래그로 종이 이동, 두 손가락으로 확대' };
     this.toolHint = hints[tool];
     if (tool === 'text' && this.page && !this.switching && this.textEditor.mode === 'document') this.textEditor.open();
@@ -1194,7 +1199,7 @@ export class EditorView {
     const previous = this.studyPanel;
     this.setStudyPanel(mode);
     try {
-      if (mode === 'ai') await openNativeStudyAI(this.note.id);
+      if (mode === 'ai') await openNativeStudyAI(this.note.id, this.aiProvider);
       else await openNativeStudyBrowser(this.note.id);
       this.syncStudyPanelOverlay();
     } catch (error) { this.setStudyPanel(previous); throw error; }
