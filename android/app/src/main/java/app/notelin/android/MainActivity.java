@@ -33,7 +33,6 @@ public class MainActivity extends BridgeActivity {
     private float studyAiRatio = 1f / 5f;
     private boolean studyPanelOccluded;
     private boolean studyPanelOnLeft;
-    private boolean useConnectedBrowser;
 
     @Override public void onCreate(Bundle state) {
         registerPlugin(NotelinDevicePlugin.class);
@@ -41,7 +40,6 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(state);
         noteBrowserSessions = new NoteBrowserSessions(this);
         studyPanelOnLeft = "left".equals(getSharedPreferences("study-browser", MODE_PRIVATE).getString("panel-side", "right"));
-        useConnectedBrowser = "browser".equals(getSharedPreferences("study-browser", MODE_PRIVATE).getString("mode", "panel"));
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         View content = findViewById(android.R.id.content);
         content.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
@@ -138,13 +136,7 @@ public class MainActivity extends BridgeActivity {
 
     public void setDarkChrome(boolean value) { dark = value; applyChrome(); }
 
-    public boolean openStudyBrowser(String noteId, String url) {
-        if (useConnectedBrowser) {
-            String address = url == null ? new ConnectedBrowserPages(this).lastUrl(noteId, false) : url;
-            if (address == null) address = noteBrowserSessions.lastUrl(noteId);
-            openConnectedBrowser(address == null ? "https://www.google.com/" : address, noteId, false, studyBrowserRatio);
-            return true;
-        }
+    public void openStudyBrowser(String noteId, String url) {
         StudyBrowserPanel panel = noteBrowsers.get(noteId);
         boolean firstOpen = panel == null;
         if (firstOpen) {
@@ -167,25 +159,13 @@ public class MainActivity extends BridgeActivity {
             previous.release();
             noteBrowsers.remove(oldest.getKey());
         }
-        return false;
     }
 
-    public boolean openStudyAI(String noteId) {
-        if (useConnectedBrowser) {
-            String address = new ConnectedBrowserPages(this).lastUrl(noteId, true);
-            openConnectedBrowser(address == null ? "https://chatgpt.com/" : address, noteId, true, studyAiRatio);
-            return true;
-        }
+    public void openStudyAI(String noteId) {
         boolean firstOpen = studyAi == null;
         if (firstOpen) studyAi = new StudyBrowserPanel(this, true, () -> closeStudyPanel(true), this::resizeStudyPanel);
         showStudyPanel(studyAi);
         if (firstOpen) studyAi.openUrl("https://chatgpt.com/");
-        return false;
-    }
-
-    private void openConnectedBrowser(String url, String noteId, boolean ai, float ratio) {
-        closeStudyPanel(true);
-        StudyCustomTabs.open(this, url, noteId, ai, isTablet(), studyPanelOnLeft, dark, Math.max(1, Math.round(studyBrowserAvailableWidth() * ratio)));
     }
 
     private void showStudyPanel(StudyBrowserPanel panel) {
@@ -206,12 +186,6 @@ public class MainActivity extends BridgeActivity {
 
     public void closeStudyPanel() { closeStudyPanel(false); }
     public String studyPanelSide() { return studyPanelOnLeft ? "left" : "right"; }
-    public String studyBrowserMode() { return useConnectedBrowser ? "browser" : "panel"; }
-    public void setStudyBrowserMode(String mode) {
-        useConnectedBrowser = "browser".equals(mode);
-        getSharedPreferences("study-browser", MODE_PRIVATE).edit().putString("mode", studyBrowserMode()).apply();
-        if (useConnectedBrowser) closeStudyPanel(true);
-    }
     public void clearStudyLoginCookies(Runnable done) {
         closeStudyPanel(true);
         FrameLayout content = findViewById(android.R.id.content);

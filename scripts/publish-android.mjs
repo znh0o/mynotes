@@ -36,7 +36,7 @@ if (!release) {
   const revision = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
   release = await api('/releases', 'POST', {
     tag_name: tag, target_commitish: revision, name: `Notelin ${version} — Android`, draft: true, prerelease: false,
-    body: 'Android 설치형 Notelin입니다.\n\n- 기기 브라우저 메뉴에 “이 노트에 주소 저장” 추가\n- 저장한 인터넷 주소와 ChatGPT 대화 주소를 각각 노트별로 기억하고 다음 실행 때 복원\n- 앱 내 패널의 페이지 기록과 연결 브라우저에서 직접 저장한 주소를 별도로 보관\n- 설정에서 앱 내 패널/기기 브라우저 연결 및 왼쪽/오른쪽 위치 선택\n- 앱 내 로그인 쿠키 삭제 기능 유지: 노트와 PDF 데이터는 유지\n\n연결 브라우저는 메뉴에서 직접 저장한 주소를 기억합니다. 방문 페이지의 자동 추적은 하지 않으며, 로그인과 쿠키는 해당 브라우저에서 관리합니다. 브라우저가 Custom Tabs 메뉴를 지원해야 주소 저장 버튼이 표시됩니다.\n\n첫 설치와 업데이트의 마지막 확인은 Android 시스템에서 진행합니다.',
+    body: 'Android 설치형 Notelin입니다.\n\n- 인터넷과 AI는 앱 내 WebView 패널에서만 열립니다. 기기 브라우저 연결 모드를 제거했습니다.\n- 기존에 기기 브라우저 연결을 선택했던 경우에도 인터넷과 AI 버튼이 앱 내 패널을 엽니다.\n- 노트별 인터넷 페이지 기억, 공통 로그인 쿠키, 즐겨찾기 및 패널 위치 선택은 유지합니다.\n- Notelin은 로그인 비밀번호를 별도로 저장하지 않습니다. 웹사이트의 쿠키와 저장소를 사용합니다.\n- 노트, PDF와 필기 데이터는 유지합니다.\n\n설정의 “앱 내 로그인 쿠키 삭제”는 패널의 쿠키를 지웁니다. 사이트 저장 정보는 남을 수 있습니다.\n\n첫 설치와 업데이트의 마지막 확인은 Android 시스템에서 진행합니다.',
   });
 }
 for (const [assetName, content, type] of [[name, bytes, 'application/vnd.android.package-archive'], [`${name}.sha256`, Buffer.from(checksum), 'text/plain'], ['Notelin.apk', bytes, 'application/vnd.android.package-archive']]) {

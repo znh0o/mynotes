@@ -17,7 +17,7 @@ async function nativeBridge(page: Page, pdf = '') {
     win.Capacitor = {
       PluginHeaders: [
         { name: 'App', methods: methods(['addListener', 'removeListener']) },
-        { name: 'NotelinDevice', methods: methods(['addListener', 'removeListener', 'setAppearance', 'pendingDocuments', 'readDocument', 'completeDocument', 'beginExport', 'appendExport', 'finishExport', 'cancelExport', 'openUpdates', 'openStudyBrowser', 'openStudyAI', 'closeStudyPanel', 'setStudyPanelOccluded', 'getStudyPanelSettings', 'setStudyPanelSide', 'setStudyBrowserMode', 'clearStudyLoginCookies']) },
+        { name: 'NotelinDevice', methods: methods(['addListener', 'removeListener', 'setAppearance', 'pendingDocuments', 'readDocument', 'completeDocument', 'beginExport', 'appendExport', 'finishExport', 'cancelExport', 'openUpdates', 'openStudyBrowser', 'openStudyAI', 'closeStudyPanel', 'setStudyPanelOccluded', 'getStudyPanelSettings', 'setStudyPanelSide', 'clearStudyLoginCookies']) },
         { name: 'NotelinUpdater', methods: methods(['addListener', 'removeListener', 'check', 'install']) },
       ],
       nativeCallback: (_plugin: string, _method: string, options: any, callback: (data: unknown) => void) => {
@@ -36,17 +36,13 @@ async function nativeBridge(page: Page, pdf = '') {
         if (method === 'openUpdates') state.updates++;
         if (method === 'openStudyBrowser') {
           state.browserOpens++; state.browserAddresses.push(options.url || ''); state.browserNoteIds.push(options.noteId);
-          return { external: localStorage.getItem('native-browser-mode') === 'browser' };
+          return {};
         }
-        if (method === 'openStudyAI') { state.aiOpens++; state.aiNoteIds.push(options.noteId); return { external: localStorage.getItem('native-browser-mode') === 'browser' }; }
+        if (method === 'openStudyAI') { state.aiOpens++; state.aiNoteIds.push(options.noteId); return {}; }
         if (method === 'closeStudyPanel') state.browserCloses++;
         if (method === 'setStudyPanelOccluded') state.browserHidden = options.hidden;
-        if (method === 'getStudyPanelSettings') return { side: localStorage.getItem('native-panel-side') || 'right', mode: localStorage.getItem('native-browser-mode') || 'panel' };
+        if (method === 'getStudyPanelSettings') return { side: localStorage.getItem('native-panel-side') || 'right' };
         if (method === 'setStudyPanelSide') localStorage.setItem('native-panel-side', options.side);
-        if (method === 'setStudyBrowserMode') {
-          localStorage.setItem('native-browser-mode', options.mode);
-          if (options.mode === 'browser') dispatchEvent(new Event('notelin-study-browser-closed'));
-        }
         if (method === 'clearStudyLoginCookies') { state.cookieClears++; dispatchEvent(new Event('notelin-study-browser-closed')); }
         if (method === 'check') return { available: state.updateAvailable, version: state.updateAvailable ? '2.0.1' : '2.0.0', installedVersion: '2.0.0' };
         if (method === 'install') { state.updates++; state.listeners.downloadProgress?.({ percent: 100 }); return { needsPermission: false }; }
@@ -207,26 +203,24 @@ test('panel position is saved in settings and applies to internet and AI after r
   expect((await workspace.boundingBox())!.width).toBeCloseTo(full.width * .8, 0);
 });
 
-test('browser connection mode persists and opens internet and AI without an inline panel', async ({ page }) => {
+test('older browser mode settings cannot prevent internet and AI WebView panels opening', async ({ page }) => {
   await nativeBridge(page);
   await page.goto('./');
+  await page.evaluate(() => localStorage.setItem('native-browser-mode', 'browser'));
+  await page.reload();
   await page.getByRole('button', { name: '설정 및 백업', exact: true }).click();
-  const modes = page.getByRole('group', { name: '인터넷 · AI 실행 방식', exact: true });
-  await expect(modes.locator('[data-browser-mode=panel]')).toHaveAttribute('aria-pressed', 'true');
-  await modes.locator('[data-browser-mode=browser]').click();
-  await expect(modes.locator('[data-browser-mode=browser]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('group', { name: '인터넷 · AI 실행 방식' })).toHaveCount(0);
+  await expect(page.getByText('Notelin은 비밀번호를 별도로 저장하지 않아요.', { exact: false })).toBeVisible();
   await page.getByRole('button', { name: '완료', exact: true }).click();
   await expect.poll(() => page.evaluate(() => !!history.state?.overlay)).toBe(false);
-  await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('data-study-browser-mode', 'browser');
   await page.getByRole('button', { name: 'Notelin 시작 가이드 열기', exact: true }).click();
   const workspace = page.locator('.editor-shell');
   const full = (await workspace.boundingBox())!;
   await page.getByRole('button', { name: '인터넷 패널', exact: true }).click();
-  await expect(workspace).not.toHaveClass(/study-browser-open/);
+  await expect(workspace).toHaveClass(/study-browser-open/);
   await page.getByRole('button', { name: 'AI · ChatGPT 열기', exact: true }).click();
-  await expect(workspace).not.toHaveClass(/study-browser-open/);
-  expect((await workspace.boundingBox())!.width).toBe(full.width);
+  await expect(workspace).toHaveClass(/study-browser-open/);
+  expect((await workspace.boundingBox())!.width).toBeCloseTo(full.width * .8, 0);
   expect(await page.evaluate(() => [(window as any).nativeTest.browserOpens, (window as any).nativeTest.aiOpens])).toEqual([1, 1]);
   await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).click();
   await page.getByRole('button', { name: '새 노트', exact: true }).click();
@@ -238,9 +232,6 @@ test('browser connection mode persists and opens internet and AI without an inli
   expect(context.web).toHaveLength(2);
   expect(context.ai).toEqual(context.web);
   expect(context.web[0]).not.toBe(context.web[1]);
-  await page.getByRole('button', { name: '노트 설정', exact: true }).click();
-  await modes.locator('[data-browser-mode=panel]').click();
-  await page.getByRole('button', { name: '완료', exact: true }).click();
   await page.getByRole('button', { name: '인터넷 패널', exact: true }).click();
   await expect(workspace).toHaveClass(/study-browser-open/);
 });

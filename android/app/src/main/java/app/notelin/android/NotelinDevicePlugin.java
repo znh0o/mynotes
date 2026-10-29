@@ -152,9 +152,8 @@ public class NotelinDevicePlugin extends Plugin {
         if (noteId == null || noteId.trim().isEmpty() || noteId.length() > 200) { call.reject("인터넷을 열 노트를 확인하지 못했어요."); return; }
         getActivity().runOnUiThread(() -> {
             try {
-                JSObject result = new JSObject();
-                result.put("external", ((MainActivity) getActivity()).openStudyBrowser(noteId, call.getString("url")));
-                call.resolve(result);
+                ((MainActivity) getActivity()).openStudyBrowser(noteId, call.getString("url"));
+                call.resolve();
             }
             catch (Exception error) { call.reject("인터넷 패널을 열지 못했어요.", error); }
         });
@@ -165,9 +164,8 @@ public class NotelinDevicePlugin extends Plugin {
         if (noteId == null || noteId.trim().isEmpty() || noteId.length() > 200) { call.reject("AI를 열 노트를 확인하지 못했어요."); return; }
         getActivity().runOnUiThread(() -> {
             try {
-                JSObject result = new JSObject();
-                result.put("external", ((MainActivity) getActivity()).openStudyAI(noteId));
-                call.resolve(result);
+                ((MainActivity) getActivity()).openStudyAI(noteId);
+                call.resolve();
             }
             catch (Exception error) { call.reject("AI 패널을 열지 못했어요.", error); }
         });
@@ -185,7 +183,6 @@ public class NotelinDevicePlugin extends Plugin {
         getActivity().runOnUiThread(() -> {
             JSObject settings = new JSObject();
             settings.put("side", ((MainActivity) getActivity()).studyPanelSide());
-            settings.put("mode", ((MainActivity) getActivity()).studyBrowserMode());
             call.resolve(settings);
         });
     }
@@ -197,12 +194,6 @@ public class NotelinDevicePlugin extends Plugin {
             ((MainActivity) getActivity()).setStudyPanelSide(side);
             call.resolve();
         });
-    }
-
-    @PluginMethod public void setStudyBrowserMode(PluginCall call) {
-        String mode = call.getString("mode");
-        if (!"panel".equals(mode) && !"browser".equals(mode)) { call.reject("인터넷 실행 방식을 확인해 주세요."); return; }
-        getActivity().runOnUiThread(() -> { ((MainActivity) getActivity()).setStudyBrowserMode(mode); call.resolve(); });
     }
 
     @PluginMethod public void clearStudyLoginCookies(PluginCall call) {

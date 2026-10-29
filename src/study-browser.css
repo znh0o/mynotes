@@ -68,34 +68,8 @@
   color: #c4d4ec;
 }
 
-.study-browser-mode-options {
-  display: grid;
-  gap: 8px;
-}
-
-.study-browser-mode-options button {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 13px 14px;
-  text-align: left;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: #f7f9fe;
-  color: #3f5677;
-  cursor: pointer;
-}
-
-.study-browser-mode-options button > span { flex: 1; }
-.study-browser-mode-options strong { display: block; font-size: 13px; font-weight: 600; }
-.study-browser-mode-options small { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.5; }
-.study-browser-mode-options button > svg:last-child { visibility: hidden; }
-.study-browser-mode-options button[aria-pressed=true] { border-color: #6b91ce; background: #edf3ff; color: #23569e; }
-.study-browser-mode-options button[aria-pressed=true] > svg:last-child { visibility: visible; }
 .study-browser-privacy { margin-top: 16px; padding-top: 15px; border-top: 1px solid var(--border); }
 .study-browser-privacy p { margin-bottom: 0; }
-:root[data-theme=dark] .study-browser-mode-options button { background: var(--night-raised); color: #c4d4ec; }
-:root[data-theme=dark] .study-browser-mode-options button[aria-pressed=true] { border-color: #6285bc; background: #284467; color: #d0e0ff; }
 
 .external-pdf-notice {
   transition: opacity .25s ease, transform .25s ease;

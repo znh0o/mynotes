@@ -430,18 +430,7 @@ final class StudyBrowserPanel extends LinearLayout {
         }
         scroll.addView(entries);
         bookmarksPanel.addView(scroll, new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1));
-        TextView external = bookmarkAction("기본 브라우저에서 열기 ↗", this::openExternal);
-        external.setEnabled(BrowserBookmarks.validUrl(current));
-        external.setAlpha(external.isEnabled() ? 1 : .45f);
-        bookmarksPanel.addView(external);
         page.addView(bookmarksPanel, new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
-    }
-
-    private void openExternal() {
-        String url = activeBrowser().getUrl();
-        if (url == null || !isWebAddress(Uri.parse(url))) return;
-        try { activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))); }
-        catch (Exception error) { Toast.makeText(activity, "브라우저를 열지 못했어요.", Toast.LENGTH_SHORT).show(); }
     }
 
     private void updateNavigation() {
