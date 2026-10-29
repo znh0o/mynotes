@@ -1194,7 +1194,7 @@ export class EditorView {
     const previous = this.studyPanel;
     if (document.documentElement.dataset.studyBrowserMode !== 'browser') this.setStudyPanel(mode);
     try {
-      const result = mode === 'ai' ? await openNativeStudyAI() : await openNativeStudyBrowser(this.note.id);
+      const result = mode === 'ai' ? await openNativeStudyAI(this.note.id) : await openNativeStudyBrowser(this.note.id);
       this.setStudyPanel(result.external ? null : mode);
       this.syncStudyPanelOverlay();
     } catch (error) { this.setStudyPanel(previous); throw error; }

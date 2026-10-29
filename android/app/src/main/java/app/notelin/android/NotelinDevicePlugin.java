@@ -161,10 +161,12 @@ public class NotelinDevicePlugin extends Plugin {
     }
 
     @PluginMethod public void openStudyAI(PluginCall call) {
+        String noteId = call.getString("noteId");
+        if (noteId == null || noteId.trim().isEmpty() || noteId.length() > 200) { call.reject("AI를 열 노트를 확인하지 못했어요."); return; }
         getActivity().runOnUiThread(() -> {
             try {
                 JSObject result = new JSObject();
-                result.put("external", ((MainActivity) getActivity()).openStudyAI());
+                result.put("external", ((MainActivity) getActivity()).openStudyAI(noteId));
                 call.resolve(result);
             }
             catch (Exception error) { call.reject("AI 패널을 열지 못했어요.", error); }

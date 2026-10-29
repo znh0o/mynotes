@@ -140,8 +140,9 @@ public class MainActivity extends BridgeActivity {
 
     public boolean openStudyBrowser(String noteId, String url) {
         if (useConnectedBrowser) {
-            String address = url == null ? noteBrowserSessions.lastUrl(noteId) : url;
-            openConnectedBrowser(address == null ? "https://www.google.com/" : address, studyBrowserRatio);
+            String address = url == null ? new ConnectedBrowserPages(this).lastUrl(noteId, false) : url;
+            if (address == null) address = noteBrowserSessions.lastUrl(noteId);
+            openConnectedBrowser(address == null ? "https://www.google.com/" : address, noteId, false, studyBrowserRatio);
             return true;
         }
         StudyBrowserPanel panel = noteBrowsers.get(noteId);
@@ -169,8 +170,12 @@ public class MainActivity extends BridgeActivity {
         return false;
     }
 
-    public boolean openStudyAI() {
-        if (useConnectedBrowser) { openConnectedBrowser("https://chatgpt.com/", studyAiRatio); return true; }
+    public boolean openStudyAI(String noteId) {
+        if (useConnectedBrowser) {
+            String address = new ConnectedBrowserPages(this).lastUrl(noteId, true);
+            openConnectedBrowser(address == null ? "https://chatgpt.com/" : address, noteId, true, studyAiRatio);
+            return true;
+        }
         boolean firstOpen = studyAi == null;
         if (firstOpen) studyAi = new StudyBrowserPanel(this, true, () -> closeStudyPanel(true), this::resizeStudyPanel);
         showStudyPanel(studyAi);
@@ -178,9 +183,9 @@ public class MainActivity extends BridgeActivity {
         return false;
     }
 
-    private void openConnectedBrowser(String url, float ratio) {
+    private void openConnectedBrowser(String url, String noteId, boolean ai, float ratio) {
         closeStudyPanel(true);
-        StudyCustomTabs.open(this, url, isTablet(), studyPanelOnLeft, dark, Math.max(1, Math.round(studyBrowserAvailableWidth() * ratio)));
+        StudyCustomTabs.open(this, url, noteId, ai, isTablet(), studyPanelOnLeft, dark, Math.max(1, Math.round(studyBrowserAvailableWidth() * ratio)));
     }
 
     private void showStudyPanel(StudyBrowserPanel panel) {

@@ -16,7 +16,7 @@ interface NotelinDevicePlugin {
   setAppearance(options: { dark: boolean }): Promise<void>;
   openUpdates(): Promise<void>;
   openStudyBrowser(options: { noteId: string; url?: string }): Promise<{ external: boolean }>;
-  openStudyAI(): Promise<{ external: boolean }>;
+  openStudyAI(options: { noteId: string }): Promise<{ external: boolean }>;
   closeStudyPanel(): Promise<void>;
   setStudyPanelOccluded(options: { hidden: boolean }): Promise<void>;
   getStudyPanelSettings(): Promise<{ side: StudyPanelSide; mode: StudyBrowserMode }>;
@@ -71,7 +71,7 @@ export function completeNativeDocument(id: string) { return device.completeDocum
 export function onNativeDocument(callback: () => void) { return device.addListener('documentReceived', callback); }
 export function openNativeUpdates() { return device.openUpdates(); }
 export function openNativeStudyBrowser(noteId: string, url?: string) { return device.openStudyBrowser({ noteId, ...(url ? { url } : {}) }); }
-export function openNativeStudyAI() { return device.openStudyAI(); }
+export function openNativeStudyAI(noteId: string) { return device.openStudyAI({ noteId }); }
 export function closeNativeStudyPanel() { return device.closeStudyPanel(); }
 export function setNativeStudyPanelOccluded(hidden: boolean) { return device.setStudyPanelOccluded({ hidden }); }
 export function getStudyPanelSide(): StudyPanelSide { return document.documentElement.dataset.studyPanelSide === 'left' ? 'left' : 'right'; }

@@ -9,7 +9,7 @@ async function nativeBridge(page: Page, pdf = '') {
       ? { ...matchMedia(query), matches: true } as MediaQueryList : matchMedia(query);
     const state = win.nativeTest = {
       listeners: {} as Record<string, (data: unknown) => void>, chunks: [] as string[], exports: [] as string[],
-      cancel: false, updates: 0, updateAvailable: true, browserOpens: 0, aiOpens: 0, browserCloses: 0, browserHidden: false, browserAddresses: [] as string[], browserNoteIds: [] as string[], cookieClears: 0,
+      cancel: false, updates: 0, updateAvailable: true, browserOpens: 0, aiOpens: 0, browserCloses: 0, browserHidden: false, browserAddresses: [] as string[], browserNoteIds: [] as string[], aiNoteIds: [] as string[], cookieClears: 0,
       documents: pdf && !sessionStorage.getItem('native-pdf-consumed') ? [{ id: 'android-pdf', name: 'Android에서 연 PDF.pdf', size: atob(pdf).length }] : [],
     };
     win.androidBridge = {};
@@ -38,7 +38,7 @@ async function nativeBridge(page: Page, pdf = '') {
           state.browserOpens++; state.browserAddresses.push(options.url || ''); state.browserNoteIds.push(options.noteId);
           return { external: localStorage.getItem('native-browser-mode') === 'browser' };
         }
-        if (method === 'openStudyAI') { state.aiOpens++; return { external: localStorage.getItem('native-browser-mode') === 'browser' }; }
+        if (method === 'openStudyAI') { state.aiOpens++; state.aiNoteIds.push(options.noteId); return { external: localStorage.getItem('native-browser-mode') === 'browser' }; }
         if (method === 'closeStudyPanel') state.browserCloses++;
         if (method === 'setStudyPanelOccluded') state.browserHidden = options.hidden;
         if (method === 'getStudyPanelSettings') return { side: localStorage.getItem('native-panel-side') || 'right', mode: localStorage.getItem('native-browser-mode') || 'panel' };
@@ -226,6 +226,16 @@ test('browser connection mode persists and opens internet and AI without an inli
   await expect(workspace).not.toHaveClass(/study-browser-open/);
   expect((await workspace.boundingBox())!.width).toBe(full.width);
   expect(await page.evaluate(() => [(window as any).nativeTest.browserOpens, (window as any).nativeTest.aiOpens])).toEqual([1, 1]);
+  await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).click();
+  await page.getByRole('button', { name: '새 노트', exact: true }).click();
+  await page.locator('[name=title]').fill('다른 브라우저 주소를 저장할 노트');
+  await page.getByRole('button', { name: '노트 만들기', exact: true }).click();
+  await page.getByRole('button', { name: '인터넷 패널', exact: true }).click();
+  await page.getByRole('button', { name: 'AI · ChatGPT 열기', exact: true }).click();
+  const context = await page.evaluate(() => ({ web: (window as any).nativeTest.browserNoteIds, ai: (window as any).nativeTest.aiNoteIds }));
+  expect(context.web).toHaveLength(2);
+  expect(context.ai).toEqual(context.web);
+  expect(context.web[0]).not.toBe(context.web[1]);
   await page.getByRole('button', { name: '노트 설정', exact: true }).click();
   await modes.locator('[data-browser-mode=panel]').click();
   await page.getByRole('button', { name: '완료', exact: true }).click();
