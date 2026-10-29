@@ -36,7 +36,7 @@ if (!release) {
   const revision = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
   release = await api('/releases', 'POST', {
     tag_name: tag, target_commitish: revision, name: `Notelin ${version} — Android`, draft: true, prerelease: false,
-    body: 'Android 설치형 Notelin입니다.\n\n- 타이머 팝업을 닫아도 페이지 이동 버튼 옆에서 남은 시간을 볼 수 있습니다.\n- 작은 시간 표시에서 일시정지와 계속을 바로 조작하고, 시간을 누르면 타이머 설정이 다시 열립니다. 휴대폰 상단바에도 간결하게 표시됩니다.\n- 이름을 붙여 저장한 타이머와 기존 노트, PDF, 필기 및 웹 패널 로그인 정보는 유지합니다.\n\n타이머 완료 알림은 Notelin이 열려 있을 때 표시됩니다. Android가 앱을 완전히 종료한 상태의 시스템 알림은 지원하지 않습니다.\n\n첫 설치와 업데이트의 마지막 확인은 Android 시스템에서 진행합니다.',
+    body: 'Android 설치형 Notelin입니다.\n\n- 저장된 타이머를 누르면 큰 시간 표시와 이름이 즉시 해당 타이머로 바뀝니다.\n- 실행 중 다른 저장 타이머를 고르면 기존 타이머를 멈추고 새 시간을 시작 대기로 표시합니다.\n- 팝업 밖의 남은 시간 표시와 일시정지·계속 조작, 기존 노트와 필기 데이터는 유지합니다.\n\n타이머 완료 알림은 Notelin이 열려 있을 때 표시됩니다. Android가 앱을 완전히 종료한 상태의 시스템 알림은 지원하지 않습니다.\n\n첫 설치와 업데이트의 마지막 확인은 Android 시스템에서 진행합니다.',
   });
 }
 for (const [assetName, content, type] of [[name, bytes, 'application/vnd.android.package-archive'], [`${name}.sha256`, Buffer.from(checksum), 'text/plain'], ['Notelin.apk', bytes, 'application/vnd.android.package-archive']]) {

@@ -118,7 +118,8 @@ export class StudyTimer {
     const remaining = state?.endsAt ? Math.max(0, Math.ceil((state.endsAt - Date.now()) / 1000)) : state?.remaining ?? this.duration() ?? 1500;
     const running = !!state?.endsAt;
     this.panel.querySelector<HTMLElement>('.study-timer-clock')!.textContent = formatTime(remaining);
-    this.panel.querySelector<HTMLElement>('.study-timer-status')!.textContent = state?.finished ? `${state.name} · 완료` : running ? `${state!.name} · 진행 중` : state ? `${state.name} · ${state.remaining < state.seconds ? '일시정지' : '시작 대기'}` : '시간을 정하고 시작하세요';
+    const selected = this.presets.find(preset => preset.id === this.selectedId);
+    this.panel.querySelector<HTMLElement>('.study-timer-status')!.textContent = state?.finished ? `${state.name} · 완료` : running ? `${state!.name} · 진행 중` : state ? `${state.name} · ${state.remaining < state.seconds ? '일시정지' : '시작 대기'}` : selected ? `${selected.name} · 시작 대기` : '시간을 정하고 시작하세요';
     this.panel.querySelector<HTMLButtonElement>('[data-timer-action=pause]')!.hidden = !running;
     const start = this.panel.querySelector<HTMLButtonElement>('[data-timer-action=start]')!;
     start.textContent = state && !state.finished && !running && state.remaining < state.seconds ? '계속' : running ? '다시 시작' : '시작';
@@ -151,7 +152,9 @@ export class StudyTimer {
     if (action === 'select') {
       const preset = this.presets.find(item => item.id === target.dataset.id);
       if (!preset) return;
-      this.selectedId = preset.id; this.setInputs(preset.name, preset.seconds); this.renderPresets(); return;
+      this.selectedId = preset.id; this.setInputs(preset.name, preset.seconds);
+      this.state = null; this.persist(stateKey, null);
+      this.renderPresets(); this.renderClock(); return;
     }
     if (action === 'delete') {
       this.presets = this.presets.filter(item => item.id !== target.dataset.id);

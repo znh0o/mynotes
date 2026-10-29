@@ -20,8 +20,12 @@ test('named study timers remain available across notes and a running countdown s
   await page.getByRole('button', { name: '노트 만들기', exact: true }).click();
   await page.locator('[data-action=timer]').click();
   await expect(panel.locator('.study-timer-preset')).toContainText('국어 복습');
+  await panel.locator('[data-timer-action=start]').click();
+  await expect(panel.locator('.study-timer-status')).toContainText('진행 중');
   await panel.locator('[data-timer-action=select]').click();
   await expect(panel.locator('#study-timer-name')).toHaveValue('국어 복습');
+  await expect(panel.locator('.study-timer-clock')).toHaveText('0:06');
+  await expect(panel.locator('.study-timer-status')).toContainText('국어 복습 · 시작 대기');
   await panel.locator('[data-timer-action=start]').click();
   await expect(panel.locator('.study-timer-status')).toContainText('진행 중');
   await panel.getByRole('button', { name: '타이머 닫기' }).click();
