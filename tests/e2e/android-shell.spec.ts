@@ -184,6 +184,7 @@ test('panel position is saved in settings and applies to internet and AI after r
   await positions.getByRole('button', { name: '왼쪽', exact: true }).click();
   await expect(positions.getByRole('button', { name: '왼쪽', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: '완료', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => !!history.state?.overlay)).toBe(false);
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-study-panel-side', 'left');
   await page.getByRole('button', { name: 'Notelin 시작 가이드 열기', exact: true }).click();
@@ -215,6 +216,7 @@ test('browser connection mode persists and opens internet and AI without an inli
   await modes.locator('[data-browser-mode=browser]').click();
   await expect(modes.locator('[data-browser-mode=browser]')).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: '완료', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => !!history.state?.overlay)).toBe(false);
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-study-browser-mode', 'browser');
   await page.getByRole('button', { name: 'Notelin 시작 가이드 열기', exact: true }).click();
