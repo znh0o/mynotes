@@ -36,7 +36,7 @@ if (!release) {
   const revision = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
   release = await api('/releases', 'POST', {
     tag_name: tag, target_commitish: revision, name: `Notelin ${version} — Android`, draft: true, prerelease: false,
-    body: 'Android 설치형 Notelin입니다.\n\n- ChatGPT와 인터넷 패널에서 사진을 선택해도 첨부 미리보기가 나타나지 않던 문제를 수정했습니다. 선택한 파일의 content URI 접근은 해당 WebView에만 일시적으로 허용합니다.\n- 외부 웹 패널은 HTTPS만 열고 HTTP 및 위험한 스킴을 차단합니다. SSL 오류와 Safe Browsing 경고를 건너뛰지 않습니다.\n- 제3자 쿠키를 기본 차단하고 카메라·마이크·위치 접근을 자동 허용하지 않습니다. WebView를 일반 브라우저로 가장하던 사용자 에이전트 변경도 제거했습니다.\n- 앱 내부 파일 URI는 계속 차단하고, 업데이트 APK 공유 경로는 필요한 폴더로 한정했습니다. 기존 쿠키, 노트, PDF와 필기 데이터는 삭제하지 않습니다.\n\n로그인 유지는 웹사이트의 쿠키와 저장소를 사용합니다. Notelin은 비밀번호를 별도로 저장하지 않습니다.\n\n일부 웹사이트가 WebView 로그인을 제한하거나 제3자 쿠키가 필요한 경우 해당 사이트의 로그인은 제한될 수 있습니다. 첫 설치와 업데이트의 마지막 확인은 Android 시스템에서 진행합니다.',
+    body: 'Android 설치형 Notelin입니다.\n\n- ChatGPT와 인증 페이지에서는 제3자 쿠키를 허용해 기존 로그인 호환성을 복원했습니다. 다른 웹사이트는 기본 차단을 유지합니다. 기존 쿠키나 로그인 정보는 삭제하지 않습니다.\n- 2.0.17의 HTTPS, SSL, Safe Browsing, 파일 접근 보호와 사진 첨부 수정은 유지합니다.\n- 노트, PDF와 필기 데이터는 그대로 유지합니다.\n\n로그인 유지는 웹사이트의 쿠키와 저장소를 사용합니다. Notelin은 비밀번호를 별도로 저장하지 않습니다. 사이트 자체가 WebView 로그인을 제한할 수 있으며 실제 기기에서 로그인 확인이 필요합니다.\n\n첫 설치와 업데이트의 마지막 확인은 Android 시스템에서 진행합니다.',
   });
 }
 for (const [assetName, content, type] of [[name, bytes, 'application/vnd.android.package-archive'], [`${name}.sha256`, Buffer.from(checksum), 'text/plain'], ['Notelin.apk', bytes, 'application/vnd.android.package-archive']]) {

@@ -270,6 +270,7 @@ final class StudyBrowserPanel extends LinearLayout {
             }
             @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
                 activity.revokeStudyContentAccess(view);
+                updateCookiePolicy(view, Uri.parse(url));
                 if (!isWebAddress(Uri.parse(url)) && !"about:blank".equals(url)) {
                     view.stopLoading();
                     if (view == activeBrowser()) showBlockedPage("HTTPS 주소만 열 수 있어요.");
@@ -288,6 +289,7 @@ final class StudyBrowserPanel extends LinearLayout {
                 view.setVisibility(View.GONE);
             }
             @Override public void onPageFinished(WebView view, String url) {
+                updateCookiePolicy(view, Uri.parse(url));
                 if (view == activeBrowser()) {
                     if (!address.hasFocus() && isWebAddress(Uri.parse(url))) address.setText(url);
                     updateNavigation();
@@ -373,6 +375,14 @@ final class StudyBrowserPanel extends LinearLayout {
         return "https".equalsIgnoreCase(scheme) && uri.getHost() != null;
     }
 
+    private static void updateCookiePolicy(WebView browser, Uri uri) {
+        String host = uri.getHost();
+        boolean chatGptLogin = "https".equalsIgnoreCase(uri.getScheme()) && host != null &&
+            (host.equalsIgnoreCase("chatgpt.com") || host.toLowerCase(java.util.Locale.ROOT).endsWith(".chatgpt.com") ||
+             host.equalsIgnoreCase("auth.openai.com"));
+        CookieManager.getInstance().setAcceptThirdPartyCookies(browser, chatGptLogin);
+    }
+
     private void navigate(String input) {
         String value = input.trim();
         if (value.isEmpty()) return;
@@ -388,6 +398,7 @@ final class StudyBrowserPanel extends LinearLayout {
         closeBookmarks();
         placeholder.setVisibility(View.GONE);
         activeBrowser().setVisibility(View.VISIBLE);
+        updateCookiePolicy(activeBrowser(), uri);
         activeBrowser().loadUrl(uri.toString());
     }
 
@@ -540,6 +551,7 @@ final class StudyBrowserPanel extends LinearLayout {
 
     boolean restoreNoteState(Bundle state) {
         if (state == null || web.restoreState(state) == null) return false;
+        if (web.getUrl() != null) updateCookiePolicy(web, Uri.parse(web.getUrl()));
         placeholder.setVisibility(View.GONE);
         web.setVisibility(View.VISIBLE);
         address.setText(web.getUrl() == null ? "" : web.getUrl());
