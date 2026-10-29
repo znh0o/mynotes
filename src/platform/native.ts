@@ -4,6 +4,7 @@ import { App } from '@capacitor/app';
 export const isNativeApp = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
 export interface NativeDocument { id: string; name: string; size: number }
 export type StudyPanelSide = 'left' | 'right';
+export type StudyBrowserMode = 'panel' | 'browser';
 interface NotelinDevicePlugin {
   beginExport(options: { name: string; mimeType: string }): Promise<{ id: string }>;
   appendExport(options: { id: string; index: number; data: string }): Promise<void>;
@@ -14,12 +15,14 @@ interface NotelinDevicePlugin {
   completeDocument(options: { id: string }): Promise<void>;
   setAppearance(options: { dark: boolean }): Promise<void>;
   openUpdates(): Promise<void>;
-  openStudyBrowser(options: { noteId: string; url?: string }): Promise<void>;
-  openStudyAI(): Promise<void>;
+  openStudyBrowser(options: { noteId: string; url?: string }): Promise<{ external: boolean }>;
+  openStudyAI(): Promise<{ external: boolean }>;
   closeStudyPanel(): Promise<void>;
   setStudyPanelOccluded(options: { hidden: boolean }): Promise<void>;
-  getStudyPanelSettings(): Promise<{ side: StudyPanelSide }>;
+  getStudyPanelSettings(): Promise<{ side: StudyPanelSide; mode: StudyBrowserMode }>;
   setStudyPanelSide(options: { side: StudyPanelSide }): Promise<void>;
+  setStudyBrowserMode(options: { mode: StudyBrowserMode }): Promise<void>;
+  clearStudyLoginCookies(): Promise<void>;
   addListener(event: 'documentReceived' | 'stylusButtonPressed', callback: () => void): Promise<PluginListenerHandle>;
 }
 const device = registerPlugin<NotelinDevicePlugin>('NotelinDevice');
@@ -39,6 +42,7 @@ export async function initializeNativeShell() {
   appearance();
   const settings = await device.getStudyPanelSettings();
   document.documentElement.dataset.studyPanelSide = settings.side === 'left' ? 'left' : 'right';
+  document.documentElement.dataset.studyBrowserMode = settings.mode === 'browser' ? 'browser' : 'panel';
 }
 
 function base64(blob: Blob): Promise<string> {
@@ -75,6 +79,12 @@ export async function setStudyPanelSide(side: StudyPanelSide) {
   await device.setStudyPanelSide({ side });
   document.documentElement.dataset.studyPanelSide = side;
 }
+export function getStudyBrowserMode(): StudyBrowserMode { return document.documentElement.dataset.studyBrowserMode === 'browser' ? 'browser' : 'panel'; }
+export async function setStudyBrowserMode(mode: StudyBrowserMode) {
+  await device.setStudyBrowserMode({ mode });
+  document.documentElement.dataset.studyBrowserMode = mode;
+}
+export function clearStudyLoginCookies() { return device.clearStudyLoginCookies(); }
 export async function readNativeDocument(document: NativeDocument): Promise<File> {
   if (!Number.isSafeInteger(document.size) || document.size < 0 || document.size > 150 * 1024 * 1024) throw new Error('PDF는 150MB 이하로 가져올 수 있어요.');
   const parts: ArrayBuffer[] = [];

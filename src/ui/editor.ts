@@ -1192,9 +1192,10 @@ export class EditorView {
   private async toggleStudyPanel(mode: 'browser' | 'ai') {
     if (this.studyPanel === mode) return this.closeStudyPanel();
     const previous = this.studyPanel;
-    this.setStudyPanel(mode);
+    if (document.documentElement.dataset.studyBrowserMode !== 'browser') this.setStudyPanel(mode);
     try {
-      if (mode === 'ai') await openNativeStudyAI(); else await openNativeStudyBrowser(this.note.id);
+      const result = mode === 'ai' ? await openNativeStudyAI() : await openNativeStudyBrowser(this.note.id);
+      this.setStudyPanel(result.external ? null : mode);
       this.syncStudyPanelOverlay();
     } catch (error) { this.setStudyPanel(previous); throw error; }
   }

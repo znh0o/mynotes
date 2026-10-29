@@ -9,7 +9,7 @@ async function nativeBridge(page: Page, pdf = '') {
       ? { ...matchMedia(query), matches: true } as MediaQueryList : matchMedia(query);
     const state = win.nativeTest = {
       listeners: {} as Record<string, (data: unknown) => void>, chunks: [] as string[], exports: [] as string[],
-      cancel: false, updates: 0, updateAvailable: true, browserOpens: 0, aiOpens: 0, browserCloses: 0, browserHidden: false, browserAddresses: [] as string[], browserNoteIds: [] as string[],
+      cancel: false, updates: 0, updateAvailable: true, browserOpens: 0, aiOpens: 0, browserCloses: 0, browserHidden: false, browserAddresses: [] as string[], browserNoteIds: [] as string[], cookieClears: 0,
       documents: pdf && !sessionStorage.getItem('native-pdf-consumed') ? [{ id: 'android-pdf', name: 'Android에서 연 PDF.pdf', size: atob(pdf).length }] : [],
     };
     win.androidBridge = {};
@@ -17,7 +17,7 @@ async function nativeBridge(page: Page, pdf = '') {
     win.Capacitor = {
       PluginHeaders: [
         { name: 'App', methods: methods(['addListener', 'removeListener']) },
-        { name: 'NotelinDevice', methods: methods(['addListener', 'removeListener', 'setAppearance', 'pendingDocuments', 'readDocument', 'completeDocument', 'beginExport', 'appendExport', 'finishExport', 'cancelExport', 'openUpdates', 'openStudyBrowser', 'openStudyAI', 'closeStudyPanel', 'setStudyPanelOccluded', 'getStudyPanelSettings', 'setStudyPanelSide']) },
+        { name: 'NotelinDevice', methods: methods(['addListener', 'removeListener', 'setAppearance', 'pendingDocuments', 'readDocument', 'completeDocument', 'beginExport', 'appendExport', 'finishExport', 'cancelExport', 'openUpdates', 'openStudyBrowser', 'openStudyAI', 'closeStudyPanel', 'setStudyPanelOccluded', 'getStudyPanelSettings', 'setStudyPanelSide', 'setStudyBrowserMode', 'clearStudyLoginCookies']) },
         { name: 'NotelinUpdater', methods: methods(['addListener', 'removeListener', 'check', 'install']) },
       ],
       nativeCallback: (_plugin: string, _method: string, options: any, callback: (data: unknown) => void) => {
@@ -34,12 +34,20 @@ async function nativeBridge(page: Page, pdf = '') {
         }
         if (method === 'finishExport') { state.exports.push(btoa(state.chunks.join(''))); return { saved: !state.cancel }; }
         if (method === 'openUpdates') state.updates++;
-        if (method === 'openStudyBrowser') { state.browserOpens++; state.browserAddresses.push(options.url || ''); state.browserNoteIds.push(options.noteId); }
-        if (method === 'openStudyAI') state.aiOpens++;
+        if (method === 'openStudyBrowser') {
+          state.browserOpens++; state.browserAddresses.push(options.url || ''); state.browserNoteIds.push(options.noteId);
+          return { external: localStorage.getItem('native-browser-mode') === 'browser' };
+        }
+        if (method === 'openStudyAI') { state.aiOpens++; return { external: localStorage.getItem('native-browser-mode') === 'browser' }; }
         if (method === 'closeStudyPanel') state.browserCloses++;
         if (method === 'setStudyPanelOccluded') state.browserHidden = options.hidden;
-        if (method === 'getStudyPanelSettings') return { side: localStorage.getItem('native-panel-side') || 'right' };
+        if (method === 'getStudyPanelSettings') return { side: localStorage.getItem('native-panel-side') || 'right', mode: localStorage.getItem('native-browser-mode') || 'panel' };
         if (method === 'setStudyPanelSide') localStorage.setItem('native-panel-side', options.side);
+        if (method === 'setStudyBrowserMode') {
+          localStorage.setItem('native-browser-mode', options.mode);
+          if (options.mode === 'browser') dispatchEvent(new Event('notelin-study-browser-closed'));
+        }
+        if (method === 'clearStudyLoginCookies') { state.cookieClears++; dispatchEvent(new Event('notelin-study-browser-closed')); }
         if (method === 'check') return { available: state.updateAvailable, version: state.updateAvailable ? '2.0.1' : '2.0.0', installedVersion: '2.0.0' };
         if (method === 'install') { state.updates++; state.listeners.downloadProgress?.({ percent: 100 }); return { needsPermission: false }; }
         return {};
@@ -196,6 +204,62 @@ test('panel position is saved in settings and applies to internet and AI after r
   await page.getByRole('button', { name: '인터넷 패널', exact: true }).click();
   expect((await workspace.boundingBox())!.x).toBe(full.x);
   expect((await workspace.boundingBox())!.width).toBeCloseTo(full.width * .8, 0);
+});
+
+test('browser connection mode persists and opens internet and AI without an inline panel', async ({ page }) => {
+  await nativeBridge(page);
+  await page.goto('./');
+  await page.getByRole('button', { name: '설정 및 백업', exact: true }).click();
+  const modes = page.getByRole('group', { name: '인터넷 · AI 실행 방식', exact: true });
+  await expect(modes.locator('[data-browser-mode=panel]')).toHaveAttribute('aria-pressed', 'true');
+  await modes.locator('[data-browser-mode=browser]').click();
+  await expect(modes.locator('[data-browser-mode=browser]')).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: '완료', exact: true }).click();
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-study-browser-mode', 'browser');
+  await page.getByRole('button', { name: 'Notelin 시작 가이드 열기', exact: true }).click();
+  const workspace = page.locator('.editor-shell');
+  const full = (await workspace.boundingBox())!;
+  await page.getByRole('button', { name: '인터넷 패널', exact: true }).click();
+  await expect(workspace).not.toHaveClass(/study-browser-open/);
+  await page.getByRole('button', { name: 'AI · ChatGPT 열기', exact: true }).click();
+  await expect(workspace).not.toHaveClass(/study-browser-open/);
+  expect((await workspace.boundingBox())!.width).toBe(full.width);
+  expect(await page.evaluate(() => [(window as any).nativeTest.browserOpens, (window as any).nativeTest.aiOpens])).toEqual([1, 1]);
+  await page.getByRole('button', { name: '노트 설정', exact: true }).click();
+  await modes.locator('[data-browser-mode=panel]').click();
+  await page.getByRole('button', { name: '완료', exact: true }).click();
+  await page.getByRole('button', { name: '인터넷 패널', exact: true }).click();
+  await expect(workspace).toHaveClass(/study-browser-open/);
+});
+
+test('clearing in-app login cookies closes the panel and preserves notebook records', async ({ page }) => {
+  await nativeBridge(page);
+  await page.goto('./');
+  await page.getByRole('button', { name: 'Notelin 시작 가이드 열기', exact: true }).click();
+  const readNotes = () => page.evaluate(() => new Promise<Record<string, unknown>[]>((resolve, reject) => {
+    const request = indexedDB.open('mynotes-v1');
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const database = request.result;
+      const notes = database.transaction('notes').objectStore('notes').getAll();
+      notes.onsuccess = () => { database.close(); resolve(notes.result); };
+      notes.onerror = () => { database.close(); reject(notes.error); };
+    };
+  }));
+  // Opening a note saves its last page asynchronously; settle that write first.
+  await expect.poll(async () => (await readNotes())[0]?.lastPageId).toEqual(expect.any(String));
+  const before = await readNotes();
+  await page.getByRole('button', { name: 'AI · ChatGPT 열기', exact: true }).click();
+  await page.getByRole('button', { name: '노트 설정', exact: true }).click();
+  await page.getByRole('button', { name: '앱 내 로그인 쿠키 삭제', exact: true }).click();
+  await expect(page.locator('#toast')).toHaveText('앱 내 로그인 쿠키를 삭제했어요.');
+  expect(await page.evaluate(() => (window as any).nativeTest.cookieClears)).toBe(1);
+  expect(await readNotes()).toEqual(before);
+  await page.getByRole('button', { name: '완료', exact: true }).click();
+  await expect(page.locator('.editor-shell')).not.toHaveClass(/study-browser-open/);
+  await page.getByRole('button', { name: 'AI · ChatGPT 열기', exact: true }).click();
+  await expect(page.locator('.editor-shell')).toHaveClass(/study-browser-open/);
 });
 
 test('Android PDF intents import intact bytes once and PDF export uses the document destination picker', async ({ page }) => {

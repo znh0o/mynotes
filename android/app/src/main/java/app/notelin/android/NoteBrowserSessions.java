@@ -31,4 +31,6 @@ final class NoteBrowserSessions {
         histories.put(noteId, new Bundle(state));
         while (histories.size() > 24) histories.remove(histories.keySet().iterator().next());
     }
+
+    void clearHistories() { histories.clear(); }
 }

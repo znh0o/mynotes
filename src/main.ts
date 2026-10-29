@@ -13,7 +13,7 @@ import { version as appVersion } from '../package.json';
 import { installAppZoomGuard } from './ui/app-zoom';
 import { getAppearance, setAppearance, type Appearance } from './ui/appearance';
 import { installDeviceUI } from './ui/device-ui';
-import { isNativeApp, initializeNativeShell, pendingNativeDocuments, readNativeDocument, completeNativeDocument, onNativeDocument, openNativeUpdates, getStudyPanelSide, setStudyPanelSide, type StudyPanelSide } from './platform/native';
+import { isNativeApp, initializeNativeShell, pendingNativeDocuments, readNativeDocument, completeNativeDocument, onNativeDocument, openNativeUpdates, getStudyPanelSide, setStudyPanelSide, type StudyPanelSide, getStudyBrowserMode, setStudyBrowserMode, type StudyBrowserMode, clearStudyLoginCookies } from './platform/native';
 import { checkNativeUpdate, installNativeUpdate, onNativeUpdateProgress, type NativeUpdate } from './platform/native-updates';
 
 installAppZoomGuard();
@@ -176,10 +176,22 @@ function settings() {
     appearanceSection.querySelectorAll<HTMLElement>('[data-appearance]').forEach(button => button.addEventListener('click', () => setAppearance(button.dataset.appearance as Appearance)));
     dialog.querySelector('footer [data-close]')?.remove();
     if (isNativeApp) {
+      const browserSection = document.createElement('section');
+      browserSection.className = 'settings-section study-browser-section';
+      browserSection.innerHTML = `<h3>${icon('Globe2', 18)} 인터넷 · AI 실행 방식</h3><div class="study-browser-mode-options" role="group" aria-label="인터넷 · AI 실행 방식">${([['panel', 'PanelRight', '앱 내 패널', '노트별로 보던 페이지를 기억해요.'], ['browser', 'ExternalLink', '기기 브라우저 연결', '브라우저의 기존 로그인 상태를 사용해요.']] as const).map(([mode, symbol, title, detail]) => `<button type="button" data-browser-mode="${mode}" aria-pressed="${getStudyBrowserMode() === mode}">${icon(symbol, 20)}<span><strong>${title}</strong><small>${detail}</small></span>${icon('Check', 17)}</button>`).join('')}</div><p class="muted study-browser-mode-note">기기 브라우저 연결은 지원되는 브라우저에서만 옆 창과 위치 설정을 사용할 수 있어요. 보던 주소의 자동 저장은 앱 내 패널에서 지원해요.</p><div class="study-browser-privacy"><button type="button" class="button secondary" data-setting="clear-web-cookies">앱 내 로그인 쿠키 삭제</button><p class="muted">인터넷·AI 패널의 로그인 쿠키를 지워요. 노트는 유지되며, 기기 브라우저의 로그인은 해당 브라우저에서 관리해요.</p></div>`;
+      appearanceSection.after(browserSection);
+      browserSection.querySelectorAll<HTMLButtonElement>('[data-browser-mode]').forEach(button => button.addEventListener('click', () => run(async () => {
+        const buttons = browserSection.querySelectorAll<HTMLButtonElement>('[data-browser-mode]');
+        buttons.forEach(item => { item.disabled = true; });
+        try {
+          await setStudyBrowserMode(button.dataset.browserMode as StudyBrowserMode);
+          buttons.forEach(item => item.setAttribute('aria-pressed', String(item.dataset.browserMode === getStudyBrowserMode())));
+        } finally { buttons.forEach(item => { item.disabled = false; }); }
+      })));
       const panelSection = document.createElement('section');
       panelSection.className = 'settings-section study-panel-section';
       panelSection.innerHTML = `<h3>${icon('PanelRight', 18)} 인터넷 · AI 패널 위치</h3><p class="muted">필기 화면에서 패널을 열 위치를 선택하세요.</p><div class="study-panel-side-options" role="group" aria-label="인터넷 · AI 패널 위치">${(['left', 'right'] as const).map(side => `<button type="button" data-panel-side="${side}" aria-pressed="${getStudyPanelSide() === side}">${icon(side === 'left' ? 'PanelLeft' : 'PanelRight', 20)}<span>${side === 'left' ? '왼쪽' : '오른쪽'}</span></button>`).join('')}</div>`;
-      appearanceSection.after(panelSection);
+      browserSection.after(panelSection);
       panelSection.querySelectorAll<HTMLButtonElement>('[data-panel-side]').forEach(button => button.addEventListener('click', () => run(async () => {
         const buttons = panelSection.querySelectorAll<HTMLButtonElement>('[data-panel-side]');
         buttons.forEach(item => { item.disabled = true; });
@@ -212,6 +224,7 @@ function settings() {
       const action = el.dataset.setting; el.setAttribute('disabled', '');
       try {
         if (action === 'backup') { await editor?.flush(); const saved = await backup(); toast(saved === false ? '저장을 취소했어요.' : '백업 파일을 만들었어요.'); }
+        if (action === 'clear-web-cookies') { await clearStudyLoginCookies(); toast('앱 내 로그인 쿠키를 삭제했어요.'); }
         if (action === 'apk-updates') await openNativeUpdates();
         if (action === 'check-apk-update') {
           const status = dialog.querySelector('#apk-update-status')!;

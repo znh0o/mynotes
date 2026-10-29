@@ -11,6 +11,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.Gravity;
 import android.widget.FrameLayout;
+import android.webkit.CookieManager;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -32,6 +33,7 @@ public class MainActivity extends BridgeActivity {
     private float studyAiRatio = 1f / 5f;
     private boolean studyPanelOccluded;
     private boolean studyPanelOnLeft;
+    private boolean useConnectedBrowser;
 
     @Override public void onCreate(Bundle state) {
         registerPlugin(NotelinDevicePlugin.class);
@@ -39,6 +41,7 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(state);
         noteBrowserSessions = new NoteBrowserSessions(this);
         studyPanelOnLeft = "left".equals(getSharedPreferences("study-browser", MODE_PRIVATE).getString("panel-side", "right"));
+        useConnectedBrowser = "browser".equals(getSharedPreferences("study-browser", MODE_PRIVATE).getString("mode", "panel"));
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         View content = findViewById(android.R.id.content);
         content.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
@@ -135,7 +138,12 @@ public class MainActivity extends BridgeActivity {
 
     public void setDarkChrome(boolean value) { dark = value; applyChrome(); }
 
-    public void openStudyBrowser(String noteId, String url) {
+    public boolean openStudyBrowser(String noteId, String url) {
+        if (useConnectedBrowser) {
+            String address = url == null ? noteBrowserSessions.lastUrl(noteId) : url;
+            openConnectedBrowser(address == null ? "https://www.google.com/" : address, studyBrowserRatio);
+            return true;
+        }
         StudyBrowserPanel panel = noteBrowsers.get(noteId);
         boolean firstOpen = panel == null;
         if (firstOpen) {
@@ -158,13 +166,21 @@ public class MainActivity extends BridgeActivity {
             previous.release();
             noteBrowsers.remove(oldest.getKey());
         }
+        return false;
     }
 
-    public void openStudyAI() {
+    public boolean openStudyAI() {
+        if (useConnectedBrowser) { openConnectedBrowser("https://chatgpt.com/", studyAiRatio); return true; }
         boolean firstOpen = studyAi == null;
         if (firstOpen) studyAi = new StudyBrowserPanel(this, true, () -> closeStudyPanel(true), this::resizeStudyPanel);
         showStudyPanel(studyAi);
         if (firstOpen) studyAi.openUrl("https://chatgpt.com/");
+        return false;
+    }
+
+    private void openConnectedBrowser(String url, float ratio) {
+        closeStudyPanel(true);
+        StudyCustomTabs.open(this, url, isTablet(), studyPanelOnLeft, dark, Math.max(1, Math.round(studyBrowserAvailableWidth() * ratio)));
     }
 
     private void showStudyPanel(StudyBrowserPanel panel) {
@@ -185,6 +201,23 @@ public class MainActivity extends BridgeActivity {
 
     public void closeStudyPanel() { closeStudyPanel(false); }
     public String studyPanelSide() { return studyPanelOnLeft ? "left" : "right"; }
+    public String studyBrowserMode() { return useConnectedBrowser ? "browser" : "panel"; }
+    public void setStudyBrowserMode(String mode) {
+        useConnectedBrowser = "browser".equals(mode);
+        getSharedPreferences("study-browser", MODE_PRIVATE).edit().putString("mode", studyBrowserMode()).apply();
+        if (useConnectedBrowser) closeStudyPanel(true);
+    }
+    public void clearStudyLoginCookies(Runnable done) {
+        closeStudyPanel(true);
+        FrameLayout content = findViewById(android.R.id.content);
+        for (StudyBrowserPanel panel : noteBrowsers.values()) { content.removeView(panel); panel.release(); }
+        noteBrowsers.clear();
+        if (studyAi != null) { content.removeView(studyAi); studyAi.release(); studyAi = null; }
+        noteBrowserSessions.clearHistories();
+        // Cookies belong to this app's WebViews, not Chrome/Samsung Internet.
+        // Never clear WebStorage globally: Notelin notes live in IndexedDB.
+        CookieManager.getInstance().removeAllCookies(removed -> { CookieManager.getInstance().flush(); done.run(); });
+    }
     public void setStudyPanelSide(String side) {
         studyPanelOnLeft = "left".equals(side);
         getSharedPreferences("study-browser", MODE_PRIVATE).edit().putString("panel-side", studyPanelSide()).apply();

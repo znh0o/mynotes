@@ -36,7 +36,7 @@ if (!release) {
   const revision = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
   release = await api('/releases', 'POST', {
     tag_name: tag, target_commitish: revision, name: `Notelin ${version} — Android`, draft: true, prerelease: false,
-    body: 'Android 설치형 Notelin입니다.\n\n- 노트마다 인터넷 페이지와 방문 기록을 따로 유지하고, 새 노트는 빈 인터넷 화면에서 시작\n- 앱을 다시 열 때 각 노트의 마지막 인터넷 주소 복원\n- 로그인 쿠키와 즐겨찾기는 모든 노트에서 공통으로 사용\n- 설정에서 인터넷·AI 패널을 왼쪽 또는 오른쪽에 배치하고 선택한 위치 기억\n- 패널 위치에 맞춰 필기 영역과 크기 조절 손잡이 이동\n- 외부 웹페이지의 네이티브 기능 및 파일 접근을 차단하고 WebView Safe Browsing 유지\n\n첫 설치와 업데이트의 마지막 확인은 Android 시스템에서 진행합니다.',
+    body: 'Android 설치형 Notelin입니다.\n\n- 설정에서 인터넷·AI의 실행 방식을 앱 내 패널 또는 기기 브라우저 연결로 선택\n- 기기 브라우저 연결은 Custom Tabs를 통해 브라우저의 기존 로그인 상태와 보안 UI 사용\n- 지원되는 브라우저에서 태블릿 옆 창과 왼쪽·오른쪽 위치 요청\n- 앱 내 로그인 쿠키 삭제 버튼 추가: 노트와 PDF 데이터는 유지\n- 앱 내 패널의 노트별 페이지 기억 및 왼쪽·오른쪽 배치 유지\n\n기기 브라우저의 로그인은 해당 브라우저에서 관리합니다. 옆 창 지원은 브라우저에 따라 다르며, 보던 주소의 자동 저장은 앱 내 패널에서 지원합니다.\n\n첫 설치와 업데이트의 마지막 확인은 Android 시스템에서 진행합니다.',
   });
 }
 for (const [assetName, content, type] of [[name, bytes, 'application/vnd.android.package-archive'], [`${name}.sha256`, Buffer.from(checksum), 'text/plain'], ['Notelin.apk', bytes, 'application/vnd.android.package-archive']]) {
