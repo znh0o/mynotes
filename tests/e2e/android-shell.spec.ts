@@ -76,6 +76,8 @@ test('Android opens the library without installation UI and routes Back and back
   await expect.poll(() => page.evaluate(() => (window as any).nativeTest.browserHidden)).toBe(true);
   await page.getByRole('button', { name: '닫기', exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as any).nativeTest.browserHidden)).toBe(false);
+  // Closing the dialog also traverses history before the next native Back.
+  await expect.poll(() => page.evaluate(() => !!history.state?.overlay)).toBe(false);
   await page.evaluate(() => dispatchEvent(new Event('notelin-study-browser-closed')));
   await expect(browser).toHaveAttribute('aria-expanded', 'false');
   await expect.poll(() => page.evaluate(() => !!(window as any).nativeTest.listeners.stylusButtonPressed)).toBe(true);
