@@ -9,6 +9,12 @@
   border-radius: 7px;
 }
 
+.study-ai-button {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -.3px;
+}
+
 :root[data-theme=dark] .editor-header-actions [data-action=study-browser][aria-expanded=true] {
   color: #c7dbff;
   background: #284467;

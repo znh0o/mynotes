@@ -106,7 +106,8 @@ export class EditorView {
     </div>`;
     if (isNativeApp) {
       this.root.querySelector('[data-action=search]')!.insertAdjacentHTML('beforebegin',
-        button('Globe2', '인터넷 패널', 'study-browser', 'aria-expanded="false"'));
+        button('Globe2', '인터넷 패널', 'study-browser', 'aria-expanded="false"')
+        + '<button class="icon-button study-ai-button" type="button" data-action="study-ai" aria-label="AI · ChatGPT 열기" title="AI · ChatGPT 열기">AI</button>');
       this.studyBrowserObserver = new MutationObserver(() => this.syncStudyBrowserOverlay());
       this.studyBrowserObserver.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['open'] });
     }
@@ -627,6 +628,7 @@ export class EditorView {
     }
     if (action === 'search') this.search();
     if (action === 'study-browser') run(() => this.toggleStudyBrowser());
+    if (action === 'study-ai') run(() => this.openStudyBrowser('https://chatgpt.com/'));
     if (action === 'settings') this.settings();
     if (action === 'save') run(async () => { await this.flush(); await this.saveThumbnail(this.page); toast('저장했어요.'); });
     if (action === 'save-to-library') run(async () => {
@@ -1181,10 +1183,14 @@ export class EditorView {
       this.setStudyBrowserOpen(false);
       await closeNativeStudyBrowser();
     } else {
-      this.setStudyBrowserOpen(true);
-      try { await openNativeStudyBrowser(); this.syncStudyBrowserOverlay(); }
-      catch (error) { this.setStudyBrowserOpen(false); throw error; }
+      await this.openStudyBrowser();
     }
+  }
+  private async openStudyBrowser(url?: string) {
+    const wasOpen = this.studyBrowserOpen;
+    this.setStudyBrowserOpen(true);
+    try { await openNativeStudyBrowser(url); this.syncStudyBrowserOverlay(); }
+    catch (error) { if (!wasOpen) this.setStudyBrowserOpen(false); throw error; }
   }
   destroy() { this.studyBrowserObserver?.disconnect(); if (this.studyBrowserOpen) void closeNativeStudyBrowser().catch(console.error); this.textEditor?.destroy(); this.previews?.destroy(); this.detail?.destroy(); this.companionDetail?.destroy(); this.cancelViewportUpdate(); clearTimeout(this.thumbTimer); clearTimeout(this.temporaryNoticeTimer); clearTimeout(this.companionThumbTimer); clearTimeout(this.brushTimer); clearTimeout(this.penTimer); this.generation++; this.spreadGeneration++; this.engine?.destroy(); this.companionEngine?.destroy(); this.abort.abort(); this.resizeObserver?.disconnect(); }
 }

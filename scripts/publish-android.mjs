@@ -36,7 +36,7 @@ if (!release) {
   const revision = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
   release = await api('/releases', 'POST', {
     tag_name: tag, target_commitish: revision, name: `Notelin ${version} — Android`, draft: true, prerelease: false,
-    body: 'Android 설치형 Notelin입니다.\n\n- 인터넷 패널의 기본 너비를 화면의 1/6로 변경\n- 패널 왼쪽 손잡이를 드래그해 인터넷과 필기 영역의 너비 조절\n- 모바일 사이트 요청 및 패널 너비에 맞춘 웹페이지 표시 설정 개선\n- 새 창 링크와 앱 링크의 웹페이지 대체 주소를 패널 안에서 열도록 개선\n- 좁은 패널에서도 주소창을 사용할 수 있도록 브라우저 도구를 두 줄로 배치\n\n일부 사이트는 Android WebView에서 제한될 수 있습니다. 첫 설치와 업데이트의 마지막 확인은 Android 시스템에서 진행합니다.',
+    body: 'Android 설치형 Notelin입니다.\n\n- 인터넷 패널의 별표 메뉴에서 즐겨찾기 저장·열기·삭제\n- 로그인 쿠키와 웹 저장소를 보존하고 패널 종료·앱 백그라운드 전환 때 저장\n- 필기 화면에 별도 AI 버튼 추가: 같은 패널에서 chatgpt.com 열기\n- 로그인에 사용하는 새 창을 패널 안에서 유지하도록 개선\n\n사이트의 로그인 정책과 세션 만료는 해당 서비스에서 결정합니다. 첫 설치와 업데이트의 마지막 확인은 Android 시스템에서 진행합니다.',
   });
 }
 for (const [assetName, content, type] of [[name, bytes, 'application/vnd.android.package-archive'], [`${name}.sha256`, Buffer.from(checksum), 'text/plain'], ['Notelin.apk', bytes, 'application/vnd.android.package-archive']]) {

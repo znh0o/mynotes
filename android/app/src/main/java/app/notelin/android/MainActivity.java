@@ -125,8 +125,8 @@ public class MainActivity extends BridgeActivity {
 
     public void setDarkChrome(boolean value) { dark = value; applyChrome(); }
 
-    public void openStudyBrowser() {
-        if (studyBrowser != null) return;
+    public void openStudyBrowser(String url) {
+        if (studyBrowser != null) { if (url != null) studyBrowser.openUrl(url); return; }
         FrameLayout content = findViewById(android.R.id.content);
         studyBrowser = new StudyBrowserPanel(this, () -> closeStudyBrowser(true), this::resizeStudyBrowser);
         studyBrowser.setDark(dark);
@@ -135,6 +135,7 @@ public class MainActivity extends BridgeActivity {
         content.addView(studyBrowser, layout);
         studyBrowser.bringToFront();
         notifyStudyBrowserSize();
+        if (url != null) studyBrowser.openUrl(url);
     }
 
     public void closeStudyBrowser() { closeStudyBrowser(false); }
@@ -202,6 +203,11 @@ public class MainActivity extends BridgeActivity {
     @Override public void onWindowFocusChanged(boolean focused) {
         super.onWindowFocusChanged(focused);
         if (focused) applyChrome();
+    }
+
+    @Override public void onPause() {
+        if (studyBrowser != null) studyBrowser.persistSession();
+        super.onPause();
     }
 
     @Override public void onConfigurationChanged(Configuration configuration) {

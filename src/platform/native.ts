@@ -13,7 +13,7 @@ interface NotelinDevicePlugin {
   completeDocument(options: { id: string }): Promise<void>;
   setAppearance(options: { dark: boolean }): Promise<void>;
   openUpdates(): Promise<void>;
-  openStudyBrowser(): Promise<void>;
+  openStudyBrowser(options: { url?: string }): Promise<void>;
   closeStudyBrowser(): Promise<void>;
   setStudyBrowserOccluded(options: { hidden: boolean }): Promise<void>;
   addListener(event: 'documentReceived' | 'stylusButtonPressed', callback: () => void): Promise<PluginListenerHandle>;
@@ -60,7 +60,7 @@ export function pendingNativeDocuments() { return device.pendingDocuments(); }
 export function completeNativeDocument(id: string) { return device.completeDocument({ id }); }
 export function onNativeDocument(callback: () => void) { return device.addListener('documentReceived', callback); }
 export function openNativeUpdates() { return device.openUpdates(); }
-export function openNativeStudyBrowser() { return device.openStudyBrowser(); }
+export function openNativeStudyBrowser(url?: string) { return device.openStudyBrowser(url ? { url } : {}); }
 export function closeNativeStudyBrowser() { return device.closeStudyBrowser(); }
 export function setNativeStudyBrowserOccluded(hidden: boolean) { return device.setStudyBrowserOccluded({ hidden }); }
 export async function readNativeDocument(document: NativeDocument): Promise<File> {

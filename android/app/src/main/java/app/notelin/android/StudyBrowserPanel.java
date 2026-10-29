@@ -7,12 +7,14 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Message;
 import android.text.InputType;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.webkit.WebChromeClient;
+import android.webkit.CookieManager;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -21,6 +23,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.view.View;
@@ -42,10 +45,15 @@ final class StudyBrowserPanel extends LinearLayout {
     private final List<TextView> actions = new ArrayList<>();
     private final List<WebView> popups = new ArrayList<>();
     private final TextView back, forward;
+    private final TextView bookmarkButton;
+    private final BrowserBookmarks bookmarks;
+    private LinearLayout bookmarksPanel;
+    private int surfaceColor, inkColor, mutedColor;
 
     StudyBrowserPanel(MainActivity activity, Runnable close, IntConsumer resize) {
         super(activity);
         this.activity = activity;
+        bookmarks = new BrowserBookmarks(activity);
         web = new WebView(activity);
         setOrientation(HORIZONTAL);
         setElevation(dp(12));
@@ -93,8 +101,11 @@ final class StudyBrowserPanel extends LinearLayout {
         toolbar.setGravity(Gravity.CENTER_VERTICAL);
         toolbar.setPadding(dp(3), 0, dp(3), 0);
         body.addView(toolbar, new LayoutParams(LayoutParams.MATCH_PARENT, dp(38)));
-        back = action("‹", "이전 웹페이지", () -> { if (web.canGoBack()) web.goBack(); });
-        forward = action("›", "다음 웹페이지", () -> { if (web.canGoForward()) web.goForward(); });
+        back = action("‹", "이전 웹페이지", () -> {
+            WebView current = activeBrowser();
+            if (current.canGoBack()) current.goBack(); else if (current != web) closePopup(current);
+        });
+        forward = action("›", "다음 웹페이지", () -> { if (activeBrowser().canGoForward()) activeBrowser().goForward(); });
 
         address = new EditText(activity);
         address.setSingleLine(true);
@@ -110,12 +121,12 @@ final class StudyBrowserPanel extends LinearLayout {
             navigate(address.getText().toString());
             address.clearFocus();
             hideKeyboard();
-            web.requestFocus();
+            activeBrowser().requestFocus();
             return true;
         });
         addressRow.addView(address, new LayoutParams(LayoutParams.MATCH_PARENT, dp(39)));
-        action("↻", "새로고침", () -> { if (web.getUrl() != null) web.reload(); });
-        action("↗", "기본 브라우저에서 열기", this::openExternal);
+        action("↻", "새로고침", () -> { if (activeBrowser().getUrl() != null) activeBrowser().reload(); });
+        bookmarkButton = action("☆", "즐겨찾기", this::showBookmarks);
         action("×", "인터넷 패널 닫기", close);
 
         progress = new ProgressBar(activity, null, android.R.attr.progressBarStyleHorizontal);
@@ -130,56 +141,6 @@ final class StudyBrowserPanel extends LinearLayout {
         body.addView(page, new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1));
         web.setVisibility(View.GONE);
         configureWebView(web);
-        web.setWebViewClient(new WebViewClient() {
-            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                Uri uri = request.getUrl();
-                return handleSpecialLink(uri);
-            }
-            @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
-                placeholder.setVisibility(View.GONE);
-                web.setVisibility(View.VISIBLE);
-            }
-            @Override public void onReceivedError(WebView view, WebResourceRequest request, android.webkit.WebResourceError error) {
-                if (!request.isForMainFrame()) return;
-                placeholder.setText("페이지를 열지 못했어요.\n주소와 인터넷 연결을 확인해 주세요.");
-                placeholder.setVisibility(View.VISIBLE);
-                web.setVisibility(View.GONE);
-            }
-            @Override public void onPageFinished(WebView view, String url) {
-                if (!address.hasFocus() && isWebAddress(Uri.parse(url))) address.setText(url);
-                updateNavigation();
-            }
-        });
-        web.setWebChromeClient(new WebChromeClient() {
-            @Override public void onProgressChanged(WebView view, int amount) {
-                progress.setProgress(amount);
-                progress.setVisibility(amount >= 100 ? View.GONE : View.VISIBLE);
-            }
-            @Override public boolean onCreateWindow(WebView view, boolean dialog, boolean userGesture, Message result) {
-                if (!userGesture || popups.size() >= 2) return false;
-                WebView popup = new WebView(activity);
-                configureWebView(popup);
-                popups.add(popup);
-                page.addView(popup, new FrameLayout.LayoutParams(0, 0));
-                popup.setWebViewClient(new WebViewClient() {
-                    private boolean forwarded;
-                    private void forward(String url) {
-                        if (forwarded || "about:blank".equals(url)) return;
-                        forwarded = true;
-                        Uri uri = Uri.parse(url);
-                        if (isWebAddress(uri)) navigate(url); else handleSpecialLink(uri);
-                        popup.post(() -> { if (popups.remove(popup)) { page.removeView(popup); popup.destroy(); } });
-                    }
-                    @Override public boolean shouldOverrideUrlLoading(WebView target, WebResourceRequest request) {
-                        forward(request.getUrl().toString()); return true;
-                    }
-                    @Override public void onPageStarted(WebView target, String url, android.graphics.Bitmap favicon) { forward(url); }
-                });
-                ((WebView.WebViewTransport) result.obj).setWebView(popup);
-                result.sendToTarget();
-                return true;
-            }
-        });
         page.addView(web, new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
 
         placeholder = new TextView(activity);
@@ -189,6 +150,7 @@ final class StudyBrowserPanel extends LinearLayout {
         placeholder.setPadding(dp(14), 0, dp(14), 0);
         placeholder.setLineSpacing(dp(5), 1);
         page.addView(placeholder, new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        installBrowserClients(web);
         updateNavigation();
         setDark(false);
         divider.setBackgroundColor(Color.parseColor("#dde4ef"));
@@ -212,6 +174,9 @@ final class StudyBrowserPanel extends LinearLayout {
         WebSettings settings = browser.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
+        CookieManager cookies = CookieManager.getInstance();
+        cookies.setAcceptCookie(true);
+        cookies.setAcceptThirdPartyCookies(browser, true);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
@@ -227,13 +192,83 @@ final class StudyBrowserPanel extends LinearLayout {
         browser.setInitialScale(0);
     }
 
-    private boolean handleSpecialLink(Uri uri) {
+    private WebView activeBrowser() { return popups.isEmpty() ? web : popups.get(popups.size() - 1); }
+
+    private void installBrowserClients(WebView browser) {
+        browser.setWebViewClient(new WebViewClient() {
+            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                return handleSpecialLink(request.getUrl(), view);
+            }
+            @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                if (view != activeBrowser()) return;
+                placeholder.setVisibility(View.GONE);
+                view.setVisibility(View.VISIBLE);
+                if (!address.hasFocus()) address.setText(isWebAddress(Uri.parse(url)) ? url : "");
+            }
+            @Override public void onReceivedError(WebView view, WebResourceRequest request, android.webkit.WebResourceError error) {
+                if (!request.isForMainFrame() || view != activeBrowser()) return;
+                placeholder.setText("페이지를 열지 못했어요.\n주소와 인터넷 연결을 확인해 주세요.");
+                placeholder.setVisibility(View.VISIBLE);
+                view.setVisibility(View.GONE);
+            }
+            @Override public void onPageFinished(WebView view, String url) {
+                if (view == activeBrowser()) {
+                    if (!address.hasFocus() && isWebAddress(Uri.parse(url))) address.setText(url);
+                    updateNavigation();
+                }
+                persistSession();
+            }
+        });
+        browser.setWebChromeClient(new WebChromeClient() {
+            @Override public void onProgressChanged(WebView view, int amount) {
+                if (view != activeBrowser()) return;
+                progress.setProgress(amount);
+                progress.setVisibility(amount >= 100 ? View.GONE : View.VISIBLE);
+            }
+            @Override public boolean onCreateWindow(WebView view, boolean dialog, boolean userGesture, Message result) {
+                if (!userGesture || popups.size() >= 4) return false;
+                WebView popup = new WebView(activity);
+                configureWebView(popup);
+                installBrowserClients(popup);
+                closeBookmarks();
+                activeBrowser().setVisibility(View.GONE);
+                popups.add(popup);
+                page.addView(popup, new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+                placeholder.setVisibility(View.GONE);
+                address.setText("");
+                updateNavigation();
+                ((WebView.WebViewTransport) result.obj).setWebView(popup);
+                result.sendToTarget();
+                return true;
+            }
+            @Override public void onCloseWindow(WebView window) { window.post(() -> closePopup(window)); }
+        });
+    }
+
+    private void closePopup(WebView target) {
+        int index = popups.indexOf(target);
+        if (index < 0) return;
+        for (int position = popups.size() - 1; position >= index; position--) {
+            WebView popup = popups.remove(position);
+            page.removeView(popup);
+            popup.stopLoading(); popup.destroy();
+        }
+        WebView current = activeBrowser();
+        current.setVisibility(View.VISIBLE);
+        placeholder.setVisibility(View.GONE);
+        address.setText(current.getUrl() == null ? "" : current.getUrl());
+        updateNavigation();
+        persistSession();
+    }
+
+    private boolean handleSpecialLink(Uri uri, WebView browser) {
+        if ("about:blank".equals(uri.toString())) return false;
         if (isWebAddress(uri)) return false;
         try {
             String fallback = "intent".equalsIgnoreCase(uri.getScheme())
                 ? Intent.parseUri(uri.toString(), Intent.URI_INTENT_SCHEME).getStringExtra("browser_fallback_url")
                 : uri.getQueryParameter("url");
-            if (fallback != null && isWebAddress(Uri.parse(fallback))) navigate(fallback);
+            if (fallback != null && isWebAddress(Uri.parse(fallback))) browser.loadUrl(fallback);
         } catch (Exception ignored) { /* Non-web app links stay outside the research panel. */ }
         return true;
     }
@@ -252,27 +287,134 @@ final class StudyBrowserPanel extends LinearLayout {
         else url = "https://www.google.com/search?q=" + Uri.encode(value);
         Uri uri = Uri.parse(url);
         if (!isWebAddress(uri)) return;
+        closeBookmarks();
         placeholder.setVisibility(View.GONE);
-        web.setVisibility(View.VISIBLE);
-        web.loadUrl(uri.toString());
+        activeBrowser().setVisibility(View.VISIBLE);
+        activeBrowser().loadUrl(uri.toString());
+    }
+
+    void openUrl(String url) {
+        if (!popups.isEmpty()) closePopup(popups.get(0));
+        navigate(url);
+    }
+
+    private void closeBookmarks() {
+        if (bookmarksPanel != null) page.removeView(bookmarksPanel);
+        bookmarksPanel = null;
+    }
+
+    private void showBookmarks() {
+        if (bookmarksPanel != null) { closeBookmarks(); return; }
+        renderBookmarks();
+    }
+
+    private TextView bookmarkText(String text, int size) {
+        TextView label = new TextView(activity);
+        label.setText(text);
+        label.setTextSize(size);
+        label.setTextColor(inkColor);
+        return label;
+    }
+
+    private TextView bookmarkAction(String text, Runnable click) {
+        TextView button = bookmarkText(text, 12);
+        button.setPadding(dp(12), dp(11), dp(12), dp(11));
+        button.setMinHeight(dp(42));
+        button.setTextColor(Color.parseColor("#4d83d2"));
+        button.setFocusable(true);
+        button.setOnClickListener(view -> click.run());
+        return button;
+    }
+
+    private void renderBookmarks() {
+        closeBookmarks();
+        hideKeyboard();
+        bookmarksPanel = new LinearLayout(activity);
+        bookmarksPanel.setOrientation(VERTICAL);
+        bookmarksPanel.setBackgroundColor(surfaceColor);
+        LinearLayout heading = new LinearLayout(activity);
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+        heading.setPadding(dp(12), dp(4), dp(4), dp(4));
+        TextView title = bookmarkText("즐겨찾기", 14);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        heading.addView(title, new LayoutParams(0, dp(40), 1));
+        title.setGravity(Gravity.CENTER_VERTICAL);
+        TextView close = bookmarkAction("×", this::closeBookmarks);
+        close.setContentDescription("즐겨찾기 닫기");
+        heading.addView(close, new LayoutParams(dp(38), dp(42)));
+        bookmarksPanel.addView(heading);
+
+        String current = activeBrowser().getUrl();
+        String currentTitle = activeBrowser().getTitle();
+        boolean saved = bookmarks.contains(current), canSave = BrowserBookmarks.validUrl(current) && !saved;
+        TextView add = bookmarkAction(saved ? "★ 현재 페이지 저장됨" : "＋ 현재 페이지 저장", () -> {
+            bookmarks.add(currentTitle, current);
+            updateNavigation();
+            renderBookmarks();
+            Toast.makeText(activity, "즐겨찾기에 저장했어요.", Toast.LENGTH_SHORT).show();
+        });
+        add.setEnabled(canSave); add.setAlpha(canSave ? 1 : .45f);
+        bookmarksPanel.addView(add);
+
+        ScrollView scroll = new ScrollView(activity);
+        LinearLayout entries = new LinearLayout(activity);
+        entries.setOrientation(VERTICAL);
+        List<BrowserBookmarks.Entry> favorites = bookmarks.all();
+        if (favorites.isEmpty()) {
+            TextView empty = bookmarkText("저장한 즐겨찾기가 없어요.", 12);
+            empty.setTextColor(mutedColor);
+            empty.setPadding(dp(12), dp(22), dp(12), dp(22));
+            entries.addView(empty);
+        }
+        for (BrowserBookmarks.Entry entry : favorites) {
+            LinearLayout row = new LinearLayout(activity);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(12), dp(7), dp(3), dp(7));
+            LinearLayout link = new LinearLayout(activity);
+            link.setOrientation(VERTICAL);
+            link.setPadding(0, dp(5), dp(5), dp(5));
+            link.setFocusable(true);
+            link.setContentDescription(entry.title + " 열기");
+            link.setOnClickListener(view -> navigate(entry.url));
+            TextView name = bookmarkText(entry.title, 12);
+            name.setMaxLines(2); name.setEllipsize(TextUtils.TruncateAt.END);
+            TextView url = bookmarkText(entry.url, 10);
+            url.setTextColor(mutedColor); url.setSingleLine(true); url.setEllipsize(TextUtils.TruncateAt.END);
+            link.addView(name); link.addView(url);
+            row.addView(link, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1));
+            TextView remove = bookmarkAction("×", () -> { bookmarks.remove(entry.url); updateNavigation(); renderBookmarks(); });
+            remove.setContentDescription(entry.title + " 즐겨찾기 삭제");
+            row.addView(remove, new LayoutParams(dp(36), dp(44)));
+            entries.addView(row);
+        }
+        scroll.addView(entries);
+        bookmarksPanel.addView(scroll, new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1));
+        TextView external = bookmarkAction("기본 브라우저에서 열기 ↗", this::openExternal);
+        external.setEnabled(BrowserBookmarks.validUrl(current));
+        external.setAlpha(external.isEnabled() ? 1 : .45f);
+        bookmarksPanel.addView(external);
+        page.addView(bookmarksPanel, new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
     }
 
     private void openExternal() {
-        String url = web.getUrl();
+        String url = activeBrowser().getUrl();
         if (url == null || !isWebAddress(Uri.parse(url))) return;
         try { activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))); }
         catch (Exception error) { Toast.makeText(activity, "브라우저를 열지 못했어요.", Toast.LENGTH_SHORT).show(); }
     }
 
     private void updateNavigation() {
-        back.setAlpha(web.canGoBack() ? 1 : .35f);
-        forward.setAlpha(web.canGoForward() ? 1 : .35f);
+        WebView current = activeBrowser();
+        back.setAlpha(current.canGoBack() || current != web ? 1 : .35f);
+        forward.setAlpha(current.canGoForward() ? 1 : .35f);
+        bookmarkButton.setText(bookmarks.contains(current.getUrl()) ? "★" : "☆");
     }
 
     void setDark(boolean dark) {
         int surface = Color.parseColor(dark ? "#18263a" : "#ffffff");
         int ink = Color.parseColor(dark ? "#e4edfa" : "#28435f");
         int muted = Color.parseColor(dark ? "#9db0c8" : "#7188a2");
+        surfaceColor = surface; inkColor = ink; mutedColor = muted;
         setBackgroundColor(surface);
         toolbar.setBackgroundColor(surface);
         addressRow.setBackgroundColor(surface);
@@ -289,10 +431,15 @@ final class StudyBrowserPanel extends LinearLayout {
         input.setCornerRadius(dp(9));
         address.setBackground(input);
         placeholder.setTextColor(muted);
+        if (bookmarksPanel != null) renderBookmarks();
     }
+
+    void persistSession() { CookieManager.getInstance().flush(); }
 
     void release() {
         hideKeyboard();
+        persistSession();
+        closeBookmarks();
         for (WebView popup : new ArrayList<>(popups)) { page.removeView(popup); popup.destroy(); }
         popups.clear();
         web.stopLoading();

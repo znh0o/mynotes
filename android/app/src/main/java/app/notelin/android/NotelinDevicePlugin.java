@@ -149,7 +149,7 @@ public class NotelinDevicePlugin extends Plugin {
 
     @PluginMethod public void openStudyBrowser(PluginCall call) {
         getActivity().runOnUiThread(() -> {
-            try { ((MainActivity) getActivity()).openStudyBrowser(); call.resolve(); }
+            try { ((MainActivity) getActivity()).openStudyBrowser(call.getString("url")); call.resolve(); }
             catch (Exception error) { call.reject("인터넷 패널을 열지 못했어요.", error); }
         });
     }
