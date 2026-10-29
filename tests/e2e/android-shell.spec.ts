@@ -59,7 +59,7 @@ test('Android opens the library without installation UI and routes Back and back
   await browser.click();
   await expect(browser).toHaveAttribute('aria-expanded', 'true');
   await expect(page.locator('.editor-shell')).toHaveClass(/study-browser-open/);
-  expect((await page.locator('.editor-shell').boundingBox())!.width).toBeCloseTo(fullWidth * 5 / 6, 0);
+  expect((await page.locator('.editor-shell').boundingBox())!.width).toBeCloseTo(fullWidth * 4 / 5, 0);
   await page.evaluate(() => dispatchEvent(new CustomEvent('notelin-study-browser-resized', { detail: { ratio: .4 } })));
   expect((await page.locator('.editor-shell').boundingBox())!.width).toBeCloseTo(fullWidth * .6, 0);
   expect(await page.evaluate(() => (window as any).nativeTest.browserOpens)).toBe(1);

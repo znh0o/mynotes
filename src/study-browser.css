@@ -1,5 +1,5 @@
 :root[data-device-ui=tablet] .editor-shell.study-browser-open {
-  width: calc(100% - var(--study-browser-width, 16.666667vw));
+  width: calc(100% - var(--study-browser-width, 20vw));
   border-right: 1px solid #d6dfed;
 }
 

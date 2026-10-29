@@ -23,7 +23,7 @@ public class MainActivity extends BridgeActivity {
     private boolean stylusButtonDown;
     private int keyboardInset = -1;
     private StudyBrowserPanel studyBrowser;
-    private float studyBrowserRatio = 1f / 6f;
+    private float studyBrowserRatio = 1f / 5f;
 
     @Override public void onCreate(Bundle state) {
         registerPlugin(NotelinDevicePlugin.class);
