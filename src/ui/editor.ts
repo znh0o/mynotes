@@ -129,7 +129,9 @@ export class EditorView {
     bindPhoneEditor(this.root, this.abort.signal);
     window.addEventListener('notelin-study-browser-closed', () => this.setStudyPanel(null), { signal: this.abort.signal });
     window.addEventListener('notelin-study-browser-resized', event => {
-      const ratio = (event as CustomEvent<{ ratio: number }>).detail?.ratio;
+      const detail = (event as CustomEvent<{ ratio: number; side?: string }>).detail;
+      const ratio = detail?.ratio;
+      if (detail?.side === 'left' || detail?.side === 'right') document.documentElement.dataset.studyPanelSide = detail.side;
       if (Number.isFinite(ratio) && ratio >= .1 && ratio <= 1) {
         this.root.querySelector<HTMLElement>('.editor-shell')?.style.setProperty('--study-browser-width', `${ratio * 100}vw`);
       }
@@ -1192,7 +1194,7 @@ export class EditorView {
     const previous = this.studyPanel;
     this.setStudyPanel(mode);
     try {
-      if (mode === 'ai') await openNativeStudyAI(); else await openNativeStudyBrowser();
+      if (mode === 'ai') await openNativeStudyAI(); else await openNativeStudyBrowser(this.note.id);
       this.syncStudyPanelOverlay();
     } catch (error) { this.setStudyPanel(previous); throw error; }
   }

@@ -6,6 +6,8 @@ import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Message;
+import android.os.Build;
+import android.os.Bundle;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.view.Gravity;
@@ -30,6 +32,7 @@ import android.view.View;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.IntConsumer;
+import java.util.function.Consumer;
 
 /** A separate WebView for web research. It never receives Capacitor's bridge. */
 final class StudyBrowserPanel extends LinearLayout {
@@ -52,6 +55,8 @@ final class StudyBrowserPanel extends LinearLayout {
     private final BrowserBookmarks bookmarks;
     private LinearLayout bookmarksPanel;
     private int surfaceColor, inkColor, mutedColor;
+    private boolean panelOnLeft;
+    private Consumer<String> pageListener = url -> {};
 
     StudyBrowserPanel(MainActivity activity, boolean aiMode, Runnable close, IntConsumer resize) {
         super(activity);
@@ -77,7 +82,8 @@ final class StudyBrowserPanel extends LinearLayout {
                 view.getParent().requestDisallowInterceptTouchEvent(true);
                 view.setAlpha(.65f);
             } else if (event.getActionMasked() == MotionEvent.ACTION_MOVE) {
-                resize.accept(startWidth[0] + Math.round(startX[0] - event.getRawX()));
+                float delta = event.getRawX() - startX[0];
+                resize.accept(startWidth[0] + Math.round(panelOnLeft ? delta : -delta));
             } else if (event.getActionMasked() == MotionEvent.ACTION_UP || event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
                 view.setAlpha(1);
                 view.getParent().requestDisallowInterceptTouchEvent(false);
@@ -88,7 +94,8 @@ final class StudyBrowserPanel extends LinearLayout {
         resizeHandle.setOnKeyListener((view, keyCode, event) -> {
             if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
             if (keyCode != KeyEvent.KEYCODE_DPAD_LEFT && keyCode != KeyEvent.KEYCODE_DPAD_RIGHT) return false;
-            resize.accept(getWidth() + dp(keyCode == KeyEvent.KEYCODE_DPAD_LEFT ? 32 : -32));
+            boolean grow = (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) != panelOnLeft;
+            resize.accept(getWidth() + dp(grow ? 32 : -32));
             return true;
         });
         if (getResources().getConfiguration().smallestScreenWidthDp < 600) resizeHandle.setVisibility(View.GONE);
@@ -212,6 +219,7 @@ final class StudyBrowserPanel extends LinearLayout {
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) settings.setSafeBrowsingEnabled(true);
         settings.setUseWideViewPort(true);
         settings.setLoadWithOverviewMode(true);
         settings.setBuiltInZoomControls(true);
@@ -477,7 +485,33 @@ final class StudyBrowserPanel extends LinearLayout {
         if (bookmarksPanel != null) renderBookmarks();
     }
 
-    void persistSession() { CookieManager.getInstance().flush(); }
+    void setPageListener(Consumer<String> listener) { pageListener = listener; }
+
+    Bundle saveNoteState() {
+        Bundle state = new Bundle();
+        return activeBrowser().saveState(state) == null ? null : state;
+    }
+
+    boolean restoreNoteState(Bundle state) {
+        if (state == null || web.restoreState(state) == null) return false;
+        placeholder.setVisibility(View.GONE);
+        web.setVisibility(View.VISIBLE);
+        address.setText(web.getUrl() == null ? "" : web.getUrl());
+        updateNavigation();
+        return true;
+    }
+
+    void setPanelSide(boolean left) {
+        if (panelOnLeft == left) return;
+        panelOnLeft = left;
+        removeView(resizeHandle);
+        addView(resizeHandle, left ? getChildCount() : 0, new LayoutParams(dp(14), LayoutParams.MATCH_PARENT));
+    }
+
+    void persistSession() {
+        pageListener.accept(activeBrowser().getUrl());
+        CookieManager.getInstance().flush();
+    }
 
     void hidePanel() { hideKeyboard(); persistSession(); setVisibility(View.GONE); }
 

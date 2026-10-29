@@ -3,6 +3,7 @@ import { App } from '@capacitor/app';
 
 export const isNativeApp = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
 export interface NativeDocument { id: string; name: string; size: number }
+export type StudyPanelSide = 'left' | 'right';
 interface NotelinDevicePlugin {
   beginExport(options: { name: string; mimeType: string }): Promise<{ id: string }>;
   appendExport(options: { id: string; index: number; data: string }): Promise<void>;
@@ -13,10 +14,12 @@ interface NotelinDevicePlugin {
   completeDocument(options: { id: string }): Promise<void>;
   setAppearance(options: { dark: boolean }): Promise<void>;
   openUpdates(): Promise<void>;
-  openStudyBrowser(options: { url?: string }): Promise<void>;
+  openStudyBrowser(options: { noteId: string; url?: string }): Promise<void>;
   openStudyAI(): Promise<void>;
   closeStudyPanel(): Promise<void>;
   setStudyPanelOccluded(options: { hidden: boolean }): Promise<void>;
+  getStudyPanelSettings(): Promise<{ side: StudyPanelSide }>;
+  setStudyPanelSide(options: { side: StudyPanelSide }): Promise<void>;
   addListener(event: 'documentReceived' | 'stylusButtonPressed', callback: () => void): Promise<PluginListenerHandle>;
 }
 const device = registerPlugin<NotelinDevicePlugin>('NotelinDevice');
@@ -34,6 +37,8 @@ export async function initializeNativeShell() {
   const appearance = () => { void device.setAppearance({ dark: document.documentElement.dataset.theme === 'dark' }).catch(console.error); };
   new MutationObserver(appearance).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   appearance();
+  const settings = await device.getStudyPanelSettings();
+  document.documentElement.dataset.studyPanelSide = settings.side === 'left' ? 'left' : 'right';
 }
 
 function base64(blob: Blob): Promise<string> {
@@ -61,10 +66,15 @@ export function pendingNativeDocuments() { return device.pendingDocuments(); }
 export function completeNativeDocument(id: string) { return device.completeDocument({ id }); }
 export function onNativeDocument(callback: () => void) { return device.addListener('documentReceived', callback); }
 export function openNativeUpdates() { return device.openUpdates(); }
-export function openNativeStudyBrowser(url?: string) { return device.openStudyBrowser(url ? { url } : {}); }
+export function openNativeStudyBrowser(noteId: string, url?: string) { return device.openStudyBrowser({ noteId, ...(url ? { url } : {}) }); }
 export function openNativeStudyAI() { return device.openStudyAI(); }
 export function closeNativeStudyPanel() { return device.closeStudyPanel(); }
 export function setNativeStudyPanelOccluded(hidden: boolean) { return device.setStudyPanelOccluded({ hidden }); }
+export function getStudyPanelSide(): StudyPanelSide { return document.documentElement.dataset.studyPanelSide === 'left' ? 'left' : 'right'; }
+export async function setStudyPanelSide(side: StudyPanelSide) {
+  await device.setStudyPanelSide({ side });
+  document.documentElement.dataset.studyPanelSide = side;
+}
 export async function readNativeDocument(document: NativeDocument): Promise<File> {
   if (!Number.isSafeInteger(document.size) || document.size < 0 || document.size > 150 * 1024 * 1024) throw new Error('PDF는 150MB 이하로 가져올 수 있어요.');
   const parts: ArrayBuffer[] = [];

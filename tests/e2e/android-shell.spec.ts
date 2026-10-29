@@ -9,7 +9,7 @@ async function nativeBridge(page: Page, pdf = '') {
       ? { ...matchMedia(query), matches: true } as MediaQueryList : matchMedia(query);
     const state = win.nativeTest = {
       listeners: {} as Record<string, (data: unknown) => void>, chunks: [] as string[], exports: [] as string[],
-      cancel: false, updates: 0, updateAvailable: true, browserOpens: 0, aiOpens: 0, browserCloses: 0, browserHidden: false, browserAddresses: [] as string[],
+      cancel: false, updates: 0, updateAvailable: true, browserOpens: 0, aiOpens: 0, browserCloses: 0, browserHidden: false, browserAddresses: [] as string[], browserNoteIds: [] as string[],
       documents: pdf && !sessionStorage.getItem('native-pdf-consumed') ? [{ id: 'android-pdf', name: 'Android에서 연 PDF.pdf', size: atob(pdf).length }] : [],
     };
     win.androidBridge = {};
@@ -17,7 +17,7 @@ async function nativeBridge(page: Page, pdf = '') {
     win.Capacitor = {
       PluginHeaders: [
         { name: 'App', methods: methods(['addListener', 'removeListener']) },
-        { name: 'NotelinDevice', methods: methods(['addListener', 'removeListener', 'setAppearance', 'pendingDocuments', 'readDocument', 'completeDocument', 'beginExport', 'appendExport', 'finishExport', 'cancelExport', 'openUpdates', 'openStudyBrowser', 'openStudyAI', 'closeStudyPanel', 'setStudyPanelOccluded']) },
+        { name: 'NotelinDevice', methods: methods(['addListener', 'removeListener', 'setAppearance', 'pendingDocuments', 'readDocument', 'completeDocument', 'beginExport', 'appendExport', 'finishExport', 'cancelExport', 'openUpdates', 'openStudyBrowser', 'openStudyAI', 'closeStudyPanel', 'setStudyPanelOccluded', 'getStudyPanelSettings', 'setStudyPanelSide']) },
         { name: 'NotelinUpdater', methods: methods(['addListener', 'removeListener', 'check', 'install']) },
       ],
       nativeCallback: (_plugin: string, _method: string, options: any, callback: (data: unknown) => void) => {
@@ -34,10 +34,12 @@ async function nativeBridge(page: Page, pdf = '') {
         }
         if (method === 'finishExport') { state.exports.push(btoa(state.chunks.join(''))); return { saved: !state.cancel }; }
         if (method === 'openUpdates') state.updates++;
-        if (method === 'openStudyBrowser') { state.browserOpens++; state.browserAddresses.push(options.url || ''); }
+        if (method === 'openStudyBrowser') { state.browserOpens++; state.browserAddresses.push(options.url || ''); state.browserNoteIds.push(options.noteId); }
         if (method === 'openStudyAI') state.aiOpens++;
         if (method === 'closeStudyPanel') state.browserCloses++;
         if (method === 'setStudyPanelOccluded') state.browserHidden = options.hidden;
+        if (method === 'getStudyPanelSettings') return { side: localStorage.getItem('native-panel-side') || 'right' };
+        if (method === 'setStudyPanelSide') localStorage.setItem('native-panel-side', options.side);
         if (method === 'check') return { available: state.updateAvailable, version: state.updateAvailable ? '2.0.1' : '2.0.0', installedVersion: '2.0.0' };
         if (method === 'install') { state.updates++; state.listeners.downloadProgress?.({ percent: 100 }); return { needsPermission: false }; }
         return {};
@@ -140,6 +142,60 @@ test('AI and internet use separate panels and switch without closing the other c
   await page.evaluate(() => dispatchEvent(new Event('notelin-study-browser-closed')));
   await expect(ai).toHaveAttribute('aria-expanded', 'false');
   await expect(internet).toHaveAttribute('aria-expanded', 'false');
+});
+
+test('internet requests are scoped to the current note when switching and reopening notes', async ({ page }) => {
+  await nativeBridge(page);
+  await page.goto('./');
+  await page.getByRole('button', { name: 'Notelin 시작 가이드 열기', exact: true }).click();
+  await page.getByRole('button', { name: '인터넷 패널', exact: true }).click();
+  await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).click();
+  await page.getByRole('button', { name: '새 노트', exact: true }).click();
+  await page.locator('[name=title]').fill('별도의 인터넷을 쓰는 노트');
+  await page.getByRole('button', { name: '노트 만들기', exact: true }).click();
+  await expect(page.locator('#paper-live')).toBeVisible();
+  await page.getByRole('button', { name: '인터넷 패널', exact: true }).click();
+  await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).click();
+  await page.getByRole('button', { name: 'Notelin 시작 가이드 열기', exact: true }).click();
+  await page.getByRole('button', { name: '인터넷 패널', exact: true }).click();
+  const ids = await page.evaluate(() => (window as any).nativeTest.browserNoteIds as string[]);
+  expect(ids).toHaveLength(3);
+  expect(ids[0]).toEqual(expect.any(String));
+  expect(ids[0].length).toBeGreaterThan(0);
+  expect(ids[1]).not.toBe(ids[0]);
+  expect(ids[2]).toBe(ids[0]);
+  expect(await page.evaluate(() => (window as any).nativeTest.browserAddresses)).toEqual(['', '', '']);
+});
+
+test('panel position is saved in settings and applies to internet and AI after reopening the app', async ({ page }) => {
+  await nativeBridge(page);
+  await page.goto('./');
+  await page.getByRole('button', { name: '설정 및 백업', exact: true }).click();
+  const positions = page.getByRole('group', { name: '인터넷 · AI 패널 위치', exact: true });
+  await expect(positions.getByRole('button', { name: '오른쪽', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await positions.getByRole('button', { name: '왼쪽', exact: true }).click();
+  await expect(positions.getByRole('button', { name: '왼쪽', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: '완료', exact: true }).click();
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-study-panel-side', 'left');
+  await page.getByRole('button', { name: 'Notelin 시작 가이드 열기', exact: true }).click();
+  const workspace = page.locator('.editor-shell');
+  const full = (await workspace.boundingBox())!;
+  await page.getByRole('button', { name: '인터넷 패널', exact: true }).click();
+  expect((await workspace.boundingBox())!.x).toBeCloseTo(full.width * .2, 0);
+  expect((await workspace.boundingBox())!.width).toBeCloseTo(full.width * .8, 0);
+  await page.getByRole('button', { name: 'AI · ChatGPT 열기', exact: true }).click();
+  expect((await workspace.boundingBox())!.x).toBeCloseTo(full.width * .2, 0);
+  await page.getByRole('button', { name: 'AI · ChatGPT 열기', exact: true }).click();
+  expect((await workspace.boundingBox())!.x).toBe(full.x);
+  await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).click();
+  await page.getByRole('button', { name: '설정 및 백업', exact: true }).click();
+  await positions.getByRole('button', { name: '오른쪽', exact: true }).click();
+  await page.getByRole('button', { name: '완료', exact: true }).click();
+  await page.getByRole('button', { name: 'Notelin 시작 가이드 열기', exact: true }).click();
+  await page.getByRole('button', { name: '인터넷 패널', exact: true }).click();
+  expect((await workspace.boundingBox())!.x).toBe(full.x);
+  expect((await workspace.boundingBox())!.width).toBeCloseTo(full.width * .8, 0);
 });
 
 test('Android PDF intents import intact bytes once and PDF export uses the document destination picker', async ({ page }) => {

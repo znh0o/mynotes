@@ -3,6 +3,12 @@
   border-right: 1px solid #d6dfed;
 }
 
+:root[data-device-ui=tablet][data-study-panel-side=left] .editor-shell.study-browser-open {
+  margin-left: var(--study-browser-width, 20vw);
+  border-right: 0;
+  border-left: 1px solid #d6dfed;
+}
+
 .editor-header-actions :is([data-action=study-browser],[data-action=study-ai])[aria-expanded=true] {
   color: #2d66b9;
   background: #e6efff;
@@ -22,6 +28,44 @@
 
 :root[data-theme=dark][data-device-ui=tablet] .editor-shell.study-browser-open {
   border-right-color: #324867;
+  border-left-color: #324867;
+}
+
+.study-panel-side-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.study-panel-side-options button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 48px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #f7f9fe;
+  color: #647b9b;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.study-panel-side-options button[aria-pressed=true] {
+  border-color: #6b91ce;
+  background: #edf3ff;
+  color: #23569e;
+}
+
+:root[data-theme=dark] .study-panel-side-options button[aria-pressed=true] {
+  border-color: #6285bc;
+  background: #284467;
+  color: #d0e0ff;
+}
+
+:root[data-theme=dark] .study-panel-side-options button[aria-pressed=false] {
+  background: var(--night-raised);
+  color: #c4d4ec;
 }
 
 .external-pdf-notice {

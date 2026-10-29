@@ -17,22 +17,28 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class MainActivity extends BridgeActivity {
     private boolean dark;
     private boolean stylusButtonDown;
     private int keyboardInset = -1;
-    private StudyBrowserPanel studyBrowser;
+    private final LinkedHashMap<String, StudyBrowserPanel> noteBrowsers = new LinkedHashMap<>(4, .75f, true);
+    private NoteBrowserSessions noteBrowserSessions;
     private StudyBrowserPanel studyAi;
     private StudyBrowserPanel activeStudyPanel;
     private float studyBrowserRatio = 1f / 5f;
     private float studyAiRatio = 1f / 5f;
     private boolean studyPanelOccluded;
+    private boolean studyPanelOnLeft;
 
     @Override public void onCreate(Bundle state) {
         registerPlugin(NotelinDevicePlugin.class);
         registerPlugin(NotelinUpdaterPlugin.class);
         super.onCreate(state);
+        noteBrowserSessions = new NoteBrowserSessions(this);
+        studyPanelOnLeft = "left".equals(getSharedPreferences("study-browser", MODE_PRIVATE).getString("panel-side", "right"));
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         View content = findViewById(android.R.id.content);
         content.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
@@ -129,10 +135,29 @@ public class MainActivity extends BridgeActivity {
 
     public void setDarkChrome(boolean value) { dark = value; applyChrome(); }
 
-    public void openStudyBrowser(String url) {
-        if (studyBrowser == null) studyBrowser = new StudyBrowserPanel(this, false, () -> closeStudyPanel(true), this::resizeStudyPanel);
-        showStudyPanel(studyBrowser);
-        if (url != null) studyBrowser.openUrl(url);
+    public void openStudyBrowser(String noteId, String url) {
+        StudyBrowserPanel panel = noteBrowsers.get(noteId);
+        boolean firstOpen = panel == null;
+        if (firstOpen) {
+            panel = new StudyBrowserPanel(this, false, () -> closeStudyPanel(true), this::resizeStudyPanel);
+            panel.setPageListener(page -> noteBrowserSessions.rememberUrl(noteId, page));
+            noteBrowsers.put(noteId, panel);
+        }
+        showStudyPanel(panel);
+        if (url != null) panel.openUrl(url);
+        else if (firstOpen && !panel.restoreNoteState(noteBrowserSessions.history(noteId))) {
+            String lastUrl = noteBrowserSessions.lastUrl(noteId);
+            if (lastUrl != null) panel.openUrl(lastUrl);
+        }
+        // Keep recent DOMs alive without retaining a heavyweight WebView for every note.
+        while (noteBrowsers.size() > 3) {
+            Map.Entry<String, StudyBrowserPanel> oldest = noteBrowsers.entrySet().iterator().next();
+            StudyBrowserPanel previous = oldest.getValue();
+            noteBrowserSessions.rememberHistory(oldest.getKey(), previous.saveNoteState());
+            ((FrameLayout) findViewById(android.R.id.content)).removeView(previous);
+            previous.release();
+            noteBrowsers.remove(oldest.getKey());
+        }
     }
 
     public void openStudyAI() {
@@ -147,9 +172,10 @@ public class MainActivity extends BridgeActivity {
             activeStudyPanel.hidePanel();
         }
         activeStudyPanel = panel;
+        panel.setPanelSide(studyPanelOnLeft);
         FrameLayout content = findViewById(android.R.id.content);
         FrameLayout.LayoutParams layout = new FrameLayout.LayoutParams(studyPanelWidth(),
-            FrameLayout.LayoutParams.MATCH_PARENT, Gravity.RIGHT | Gravity.TOP);
+            FrameLayout.LayoutParams.MATCH_PARENT, (studyPanelOnLeft ? Gravity.LEFT : Gravity.RIGHT) | Gravity.TOP);
         if (panel.getParent() == null) content.addView(panel, layout); else panel.setLayoutParams(layout);
         panel.setVisibility(studyPanelOccluded ? View.GONE : View.VISIBLE);
         panel.setDark(dark);
@@ -158,6 +184,15 @@ public class MainActivity extends BridgeActivity {
     }
 
     public void closeStudyPanel() { closeStudyPanel(false); }
+    public String studyPanelSide() { return studyPanelOnLeft ? "left" : "right"; }
+    public void setStudyPanelSide(String side) {
+        studyPanelOnLeft = "left".equals(side);
+        getSharedPreferences("study-browser", MODE_PRIVATE).edit().putString("panel-side", studyPanelSide()).apply();
+        if (activeStudyPanel != null) {
+            activeStudyPanel.setPanelSide(studyPanelOnLeft);
+            layoutStudyPanel();
+        }
+    }
     public void setStudyPanelOccluded(boolean hidden) {
         studyPanelOccluded = hidden;
         if (activeStudyPanel != null) activeStudyPanel.setVisibility(hidden ? View.GONE : View.VISIBLE);
@@ -196,6 +231,7 @@ public class MainActivity extends BridgeActivity {
         if (activeStudyPanel == null) return;
         FrameLayout.LayoutParams layout = (FrameLayout.LayoutParams) activeStudyPanel.getLayoutParams();
         layout.width = studyPanelWidth();
+        layout.gravity = (studyPanelOnLeft ? Gravity.LEFT : Gravity.RIGHT) | Gravity.TOP;
         activeStudyPanel.setLayoutParams(layout);
         notifyStudyPanelSize();
     }
@@ -204,7 +240,7 @@ public class MainActivity extends BridgeActivity {
         if (bridge == null) return;
         float ratio = isTablet() ? activeStudyRatio() : 1;
         bridge.getWebView().evaluateJavascript("window.dispatchEvent(new CustomEvent('notelin-study-browser-resized',{detail:{ratio:"
-            + ratio + "}}))", null);
+            + ratio + ",side:'" + studyPanelSide() + "'}}))", null);
     }
 
     private void applyChrome() {
@@ -218,7 +254,7 @@ public class MainActivity extends BridgeActivity {
         if (isTablet()) controller.hide(WindowInsetsCompat.Type.statusBars());
         else controller.show(WindowInsetsCompat.Type.statusBars());
         getWindow().getDecorView().setBackgroundColor(Color.parseColor(dark ? "#0e1624" : "#f4f7ff"));
-        if (studyBrowser != null) studyBrowser.setDark(dark);
+        for (StudyBrowserPanel panel : noteBrowsers.values()) panel.setDark(dark);
         if (studyAi != null) studyAi.setDark(dark);
         ViewCompat.requestApplyInsets(findViewById(android.R.id.content));
     }
@@ -229,7 +265,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override public void onPause() {
-        if (studyBrowser != null) studyBrowser.persistSession();
+        for (StudyBrowserPanel panel : noteBrowsers.values()) panel.persistSession();
         if (studyAi != null) studyAi.persistSession();
         super.onPause();
     }
@@ -243,9 +279,9 @@ public class MainActivity extends BridgeActivity {
     @Override public void onDestroy() {
         closeStudyPanel();
         FrameLayout content = findViewById(android.R.id.content);
-        if (studyBrowser != null) { content.removeView(studyBrowser); studyBrowser.release(); }
+        for (StudyBrowserPanel panel : noteBrowsers.values()) { content.removeView(panel); panel.release(); }
         if (studyAi != null) { content.removeView(studyAi); studyAi.release(); }
-        studyBrowser = null; studyAi = null;
+        noteBrowsers.clear(); studyAi = null;
         super.onDestroy();
     }
 }

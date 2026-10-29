@@ -13,7 +13,7 @@ import { version as appVersion } from '../package.json';
 import { installAppZoomGuard } from './ui/app-zoom';
 import { getAppearance, setAppearance, type Appearance } from './ui/appearance';
 import { installDeviceUI } from './ui/device-ui';
-import { isNativeApp, initializeNativeShell, pendingNativeDocuments, readNativeDocument, completeNativeDocument, onNativeDocument, openNativeUpdates } from './platform/native';
+import { isNativeApp, initializeNativeShell, pendingNativeDocuments, readNativeDocument, completeNativeDocument, onNativeDocument, openNativeUpdates, getStudyPanelSide, setStudyPanelSide, type StudyPanelSide } from './platform/native';
 import { checkNativeUpdate, installNativeUpdate, onNativeUpdateProgress, type NativeUpdate } from './platform/native-updates';
 
 installAppZoomGuard();
@@ -176,6 +176,18 @@ function settings() {
     appearanceSection.querySelectorAll<HTMLElement>('[data-appearance]').forEach(button => button.addEventListener('click', () => setAppearance(button.dataset.appearance as Appearance)));
     dialog.querySelector('footer [data-close]')?.remove();
     if (isNativeApp) {
+      const panelSection = document.createElement('section');
+      panelSection.className = 'settings-section study-panel-section';
+      panelSection.innerHTML = `<h3>${icon('PanelRight', 18)} 인터넷 · AI 패널 위치</h3><p class="muted">필기 화면에서 패널을 열 위치를 선택하세요.</p><div class="study-panel-side-options" role="group" aria-label="인터넷 · AI 패널 위치">${(['left', 'right'] as const).map(side => `<button type="button" data-panel-side="${side}" aria-pressed="${getStudyPanelSide() === side}">${icon(side === 'left' ? 'PanelLeft' : 'PanelRight', 20)}<span>${side === 'left' ? '왼쪽' : '오른쪽'}</span></button>`).join('')}</div>`;
+      appearanceSection.after(panelSection);
+      panelSection.querySelectorAll<HTMLButtonElement>('[data-panel-side]').forEach(button => button.addEventListener('click', () => run(async () => {
+        const buttons = panelSection.querySelectorAll<HTMLButtonElement>('[data-panel-side]');
+        buttons.forEach(item => { item.disabled = true; });
+        try {
+          await setStudyPanelSide(button.dataset.panelSide as StudyPanelSide);
+          buttons.forEach(item => item.setAttribute('aria-pressed', String(item.dataset.panelSide === getStudyPanelSide())));
+        } finally { buttons.forEach(item => { item.disabled = false; }); }
+      })));
       const storage = dialog.querySelector('[data-setting=persist]')!.closest('.settings-section')!;
       storage.querySelector('p')!.textContent = '노트는 Notelin 앱 저장 공간에 보관됩니다. 앱 삭제나 앱 데이터 초기화에 대비해 백업 파일을 보관해 주세요.';
       storage.querySelector('[data-setting=persist]')!.remove();

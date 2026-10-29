@@ -148,8 +148,10 @@ public class NotelinDevicePlugin extends Plugin {
     }
 
     @PluginMethod public void openStudyBrowser(PluginCall call) {
+        String noteId = call.getString("noteId");
+        if (noteId == null || noteId.trim().isEmpty() || noteId.length() > 200) { call.reject("인터넷을 열 노트를 확인하지 못했어요."); return; }
         getActivity().runOnUiThread(() -> {
-            try { ((MainActivity) getActivity()).openStudyBrowser(call.getString("url")); call.resolve(); }
+            try { ((MainActivity) getActivity()).openStudyBrowser(noteId, call.getString("url")); call.resolve(); }
             catch (Exception error) { call.reject("인터넷 패널을 열지 못했어요.", error); }
         });
     }
@@ -167,6 +169,23 @@ public class NotelinDevicePlugin extends Plugin {
 
     @PluginMethod public void setStudyPanelOccluded(PluginCall call) {
         getActivity().runOnUiThread(() -> { ((MainActivity) getActivity()).setStudyPanelOccluded(call.getBoolean("hidden", false)); call.resolve(); });
+    }
+
+    @PluginMethod public void getStudyPanelSettings(PluginCall call) {
+        getActivity().runOnUiThread(() -> {
+            JSObject settings = new JSObject();
+            settings.put("side", ((MainActivity) getActivity()).studyPanelSide());
+            call.resolve(settings);
+        });
+    }
+
+    @PluginMethod public void setStudyPanelSide(PluginCall call) {
+        String side = call.getString("side");
+        if (!"left".equals(side) && !"right".equals(side)) { call.reject("패널 위치를 확인해 주세요."); return; }
+        getActivity().runOnUiThread(() -> {
+            ((MainActivity) getActivity()).setStudyPanelSide(side);
+            call.resolve();
+        });
     }
 
     @PluginMethod public void openUpdates(PluginCall call) {
