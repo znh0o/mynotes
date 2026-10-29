@@ -17,7 +17,7 @@ import { brushKey, brushProfile, inkTools, isInkTool, type BrushProfile, type In
 import { defaultPenCollection, duplicatePen, isPenKind, penKinds, penNames, type PenCollection, type PenKind, type PenPreset } from '../data/pen-presets';
 import { loadSharedPens, sharedPensKey } from '../data/shared-pens';
 import { bindPhoneEditor } from './phone-chrome';
-import { isNativeApp } from '../platform/native';
+import { closeNativeStudyBrowser, isNativeApp, openNativeStudyBrowser, setNativeStudyBrowserOccluded } from '../platform/native';
 
 const shapeChoices: { id: Shape; name: string; drawing: string }[] = [
   { id: 'rect', name: '사각형', drawing: '<rect x="8" y="11" width="40" height="30" rx="2" />' },
@@ -73,6 +73,10 @@ export class EditorView {
   private brushTimer?: ReturnType<typeof setTimeout>;
   private brushWrites = Promise.resolve();
   private textEditor!: InlineTextEditor;
+  private studyBrowserOpen = false;
+  private studyBrowserOccluded = false;
+  private studyBrowserObserver?: MutationObserver;
+  private temporaryNoticeTimer?: ReturnType<typeof setTimeout>;
   constructor(private root: HTMLElement, public note: Note,
     private tabs: { id: string; title: string }[], private open: (id: string) => Promise<void>,
     private home: () => Promise<void>, private closeTab: (id: string) => Promise<void>, private settings: () => void) {
@@ -100,6 +104,12 @@ export class EditorView {
       <div class="phone-document-panel" id="phone-document-panel" role="dialog" aria-label="문서 메뉴" popover="auto"><div class="phone-document-heading">문서 메뉴</div><div class="phone-document-primary"></div><div class="phone-document-secondary"></div></div>
       <div class="selection-toolbar" hidden><span id="selection-count"></span>${button('CopyPlus', '선택 복제', 'selection-duplicate')}${button('Plus', '선택 확대', 'selection-grow')}${button('Minus', '선택 축소', 'selection-shrink')}${button('Trash2', '선택 삭제', 'selection-delete')}${button('X', '선택 해제', 'deselect')}</div>
     </div>`;
+    if (isNativeApp) {
+      this.root.querySelector('[data-action=search]')!.insertAdjacentHTML('beforebegin',
+        button('Globe2', '인터넷 패널', 'study-browser', 'aria-expanded="false"'));
+      this.studyBrowserObserver = new MutationObserver(() => this.syncStudyBrowserOverlay());
+      this.studyBrowserObserver.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['open'] });
+    }
     if (this.note.temporary) {
       const save = document.createElement('button');
       save.type = 'button'; save.className = 'external-pdf-save'; save.dataset.action = 'save-to-library';
@@ -108,9 +118,18 @@ export class EditorView {
       const notice = document.createElement('div');
       notice.className = 'external-pdf-notice';
       notice.textContent = '외부 PDF · 서재에 저장하지 않고 닫으면 이 문서의 필기가 삭제돼요.';
+      notice.setAttribute('role', 'status');
       this.root.querySelector('.editor-body')!.append(notice);
+      this.temporaryNoticeTimer = setTimeout(() => {
+        notice.classList.add('is-leaving');
+        setTimeout(() => notice.remove(), 250);
+      }, 4000);
     }
     bindPhoneEditor(this.root, this.abort.signal);
+    window.addEventListener('notelin-study-browser-closed', () => this.setStudyBrowserOpen(false), { signal: this.abort.signal });
+    window.addEventListener('notelin-native-back', event => {
+      if (this.studyBrowserOpen && !this.studyBrowserOccluded) { event.preventDefault(); run(() => this.toggleStudyBrowser()); }
+    }, { signal: this.abort.signal });
     if (isNativeApp) window.addEventListener('notelin-native-stylus-button', () => {
       if (!document.querySelector('dialog[open]')) this.togglePenEraser();
     }, { signal: this.abort.signal });
@@ -601,6 +620,7 @@ export class EditorView {
       else this.paperSettings();
     }
     if (action === 'search') this.search();
+    if (action === 'study-browser') run(() => this.toggleStudyBrowser());
     if (action === 'settings') this.settings();
     if (action === 'save') run(async () => { await this.flush(); await this.saveThumbnail(this.page); toast('저장했어요.'); });
     if (action === 'save-to-library') run(async () => {
@@ -1137,5 +1157,28 @@ export class EditorView {
       }
     }, { signal, passive: false });
   }
-  destroy() { this.textEditor?.destroy(); this.previews?.destroy(); this.detail?.destroy(); this.companionDetail?.destroy(); this.cancelViewportUpdate(); clearTimeout(this.thumbTimer); clearTimeout(this.companionThumbTimer); clearTimeout(this.brushTimer); clearTimeout(this.penTimer); this.generation++; this.spreadGeneration++; this.engine?.destroy(); this.companionEngine?.destroy(); this.abort.abort(); this.resizeObserver?.disconnect(); }
+  private setStudyBrowserOpen(open: boolean) {
+    this.studyBrowserOpen = open;
+    if (!open) this.studyBrowserOccluded = false;
+    this.root.querySelector('.editor-shell')?.classList.toggle('study-browser-open', open);
+    this.root.querySelector('[data-action=study-browser]')?.setAttribute('aria-expanded', String(open));
+  }
+  private syncStudyBrowserOverlay() {
+    if (!this.studyBrowserOpen) return;
+    const hidden = !!document.querySelector('dialog[open]');
+    if (hidden === this.studyBrowserOccluded) return;
+    this.studyBrowserOccluded = hidden;
+    void setNativeStudyBrowserOccluded(hidden).catch(report);
+  }
+  private async toggleStudyBrowser() {
+    if (this.studyBrowserOpen) {
+      this.setStudyBrowserOpen(false);
+      await closeNativeStudyBrowser();
+    } else {
+      this.setStudyBrowserOpen(true);
+      try { await openNativeStudyBrowser(); this.syncStudyBrowserOverlay(); }
+      catch (error) { this.setStudyBrowserOpen(false); throw error; }
+    }
+  }
+  destroy() { this.studyBrowserObserver?.disconnect(); if (this.studyBrowserOpen) void closeNativeStudyBrowser().catch(console.error); this.textEditor?.destroy(); this.previews?.destroy(); this.detail?.destroy(); this.companionDetail?.destroy(); this.cancelViewportUpdate(); clearTimeout(this.thumbTimer); clearTimeout(this.temporaryNoticeTimer); clearTimeout(this.companionThumbTimer); clearTimeout(this.brushTimer); clearTimeout(this.penTimer); this.generation++; this.spreadGeneration++; this.engine?.destroy(); this.companionEngine?.destroy(); this.abort.abort(); this.resizeObserver?.disconnect(); }
 }

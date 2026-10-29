@@ -9,6 +9,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.Gravity;
+import android.widget.FrameLayout;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -20,6 +22,7 @@ public class MainActivity extends BridgeActivity {
     private boolean dark;
     private boolean stylusButtonDown;
     private int keyboardInset = -1;
+    private StudyBrowserPanel studyBrowser;
 
     @Override public void onCreate(Bundle state) {
         registerPlugin(NotelinDevicePlugin.class);
@@ -82,6 +85,14 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void observeStylusButton(MotionEvent event) {
+        if (studyBrowser != null && studyBrowser.getVisibility() == View.VISIBLE) {
+            int[] location = new int[2];
+            studyBrowser.getLocationOnScreen(location);
+            if (event.getRawX() >= location[0] && event.getRawX() < location[0] + studyBrowser.getWidth()) {
+                stylusButtonDown = false;
+                return;
+            }
+        }
         boolean stylus = false;
         for (int i = 0; i < event.getPointerCount(); i++) {
             if (event.getToolType(i) == MotionEvent.TOOL_TYPE_STYLUS) { stylus = true; break; }
@@ -110,6 +121,39 @@ public class MainActivity extends BridgeActivity {
 
     public void setDarkChrome(boolean value) { dark = value; applyChrome(); }
 
+    public void openStudyBrowser() {
+        if (studyBrowser != null) return;
+        FrameLayout content = findViewById(android.R.id.content);
+        studyBrowser = new StudyBrowserPanel(this, () -> closeStudyBrowser(true));
+        studyBrowser.setDark(dark);
+        FrameLayout.LayoutParams layout = new FrameLayout.LayoutParams(studyBrowserWidth(),
+            FrameLayout.LayoutParams.MATCH_PARENT, Gravity.RIGHT | Gravity.TOP);
+        content.addView(studyBrowser, layout);
+        studyBrowser.bringToFront();
+    }
+
+    public void closeStudyBrowser() { closeStudyBrowser(false); }
+    public void setStudyBrowserOccluded(boolean hidden) {
+        if (studyBrowser != null) studyBrowser.setVisibility(hidden ? View.GONE : View.VISIBLE);
+    }
+
+    private void closeStudyBrowser(boolean notifyWeb) {
+        if (studyBrowser == null) return;
+        FrameLayout content = findViewById(android.R.id.content);
+        content.removeView(studyBrowser);
+        studyBrowser.release();
+        studyBrowser = null;
+        if (notifyWeb && bridge != null) bridge.getWebView().evaluateJavascript(
+            "window.dispatchEvent(new Event('notelin-study-browser-closed'))", null);
+    }
+
+    private int studyBrowserWidth() {
+        int width = getResources().getConfiguration().screenWidthDp;
+        if (!isTablet() || width < 900) return FrameLayout.LayoutParams.MATCH_PARENT;
+        int browserDp = Math.min(600, Math.max(360, Math.round(width * .4f)));
+        return Math.round(browserDp * getResources().getDisplayMetrics().density);
+    }
+
     private void applyChrome() {
         WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
         controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
@@ -121,6 +165,7 @@ public class MainActivity extends BridgeActivity {
         if (isTablet()) controller.hide(WindowInsetsCompat.Type.statusBars());
         else controller.show(WindowInsetsCompat.Type.statusBars());
         getWindow().getDecorView().setBackgroundColor(Color.parseColor(dark ? "#0e1624" : "#f4f7ff"));
+        if (studyBrowser != null) studyBrowser.setDark(dark);
         ViewCompat.requestApplyInsets(findViewById(android.R.id.content));
     }
 
@@ -132,5 +177,15 @@ public class MainActivity extends BridgeActivity {
     @Override public void onConfigurationChanged(Configuration configuration) {
         super.onConfigurationChanged(configuration);
         applyChrome();
+        if (studyBrowser != null) {
+            FrameLayout.LayoutParams layout = (FrameLayout.LayoutParams) studyBrowser.getLayoutParams();
+            layout.width = studyBrowserWidth();
+            studyBrowser.setLayoutParams(layout);
+        }
+    }
+
+    @Override public void onDestroy() {
+        closeStudyBrowser();
+        super.onDestroy();
     }
 }

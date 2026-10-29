@@ -4,6 +4,7 @@ import './dark.css';
 import './phone.css';
 import './landing.css';
 import './keyboard-modal.css';
+import './study-browser.css';
 import { installFastTaps } from './ui/tool-taps';
 import { initAppearance } from './ui/appearance';
 import { renderInstallPage } from './ui/install-page';

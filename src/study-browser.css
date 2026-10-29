@@ -1,0 +1,35 @@
+:root[data-device-ui=tablet] .editor-shell.study-browser-open {
+  width: calc(100% - clamp(360px, 40vw, 600px));
+  border-right: 1px solid #d6dfed;
+}
+
+@media (max-width: 899px) {
+  :root[data-device-ui=tablet] .editor-shell.study-browser-open {
+    width: 100%;
+    border-right: 0;
+  }
+}
+
+.editor-header-actions [data-action=study-browser][aria-expanded=true] {
+  color: #2d66b9;
+  background: #e6efff;
+  border-radius: 7px;
+}
+
+:root[data-theme=dark] .editor-header-actions [data-action=study-browser][aria-expanded=true] {
+  color: #c7dbff;
+  background: #284467;
+}
+
+:root[data-theme=dark][data-device-ui=tablet] .editor-shell.study-browser-open {
+  border-right-color: #324867;
+}
+
+.external-pdf-notice {
+  transition: opacity .25s ease, transform .25s ease;
+}
+
+.external-pdf-notice.is-leaving {
+  opacity: 0;
+  transform: translate(-50%, -8px);
+}

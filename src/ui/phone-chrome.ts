@@ -42,7 +42,7 @@ export function bindPhoneEditor(root: HTMLElement, signal: AbortSignal) {
         move(node, actions, view);
       }
       move(root.querySelector<HTMLElement>('.editor-page-controls')!, primary);
-      for (const action of ['save', 'sidebar', 'search', 'export', 'settings']) {
+      for (const action of ['save', 'sidebar', 'search', 'study-browser', 'export', 'settings']) {
         const node = root.querySelector<HTMLElement>(`[data-action=${action}]`);
         if (node) move(node, secondary);
       }

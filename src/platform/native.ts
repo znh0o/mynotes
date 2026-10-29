@@ -13,6 +13,9 @@ interface NotelinDevicePlugin {
   completeDocument(options: { id: string }): Promise<void>;
   setAppearance(options: { dark: boolean }): Promise<void>;
   openUpdates(): Promise<void>;
+  openStudyBrowser(): Promise<void>;
+  closeStudyBrowser(): Promise<void>;
+  setStudyBrowserOccluded(options: { hidden: boolean }): Promise<void>;
   addListener(event: 'documentReceived' | 'stylusButtonPressed', callback: () => void): Promise<PluginListenerHandle>;
 }
 const device = registerPlugin<NotelinDevicePlugin>('NotelinDevice');
@@ -20,7 +23,11 @@ const chunkSize = 512 * 1024;
 
 export async function initializeNativeShell() {
   if (!isNativeApp) return;
-  await App.addListener('backButton', () => history.back());
+  await App.addListener('backButton', () => {
+    const event = new Event('notelin-native-back', { cancelable: true });
+    window.dispatchEvent(event);
+    if (!event.defaultPrevented) history.back();
+  });
   await App.addListener('pause', () => window.dispatchEvent(new Event('notelin-pause')));
   await device.addListener('stylusButtonPressed', () => window.dispatchEvent(new Event('notelin-native-stylus-button')));
   const appearance = () => { void device.setAppearance({ dark: document.documentElement.dataset.theme === 'dark' }).catch(console.error); };
@@ -53,6 +60,9 @@ export function pendingNativeDocuments() { return device.pendingDocuments(); }
 export function completeNativeDocument(id: string) { return device.completeDocument({ id }); }
 export function onNativeDocument(callback: () => void) { return device.addListener('documentReceived', callback); }
 export function openNativeUpdates() { return device.openUpdates(); }
+export function openNativeStudyBrowser() { return device.openStudyBrowser(); }
+export function closeNativeStudyBrowser() { return device.closeStudyBrowser(); }
+export function setNativeStudyBrowserOccluded(hidden: boolean) { return device.setStudyBrowserOccluded({ hidden }); }
 export async function readNativeDocument(document: NativeDocument): Promise<File> {
   if (!Number.isSafeInteger(document.size) || document.size < 0 || document.size > 150 * 1024 * 1024) throw new Error('PDF는 150MB 이하로 가져올 수 있어요.');
   const parts: ArrayBuffer[] = [];

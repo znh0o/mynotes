@@ -147,6 +147,21 @@ public class NotelinDevicePlugin extends Plugin {
         getActivity().runOnUiThread(() -> { ((MainActivity) getActivity()).setDarkChrome(call.getBoolean("dark", false)); call.resolve(); });
     }
 
+    @PluginMethod public void openStudyBrowser(PluginCall call) {
+        getActivity().runOnUiThread(() -> {
+            try { ((MainActivity) getActivity()).openStudyBrowser(); call.resolve(); }
+            catch (Exception error) { call.reject("인터넷 패널을 열지 못했어요.", error); }
+        });
+    }
+
+    @PluginMethod public void closeStudyBrowser(PluginCall call) {
+        getActivity().runOnUiThread(() -> { ((MainActivity) getActivity()).closeStudyBrowser(); call.resolve(); });
+    }
+
+    @PluginMethod public void setStudyBrowserOccluded(PluginCall call) {
+        getActivity().runOnUiThread(() -> { ((MainActivity) getActivity()).setStudyBrowserOccluded(call.getBoolean("hidden", false)); call.resolve(); });
+    }
+
     @PluginMethod public void openUpdates(PluginCall call) {
         try {
             getActivity().startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/znh0o/mynotes/releases/latest")));

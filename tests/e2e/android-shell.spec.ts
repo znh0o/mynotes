@@ -9,7 +9,7 @@ async function nativeBridge(page: Page, pdf = '') {
       ? { ...matchMedia(query), matches: true } as MediaQueryList : matchMedia(query);
     const state = win.nativeTest = {
       listeners: {} as Record<string, (data: unknown) => void>, chunks: [] as string[], exports: [] as string[],
-      cancel: false, updates: 0, updateAvailable: true,
+      cancel: false, updates: 0, updateAvailable: true, browserOpens: 0, browserCloses: 0, browserHidden: false,
       documents: pdf && !sessionStorage.getItem('native-pdf-consumed') ? [{ id: 'android-pdf', name: 'Android에서 연 PDF.pdf', size: atob(pdf).length }] : [],
     };
     win.androidBridge = {};
@@ -17,7 +17,7 @@ async function nativeBridge(page: Page, pdf = '') {
     win.Capacitor = {
       PluginHeaders: [
         { name: 'App', methods: methods(['addListener', 'removeListener']) },
-        { name: 'NotelinDevice', methods: methods(['addListener', 'removeListener', 'setAppearance', 'pendingDocuments', 'readDocument', 'completeDocument', 'beginExport', 'appendExport', 'finishExport', 'cancelExport', 'openUpdates']) },
+        { name: 'NotelinDevice', methods: methods(['addListener', 'removeListener', 'setAppearance', 'pendingDocuments', 'readDocument', 'completeDocument', 'beginExport', 'appendExport', 'finishExport', 'cancelExport', 'openUpdates', 'openStudyBrowser', 'closeStudyBrowser', 'setStudyBrowserOccluded']) },
         { name: 'NotelinUpdater', methods: methods(['addListener', 'removeListener', 'check', 'install']) },
       ],
       nativeCallback: (_plugin: string, _method: string, options: any, callback: (data: unknown) => void) => {
@@ -34,6 +34,9 @@ async function nativeBridge(page: Page, pdf = '') {
         }
         if (method === 'finishExport') { state.exports.push(btoa(state.chunks.join(''))); return { saved: !state.cancel }; }
         if (method === 'openUpdates') state.updates++;
+        if (method === 'openStudyBrowser') state.browserOpens++;
+        if (method === 'closeStudyBrowser') state.browserCloses++;
+        if (method === 'setStudyBrowserOccluded') state.browserHidden = options.hidden;
         if (method === 'check') return { available: state.updateAvailable, version: state.updateAvailable ? '2.0.1' : '2.0.0', installedVersion: '2.0.0' };
         if (method === 'install') { state.updates++; state.listeners.downloadProgress?.({ percent: 100 }); return { needsPermission: false }; }
         return {};
@@ -50,6 +53,29 @@ test('Android opens the library without installation UI and routes Back and back
   await expect(page.locator('[data-action=library-mode]')).toHaveCount(0);
   await page.getByRole('button', { name: 'Notelin 시작 가이드 열기', exact: true }).click();
   await expect(page.locator('#paper-live')).toBeVisible();
+  const browser = page.getByRole('button', { name: '인터넷 패널', exact: true });
+  await expect(browser).toHaveAttribute('aria-expanded', 'false');
+  const fullWidth = (await page.locator('.editor-shell').boundingBox())!.width;
+  await browser.click();
+  await expect(browser).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('.editor-shell')).toHaveClass(/study-browser-open/);
+  expect((await page.locator('.editor-shell').boundingBox())!.width).toBeLessThan(fullWidth);
+  expect(await page.evaluate(() => (window as any).nativeTest.browserOpens)).toBe(1);
+  await browser.click();
+  await expect(page.locator('.editor-shell')).not.toHaveClass(/study-browser-open/);
+  expect(await page.evaluate(() => (window as any).nativeTest.browserCloses)).toBe(1);
+  await browser.click();
+  await page.evaluate(() => (window as any).nativeTest.listeners.backButton({ canGoBack: true }));
+  await expect(browser).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('#paper-live')).toBeVisible();
+  expect((await page.locator('.editor-shell').boundingBox())!.width).toBe(fullWidth);
+  await browser.click();
+  await page.getByRole('button', { name: '노트 내 텍스트 검색', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).nativeTest.browserHidden)).toBe(true);
+  await page.getByRole('button', { name: '닫기', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).nativeTest.browserHidden)).toBe(false);
+  await page.evaluate(() => dispatchEvent(new Event('notelin-study-browser-closed')));
+  await expect(browser).toHaveAttribute('aria-expanded', 'false');
   await expect.poll(() => page.evaluate(() => !!(window as any).nativeTest.listeners.stylusButtonPressed)).toBe(true);
   await page.evaluate(() => (window as any).nativeTest.listeners.stylusButtonPressed({}));
   await expect(page.getByRole('button', { name: '지우개', exact: true })).toHaveAttribute('aria-pressed', 'true');
@@ -85,6 +111,9 @@ test('Android PDF intents import intact bytes once and PDF export uses the docum
   await page.goto('./');
   await expect(page.locator('#paper-live')).toBeVisible();
   await expect(page.locator('.page-loading')).toBeHidden();
+  await expect(page.getByRole('button', { name: '서재에 저장', exact: true })).toBeVisible();
+  await expect(page.locator('.external-pdf-notice')).toBeVisible();
+  await expect(page.locator('.external-pdf-notice')).toHaveCount(0, { timeout: 7000 });
   await expect(page.getByRole('button', { name: '서재에 저장', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'PDF 내보내기', exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as any).nativeTest.exports.length)).toBe(1);
