@@ -13,8 +13,7 @@ final class NoteBrowserSessions {
     NoteBrowserSessions(Context context) { pages = context.getSharedPreferences("note-browser-pages", Context.MODE_PRIVATE); }
 
     String lastUrl(String noteId) {
-        String url = pages.getString(noteId, null);
-        return BrowserBookmarks.validUrl(url) ? url : null;
+        return BrowserBookmarks.secureUrl(pages.getString(noteId, null));
     }
 
     void rememberUrl(String noteId, String url) {

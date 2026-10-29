@@ -24,8 +24,8 @@ final class BrowserBookmarks {
             for (int index = 0; index < saved.length(); index++) {
                 JSONObject item = saved.optJSONObject(index);
                 if (item == null) continue;
-                String url = item.optString("url", "");
-                if (validUrl(url)) entries.add(new Entry(title(item.optString("title", ""), url), url));
+                String url = secureUrl(item.optString("url", ""));
+                if (url != null) entries.add(new Entry(title(item.optString("title", ""), url), url));
             }
         } catch (Exception ignored) { /* A malformed bookmark never prevents the browser from opening. */ }
         return entries;
@@ -62,7 +62,18 @@ final class BrowserBookmarks {
     static boolean validUrl(String value) {
         if (value == null || value.length() > 4096) return false;
         Uri uri = Uri.parse(value);
-        return ("https".equalsIgnoreCase(uri.getScheme()) || "http".equalsIgnoreCase(uri.getScheme())) && uri.getHost() != null;
+        return "https".equalsIgnoreCase(uri.getScheme()) && uri.getHost() != null;
+    }
+
+    // Keep previously saved HTTP bookmarks visible after cleartext is disabled.
+    // Only an HTTPS equivalent may be opened; the stored record is untouched.
+    static String secureUrl(String value) {
+        if (validUrl(value)) return value;
+        if (value == null || value.length() > 4096) return null;
+        Uri old = Uri.parse(value);
+        if (!"http".equalsIgnoreCase(old.getScheme()) || old.getHost() == null) return null;
+        String upgraded = old.buildUpon().scheme("https").encodedAuthority(old.getHost()).build().toString();
+        return validUrl(upgraded) ? upgraded : null;
     }
 
     private static String title(String value, String url) {

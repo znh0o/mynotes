@@ -1,6 +1,7 @@
 package app.notelin.android;
 
 import android.app.Activity;
+import android.content.ClipData;
 import android.content.Intent;
 import android.net.Uri;
 import android.content.res.Configuration;
@@ -16,6 +17,7 @@ import android.widget.FrameLayout;
 import android.webkit.CookieManager;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
+import android.webkit.WebView;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.graphics.Insets;
@@ -25,6 +27,7 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
 import java.util.LinkedHashMap;
+import java.util.IdentityHashMap;
 import java.util.Map;
 
 public class MainActivity extends BridgeActivity {
@@ -42,6 +45,8 @@ public class MainActivity extends BridgeActivity {
     private ActivityResultLauncher<Intent> studyFilePicker;
     private ValueCallback<Uri[]> studyFileCallback;
     private StudyBrowserPanel studyFileOwner;
+    private WebView studyFileView;
+    private final Map<WebView, Runnable> studyContentTimeouts = new IdentityHashMap<>();
 
     @Override public void onCreate(Bundle state) {
         registerPlugin(NotelinDevicePlugin.class);
@@ -49,11 +54,26 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(state);
         studyFilePicker = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
             ValueCallback<Uri[]> callback = studyFileCallback;
+            WebView selectedView = studyFileView;
             studyFileCallback = null;
             studyFileOwner = null;
+            studyFileView = null;
             if (callback == null) return;
             Uri[] selected = WebChromeClient.FileChooserParams.parseResult(result.getResultCode(), result.getData());
+            // Some device pickers return the selection in ClipData even when
+            // WebView's parser cannot extract it. Keep the normal parser first.
+            if (result.getResultCode() == Activity.RESULT_OK && (selected == null || selected.length == 0)) {
+                Intent data = result.getData();
+                if (data != null) {
+                    ClipData clip = data.getClipData();
+                    if (clip != null && clip.getItemCount() > 0) {
+                        selected = new Uri[clip.getItemCount()];
+                        for (int i = 0; i < clip.getItemCount(); i++) selected[i] = clip.getItemAt(i).getUri();
+                    } else if (data.getData() != null) selected = new Uri[] { data.getData() };
+                }
+            }
             if (result.getResultCode() != Activity.RESULT_OK || selected == null || selected.length == 0) {
+                if (selectedView != null) revokeStudyContentAccess(selectedView);
                 callback.onReceiveValue(null);
                 return;
             }
@@ -61,10 +81,21 @@ public class MainActivity extends BridgeActivity {
             // private provider or file:// URI to untrusted web content.
             for (Uri uri : selected) {
                 if (uri == null || !"content".equalsIgnoreCase(uri.getScheme()) ||
-                    uri.getAuthority() == null || uri.getAuthority().startsWith(getPackageName())) {
+                    uri.getAuthority() == null || uri.getAuthority().equals(getPackageName()) ||
+                    uri.getAuthority().startsWith(getPackageName() + ".")) {
+                    if (selectedView != null) revokeStudyContentAccess(selectedView);
+                    android.widget.Toast.makeText(this, "선택한 파일을 읽을 수 없어요. 다른 사진을 선택해 주세요.", android.widget.Toast.LENGTH_SHORT).show();
                     callback.onReceiveValue(null);
                     return;
                 }
+            }
+            // WebView must be able to read the chosen content:// stream while
+            // turning it into the page's File object. The other WebViews stay
+            // closed to content providers, and this grant expires shortly.
+            if (selectedView != null) {
+                Runnable timeout = () -> revokeStudyContentAccess(selectedView);
+                studyContentTimeouts.put(selectedView, timeout);
+                selectedView.postDelayed(timeout, 600_000);
             }
             callback.onReceiveValue(selected);
         });
@@ -166,8 +197,12 @@ public class MainActivity extends BridgeActivity {
 
     public void setDarkChrome(boolean value) { dark = value; applyChrome(); }
 
-    public void chooseStudyFiles(StudyBrowserPanel owner, WebChromeClient.FileChooserParams params, ValueCallback<Uri[]> callback) {
+    public void chooseStudyFiles(StudyBrowserPanel owner, WebView source, WebChromeClient.FileChooserParams params, ValueCallback<Uri[]> callback) {
         cancelStudyFileChooser(studyFileOwner);
+        if (!source.isShown() || owner.getVisibility() != View.VISIBLE) {
+            callback.onReceiveValue(null);
+            return;
+        }
         if (params.getMode() != WebChromeClient.FileChooserParams.MODE_OPEN &&
             params.getMode() != WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE) {
             callback.onReceiveValue(null);
@@ -175,6 +210,9 @@ public class MainActivity extends BridgeActivity {
         }
         studyFileCallback = callback;
         studyFileOwner = owner;
+        studyFileView = source;
+        revokeStudyContentAccess(source);
+        source.getSettings().setAllowContentAccess(true);
         try {
             Intent picker = params.createIntent();
             picker.addCategory(Intent.CATEGORY_OPENABLE);
@@ -189,9 +227,22 @@ public class MainActivity extends BridgeActivity {
     public void cancelStudyFileChooser(StudyBrowserPanel owner) {
         if (owner == null || studyFileOwner != owner) return;
         ValueCallback<Uri[]> callback = studyFileCallback;
+        WebView source = studyFileView;
         studyFileCallback = null;
         studyFileOwner = null;
+        studyFileView = null;
+        if (source != null) revokeStudyContentAccess(source);
         if (callback != null) callback.onReceiveValue(null);
+    }
+
+    public void revokeStudyContentAccess(WebView source) {
+        Runnable timeout = studyContentTimeouts.remove(source);
+        if (timeout != null) source.removeCallbacks(timeout);
+        if (source.getParent() != null) source.getSettings().setAllowContentAccess(false);
+    }
+
+    public void cancelStudyFileChooser(StudyBrowserPanel owner, WebView source) {
+        if (studyFileView == source) cancelStudyFileChooser(owner);
     }
 
     public void openStudyBrowser(String noteId, String url) {

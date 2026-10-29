@@ -17,11 +17,16 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.webkit.WebChromeClient;
 import android.webkit.CookieManager;
+import android.webkit.PermissionRequest;
+import android.webkit.SafeBrowsingResponse;
+import android.webkit.SslErrorHandler;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.ValueCallback;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.net.http.SslError;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -31,6 +36,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.view.View;
 import java.util.ArrayList;
+import java.io.ByteArrayInputStream;
 import java.util.List;
 import java.util.function.IntConsumer;
 import java.util.function.Consumer;
@@ -216,9 +222,14 @@ final class StudyBrowserPanel extends LinearLayout {
         settings.setDomStorageEnabled(true);
         CookieManager cookies = CookieManager.getInstance();
         cookies.setAcceptCookie(true);
-        cookies.setAcceptThirdPartyCookies(browser, true);
+        cookies.setAcceptThirdPartyCookies(browser, false);
         settings.setAllowFileAccess(false);
+        // File chooser results temporarily enable content access on only the
+        // WebView that requested a user-selected photo.
         settings.setAllowContentAccess(false);
+        settings.setAllowFileAccessFromFileURLs(false);
+        settings.setAllowUniversalAccessFromFileURLs(false);
+        settings.setGeolocationEnabled(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) settings.setSafeBrowsingEnabled(true);
         settings.setUseWideViewPort(true);
@@ -227,9 +238,10 @@ final class StudyBrowserPanel extends LinearLayout {
         settings.setDisplayZoomControls(false);
         settings.setSupportMultipleWindows(true);
         settings.setJavaScriptCanOpenWindowsAutomatically(false);
-        String agent = settings.getUserAgentString().replace("; wv", "").replace("Version/4.0 ", "");
-        if (!agent.contains("Mobile")) agent = agent.replace(" Safari/", " Mobile Safari/");
-        settings.setUserAgentString(agent);
+        // Preserve WebView identity for sites that restrict embedded sign-in.
+        // Only request mobile layout on tablets whose default UA omits Mobile.
+        String agent = settings.getUserAgentString();
+        if (!agent.contains("Mobile")) settings.setUserAgentString(agent.replace(" Safari/", " Mobile Safari/"));
         browser.setInitialScale(0);
     }
 
@@ -238,9 +250,31 @@ final class StudyBrowserPanel extends LinearLayout {
     private void installBrowserClients(WebView browser) {
         browser.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                return handleSpecialLink(request.getUrl(), view);
+                return handleSpecialLink(request.getUrl(), view, request.hasGesture());
+            }
+            @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                if (!"http".equalsIgnoreCase(request.getUrl().getScheme())) return null;
+                return new WebResourceResponse("text/plain", "UTF-8", 403, "Blocked", null,
+                    new ByteArrayInputStream(new byte[0]));
+            }
+            @Override public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+                handler.cancel();
+                if (view == activeBrowser() && TextUtils.equals(error.getUrl(), view.getUrl()))
+                    activity.runOnUiThread(() -> showBlockedPage("안전한 연결을 확인하지 못했어요."));
+            }
+            @Override public void onSafeBrowsingHit(WebView view, WebResourceRequest request, int threatType,
+                SafeBrowsingResponse callback) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) callback.backToSafety(false);
+                if (view == activeBrowser() && request.isForMainFrame())
+                    activity.runOnUiThread(() -> showBlockedPage("위험한 페이지를 차단했어요."));
             }
             @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                activity.revokeStudyContentAccess(view);
+                if (!isWebAddress(Uri.parse(url)) && !"about:blank".equals(url)) {
+                    view.stopLoading();
+                    if (view == activeBrowser()) showBlockedPage("HTTPS 주소만 열 수 있어요.");
+                    return;
+                }
                 if (view != activeBrowser()) return;
                 placeholder.setVisibility(View.GONE);
                 view.setVisibility(View.VISIBLE);
@@ -262,8 +296,11 @@ final class StudyBrowserPanel extends LinearLayout {
             }
         });
         browser.setWebChromeClient(new WebChromeClient() {
+            @Override public void onPermissionRequest(PermissionRequest request) { request.deny(); }
+            @Override public void onGeolocationPermissionsShowPrompt(String origin,
+                android.webkit.GeolocationPermissions.Callback callback) { callback.invoke(origin, false, false); }
             @Override public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
-                activity.chooseStudyFiles(StudyBrowserPanel.this, params, callback);
+                activity.chooseStudyFiles(StudyBrowserPanel.this, view, params, callback);
                 return true;
             }
             @Override public void onProgressChanged(WebView view, int amount) {
@@ -296,6 +333,7 @@ final class StudyBrowserPanel extends LinearLayout {
         if (index < 0) return;
         for (int position = popups.size() - 1; position >= index; position--) {
             WebView popup = popups.remove(position);
+            activity.cancelStudyFileChooser(this, popup);
             page.removeView(popup);
             popup.stopLoading(); popup.destroy();
         }
@@ -307,21 +345,32 @@ final class StudyBrowserPanel extends LinearLayout {
         persistSession();
     }
 
-    private boolean handleSpecialLink(Uri uri, WebView browser) {
+    private boolean handleSpecialLink(Uri uri, WebView browser, boolean userGesture) {
         if ("about:blank".equals(uri.toString())) return false;
         if (isWebAddress(uri)) return false;
+        if ("http".equalsIgnoreCase(uri.getScheme())) {
+            if (browser == activeBrowser()) showBlockedPage("HTTPS 주소만 열 수 있어요.");
+            return true;
+        }
         try {
             String fallback = "intent".equalsIgnoreCase(uri.getScheme())
                 ? Intent.parseUri(uri.toString(), Intent.URI_INTENT_SCHEME).getStringExtra("browser_fallback_url")
-                : uri.getQueryParameter("url");
-            if (fallback != null && isWebAddress(Uri.parse(fallback))) browser.loadUrl(fallback);
+                : null;
+            if (userGesture && fallback != null && isWebAddress(Uri.parse(fallback))) browser.loadUrl(fallback);
         } catch (Exception ignored) { /* Non-web app links stay outside the research panel. */ }
         return true;
     }
 
+    private void showBlockedPage(String message) {
+        placeholder.setText(message);
+        placeholder.setVisibility(View.VISIBLE);
+        activeBrowser().setVisibility(View.GONE);
+        progress.setVisibility(View.GONE);
+    }
+
     private static boolean isWebAddress(Uri uri) {
         String scheme = uri.getScheme();
-        return ("https".equalsIgnoreCase(scheme) || "http".equalsIgnoreCase(scheme)) && uri.getHost() != null;
+        return "https".equalsIgnoreCase(scheme) && uri.getHost() != null;
     }
 
     private void navigate(String input) {
@@ -332,7 +381,10 @@ final class StudyBrowserPanel extends LinearLayout {
         else if (value.matches("(?i)^[^\\s/]+\\.[^\\s]+$")) url = "https://" + value;
         else url = "https://www.google.com/search?q=" + Uri.encode(value);
         Uri uri = Uri.parse(url);
-        if (!isWebAddress(uri)) return;
+        if (!isWebAddress(uri)) {
+            showBlockedPage("HTTPS 주소만 열 수 있어요.");
+            return;
+        }
         closeBookmarks();
         placeholder.setVisibility(View.GONE);
         activeBrowser().setVisibility(View.VISIBLE);
@@ -507,7 +559,11 @@ final class StudyBrowserPanel extends LinearLayout {
         CookieManager.getInstance().flush();
     }
 
-    void hidePanel() { hideKeyboard(); persistSession(); setVisibility(View.GONE); }
+    void hidePanel() {
+        hideKeyboard(); persistSession(); setVisibility(View.GONE);
+        activity.revokeStudyContentAccess(web);
+        for (WebView popup : popups) activity.revokeStudyContentAccess(popup);
+    }
 
     void release() {
         activity.cancelStudyFileChooser(this);
