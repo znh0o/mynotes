@@ -36,7 +36,7 @@ if (!release) {
   const revision = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
   release = await api('/releases', 'POST', {
     tag_name: tag, target_commitish: revision, name: `Notelin ${version} — Android`, draft: true, prerelease: false,
-    body: 'Android 설치형 Notelin입니다.\n\n- 인터넷과 AI는 앱 내 WebView 패널에서만 열립니다. 기기 브라우저 연결 모드를 제거했습니다.\n- 기존에 기기 브라우저 연결을 선택했던 경우에도 인터넷과 AI 버튼이 앱 내 패널을 엽니다.\n- 노트별 인터넷 페이지 기억, 공통 로그인 쿠키, 즐겨찾기 및 패널 위치 선택은 유지합니다.\n- Notelin은 로그인 비밀번호를 별도로 저장하지 않습니다. 웹사이트의 쿠키와 저장소를 사용합니다.\n- 노트, PDF와 필기 데이터는 유지합니다.\n\n설정의 “앱 내 로그인 쿠키 삭제”는 패널의 쿠키를 지웁니다. 사이트 저장 정보는 남을 수 있습니다.\n\n첫 설치와 업데이트의 마지막 확인은 Android 시스템에서 진행합니다.',
+    body: 'Android 설치형 Notelin입니다.\n\n- 앱 내 ChatGPT와 인터넷 WebView 패널에서 사진·파일 첨부 버튼을 누르면 Android 파일 선택기를 엽니다.\n- 사용자가 선택한 content URI만 웹페이지에 전달하며 앱 내부 파일 URI는 차단합니다.\n- 기기 브라우저 연결 모드는 제거된 상태로 유지합니다. 노트별 인터넷 페이지, 즐겨찾기와 패널 위치 설정은 유지합니다.\n- 노트, PDF와 필기 데이터는 유지합니다.\n\n로그인 유지는 웹사이트의 쿠키와 저장소를 사용합니다. Notelin은 비밀번호를 별도로 저장하지 않습니다.\n\n첫 설치와 업데이트의 마지막 확인은 Android 시스템에서 진행합니다.',
   });
 }
 for (const [assetName, content, type] of [[name, bytes, 'application/vnd.android.package-archive'], [`${name}.sha256`, Buffer.from(checksum), 'text/plain'], ['Notelin.apk', bytes, 'application/vnd.android.package-archive']]) {

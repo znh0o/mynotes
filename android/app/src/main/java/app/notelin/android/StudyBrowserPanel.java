@@ -19,6 +19,7 @@ import android.webkit.WebChromeClient;
 import android.webkit.CookieManager;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
+import android.webkit.ValueCallback;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.EditText;
@@ -261,6 +262,10 @@ final class StudyBrowserPanel extends LinearLayout {
             }
         });
         browser.setWebChromeClient(new WebChromeClient() {
+            @Override public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
+                activity.chooseStudyFiles(StudyBrowserPanel.this, params, callback);
+                return true;
+            }
             @Override public void onProgressChanged(WebView view, int amount) {
                 if (view != activeBrowser()) return;
                 progress.setProgress(amount);
@@ -505,6 +510,7 @@ final class StudyBrowserPanel extends LinearLayout {
     void hidePanel() { hideKeyboard(); persistSession(); setVisibility(View.GONE); }
 
     void release() {
+        activity.cancelStudyFileChooser(this);
         hideKeyboard();
         persistSession();
         closeBookmarks();

@@ -1,6 +1,8 @@
 package app.notelin.android;
 
+import android.app.Activity;
 import android.content.Intent;
+import android.net.Uri;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Point;
@@ -12,6 +14,10 @@ import android.view.View;
 import android.view.Gravity;
 import android.widget.FrameLayout;
 import android.webkit.CookieManager;
+import android.webkit.ValueCallback;
+import android.webkit.WebChromeClient;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -33,11 +39,35 @@ public class MainActivity extends BridgeActivity {
     private float studyAiRatio = 1f / 5f;
     private boolean studyPanelOccluded;
     private boolean studyPanelOnLeft;
+    private ActivityResultLauncher<Intent> studyFilePicker;
+    private ValueCallback<Uri[]> studyFileCallback;
+    private StudyBrowserPanel studyFileOwner;
 
     @Override public void onCreate(Bundle state) {
         registerPlugin(NotelinDevicePlugin.class);
         registerPlugin(NotelinUpdaterPlugin.class);
         super.onCreate(state);
+        studyFilePicker = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+            ValueCallback<Uri[]> callback = studyFileCallback;
+            studyFileCallback = null;
+            studyFileOwner = null;
+            if (callback == null) return;
+            Uri[] selected = WebChromeClient.FileChooserParams.parseResult(result.getResultCode(), result.getData());
+            if (result.getResultCode() != Activity.RESULT_OK || selected == null || selected.length == 0) {
+                callback.onReceiveValue(null);
+                return;
+            }
+            // A third-party picker can return arbitrary URIs. Never hand an app-
+            // private provider or file:// URI to untrusted web content.
+            for (Uri uri : selected) {
+                if (uri == null || !"content".equalsIgnoreCase(uri.getScheme()) ||
+                    uri.getAuthority() == null || uri.getAuthority().startsWith(getPackageName())) {
+                    callback.onReceiveValue(null);
+                    return;
+                }
+            }
+            callback.onReceiveValue(selected);
+        });
         noteBrowserSessions = new NoteBrowserSessions(this);
         studyPanelOnLeft = "left".equals(getSharedPreferences("study-browser", MODE_PRIVATE).getString("panel-side", "right"));
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
@@ -135,6 +165,34 @@ public class MainActivity extends BridgeActivity {
     private boolean isTablet() { return getResources().getConfiguration().smallestScreenWidthDp >= 600; }
 
     public void setDarkChrome(boolean value) { dark = value; applyChrome(); }
+
+    public void chooseStudyFiles(StudyBrowserPanel owner, WebChromeClient.FileChooserParams params, ValueCallback<Uri[]> callback) {
+        cancelStudyFileChooser(studyFileOwner);
+        if (params.getMode() != WebChromeClient.FileChooserParams.MODE_OPEN &&
+            params.getMode() != WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE) {
+            callback.onReceiveValue(null);
+            return;
+        }
+        studyFileCallback = callback;
+        studyFileOwner = owner;
+        try {
+            Intent picker = params.createIntent();
+            picker.addCategory(Intent.CATEGORY_OPENABLE);
+            picker.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            studyFilePicker.launch(picker);
+        } catch (RuntimeException error) {
+            cancelStudyFileChooser(owner);
+            android.widget.Toast.makeText(this, "파일 선택기를 열지 못했어요.", android.widget.Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    public void cancelStudyFileChooser(StudyBrowserPanel owner) {
+        if (owner == null || studyFileOwner != owner) return;
+        ValueCallback<Uri[]> callback = studyFileCallback;
+        studyFileCallback = null;
+        studyFileOwner = null;
+        if (callback != null) callback.onReceiveValue(null);
+    }
 
     public void openStudyBrowser(String noteId, String url) {
         StudyBrowserPanel panel = noteBrowsers.get(noteId);
