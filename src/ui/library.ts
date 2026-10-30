@@ -3,6 +3,8 @@ import { covers, createNote, paperNames, uid, type Folder, type Note, type Paper
 import { importPDF, thumbnail } from '../data/pdf';
 import { icon, button, escape, safeColor, modal, toast, run, pickFile, contextMenu, confirmAction, formatDate } from './common';
 import { bindPhoneLibrary } from './phone-chrome';
+import { isNativeApp } from '../platform/native';
+import { signOutDrive, syncDrive } from '../data/drive-sync';
 export interface LibraryState { filter: string; query: string; sort: string; list: boolean }
 interface Profile { name: string; school: string; grade: string; classroom: string }
 const emptyProfile = (): Profile => ({ name: '', school: '', grade: '', classroom: '' });
@@ -27,6 +29,7 @@ export class LibraryView {
   private updateAvailable = false;
   private updateApplying = false;
   private profile = emptyProfile();
+  private googleAccount?: { email: string; lastSync?: number };
   private phoneCleanup?: () => void;
   constructor(private root: HTMLElement, private openNote: (id: string) => Promise<void>, private settings: () => void,
     private navigateFilter: (filter: string) => Promise<void> = async filter => this.setFilter(filter), initial?: LibraryState,
@@ -57,10 +60,12 @@ export class LibraryView {
     }, { signal: this.abort.signal });
   }
   async show() {
-    const [notes, folders, columns, profile] = await Promise.all([db.notes.toArray(), db.folders.toArray(), db.settings.get('library-columns'), db.settings.get('user-profile')]);
+    const [notes, folders, columns, profile, drive] = await Promise.all([db.notes.toArray(), db.folders.toArray(), db.settings.get('library-columns'), db.settings.get('user-profile'), isNativeApp ? db.settings.get('drive-sync-enabled') : Promise.resolve(undefined)]);
     this.notes = notes.filter(note => !note.temporary); this.folders = folders;
     this.columns = [4, 5, 6].includes(columns?.value as number) ? columns!.value as 4 | 5 | 6 : 'auto';
     this.profile = profileFrom(profile?.value);
+    const connected = drive?.value as { email?: unknown; lastSync?: unknown } | undefined;
+    this.googleAccount = connected && typeof connected.email === 'string' ? { email: connected.email, lastSync: typeof connected.lastSync === 'number' ? connected.lastSync : undefined } : undefined;
     this.render();
     void this.previews(++this.previewVersion);
   }
@@ -136,9 +141,15 @@ export class LibraryView {
   private nav(id: string, name: Parameters<typeof icon>[0], label: string, count?: number, color?: string) {
     return `<button class="nav-item ${this.filter === id ? 'active' : ''}" data-action="filter" data-id="${id}"><span ${color ? `style="color:${safeColor(color)}"` : ''}>${icon(name)}</span><span>${escape(label)}</span>${count !== undefined ? `<small>${count}</small>` : ''}</button>`;
   }
-  private profileInitial() { return Array.from(this.profile.name)[0] || 'N'; }
+  private profileInitial() { return isNativeApp ? (this.googleAccount?.email[0]?.toUpperCase() || 'G') : (Array.from(this.profile.name)[0] || 'N'); }
   private renderProfile(editing = false) {
     const popover = this.root.querySelector<HTMLElement>('.profile-popover')!;
+    if (isNativeApp) {
+      popover.innerHTML = this.googleAccount
+        ? `<h2>Google 계정</h2><div class="profile-summary"><span class="profile-summary-avatar">${escape(this.profileInitial())}</span><strong>${escape(this.googleAccount.email)}</strong></div><p class="muted">노트는 이 기기에 저장되고 Google Drive 앱 전용 공간과 동기화돼요.</p><div class="profile-actions"><button type="button" class="button secondary" data-action="google-sync">지금 동기화</button><button type="button" class="button secondary" data-action="settings">동기화 설정</button><button type="button" class="button secondary" data-action="google-signout">로그아웃</button></div><p class="muted">로그아웃하면 앱의 Google 권한이 철회됩니다. 저장된 노트는 유지돼요.</p>`
+        : `<h2>Google 계정</h2><p class="muted">계정을 연결하면 노트를 Google Drive에 동기화할 수 있어요.</p><button type="button" class="button primary" data-action="google-sync">Google 계정 연결</button>`;
+      return;
+    }
     if (editing) {
       popover.innerHTML = `<form class="profile-form"><h2>프로필 수정</h2><label>이름<input name="name" autocomplete="name" maxlength="40" value="${escape(this.profile.name)}" /></label><label>학교<input name="school" autocomplete="organization" maxlength="80" value="${escape(this.profile.school)}" /></label><div class="profile-form-row"><label>학년<input name="grade" maxlength="20" value="${escape(this.profile.grade)}" /></label><label>반<input name="classroom" maxlength="20" value="${escape(this.profile.classroom)}" /></label></div><div class="profile-actions"><button type="button" class="button secondary" data-action="profile-cancel">취소</button><button type="submit" class="button primary">저장</button></div></form>`;
       popover.querySelector<HTMLInputElement>('[name=name]')?.focus();
@@ -226,6 +237,24 @@ export class LibraryView {
     if (action === 'profile') this.toggleProfile();
     if (action === 'profile-edit') this.renderProfile(true);
     if (action === 'profile-cancel') this.renderProfile();
+    if (action === 'google-sync' && isNativeApp) run(async () => {
+      target.setAttribute('disabled', '');
+      try {
+        const result = await syncDrive();
+        toast(`${result.email} 계정과 동기화했어요.`);
+        await this.show();
+        this.toggleProfile();
+      } finally { target.removeAttribute('disabled'); }
+    });
+    if (action === 'google-signout' && isNativeApp && this.googleAccount) run(async () => {
+      target.setAttribute('disabled', '');
+      try {
+        await signOutDrive(this.googleAccount!.email);
+        await this.show();
+        this.toggleProfile();
+        toast('Google 계정에서 로그아웃했어요. 노트는 유지됩니다.');
+      } finally { target.removeAttribute('disabled'); }
+    });
     if (action === 'settings') this.settings();
     if (action === 'import') run(async () => {
       const file = await pickFile('.pdf,application/pdf'); if (!file) return;

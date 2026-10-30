@@ -114,7 +114,8 @@ export async function persistNew(note: Note, pages: Page[], assets: Asset[] = []
   });
 }
 export async function deletePermanently(note: Note) {
-  await db.transaction('rw', db.notes, db.pages, db.assets, async () => {
+  await db.transaction('rw', db.notes, db.pages, db.assets, db.settings, async () => {
+    if (!note.temporary && (await db.settings.get('drive-sync-enabled'))?.value) await db.settings.put({ key: `drive-delete:${note.id}`, value: true });
     await db.pages.where('noteId').equals(note.id).delete();
     await db.assets.where('noteId').equals(note.id).delete();
     await db.notes.delete(note.id);
@@ -132,7 +133,7 @@ export async function download(blob: Blob, filename: string) {
 function blobData(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result)); r.onerror = reject; r.readAsDataURL(blob); });
 }
-export async function backup() {
+export async function backupBlob() {
   const data = await db.transaction('r', db.tables, async () => ({
     format: 'mynotes', version: 1,
     notes: (await db.notes.toArray()).filter(note => !note.temporary), pages: await db.pages.toArray(),
@@ -140,7 +141,10 @@ export async function backup() {
   }));
   const savedIds = new Set(data.notes.map(note => note.id));
   const assets = await Promise.all(data.assets.filter(asset => savedIds.has(asset.noteId)).map(async a => ({ ...a, blob: await blobData(a.blob) })));
-  return download(new Blob([JSON.stringify({ ...data, pages: data.pages.filter(page => savedIds.has(page.noteId)), assets })], { type: 'application/json' }), `Notelin-backup-${new Date().toISOString().slice(0, 10)}.json`);
+  return new Blob([JSON.stringify({ ...data, pages: data.pages.filter(page => savedIds.has(page.noteId)), assets })], { type: 'application/json' });
+}
+export async function backup() {
+  return download(await backupBlob(), `Notelin-backup-${new Date().toISOString().slice(0, 10)}.json`);
 }
 export async function restore(file: File) {
   if (file.size > 400 * 1024 * 1024) throw new Error('백업 파일은 400MB 이하로 복원할 수 있어요.');

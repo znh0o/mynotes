@@ -20,6 +20,7 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.activity.result.IntentSenderRequest;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -43,6 +44,7 @@ public class MainActivity extends BridgeActivity {
     private boolean studyPanelOccluded;
     private boolean studyPanelOnLeft;
     private ActivityResultLauncher<Intent> studyFilePicker;
+    private ActivityResultLauncher<IntentSenderRequest> driveAuthorization;
     private ValueCallback<Uri[]> studyFileCallback;
     private StudyBrowserPanel studyFileOwner;
     private WebView studyFileView;
@@ -51,7 +53,14 @@ public class MainActivity extends BridgeActivity {
     @Override public void onCreate(Bundle state) {
         registerPlugin(NotelinDevicePlugin.class);
         registerPlugin(NotelinUpdaterPlugin.class);
+        registerPlugin(NotelinDrivePlugin.class);
         super.onCreate(state);
+        driveAuthorization = registerForActivityResult(new ActivityResultContracts.StartIntentSenderForResult(), result -> {
+            if (bridge != null) {
+                NotelinDrivePlugin plugin = (NotelinDrivePlugin) bridge.getPlugin("NotelinDrive").getInstance();
+                plugin.completeAuthorization(result.getResultCode(), result.getData());
+            }
+        });
         studyFilePicker = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
             ValueCallback<Uri[]> callback = studyFileCallback;
             WebView selectedView = studyFileView;
@@ -139,6 +148,10 @@ public class MainActivity extends BridgeActivity {
         });
         if (bridge != null) bridge.getWebView().setOverScrollMode(View.OVER_SCROLL_NEVER);
         applyChrome();
+    }
+
+    void launchDriveAuthorization(android.app.PendingIntent pendingIntent) {
+        driveAuthorization.launch(new IntentSenderRequest.Builder(pendingIntent.getIntentSender()).build());
     }
 
     // BridgeActivity also dispatches the cold-start intent through onNewIntent.

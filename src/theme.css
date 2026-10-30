@@ -319,3 +319,4 @@ html,body,#app,.library-shell,.library-main,.library-content,.modal,.modal-body{
 .ink-toolbar .pen-width-control input::-webkit-slider-thumb{background:#39424e}
 .ink-toolbar .pen-width-control input::-moz-range-thumb{background:#39424e}
 .ink-toolbar .pen-width-control input::-moz-range-progress{background:#39424e}
+.settings-actions.drive-actions{flex-wrap:wrap;margin-top:9px}

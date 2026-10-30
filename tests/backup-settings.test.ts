@@ -7,6 +7,7 @@ describe('PWA to Android settings migration', () => {
     const imported = restoredSettings([
       { key: 'note-palette:old-note', value: ['#3344aa'] },
       { key: 'note-brush:old-note:pen', value: { color: '#3344aa', width: 4 } },
+      { key: 'note-text-color:old-note', value: '#112233' },
       { key: 'note-palette:missing-note', value: ['#ffffff'] },
       { key: 'study-timer-state:old-note', value: { name: '공부', remaining: 120 } },
       { key: 'study-timer-state:missing-note', value: { name: '다른 노트' } },
@@ -14,7 +15,7 @@ describe('PWA to Android settings migration', () => {
       { key: 'bookshelf-arrangement', value: 'custom' },
       { key: 'user-profile', value: { name: '이름' } },
     ], new Set(['old-note']), new Map([['old-note', 'new-note']]));
-    expect(imported.map(row => row.key)).toEqual(['note-palette:new-note', 'note-brush:new-note:pen', 'study-timer-state:new-note', 'study-timer-presets', 'user-profile']);
+    expect(imported.map(row => row.key)).toEqual(['note-palette:new-note', 'note-brush:new-note:pen', 'note-text-color:new-note', 'study-timer-state:new-note', 'study-timer-presets', 'user-profile']);
     expect(restoredSettings(undefined, new Set(), new Map())).toEqual([]);
   });
   it('keeps both pens when IDs collide and selects the restored pen without duplicating it on a later restore', () => {

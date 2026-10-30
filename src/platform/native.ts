@@ -34,6 +34,16 @@ interface NotelinDevicePlugin {
   addListener(event: 'documentReceived' | 'stylusButtonPressed', callback: () => void): Promise<PluginListenerHandle>;
 }
 const device = registerPlugin<NotelinDevicePlugin>('NotelinDevice');
+interface NotelinDrivePlugin {
+  authorize(options?: { silent?: boolean }): Promise<{ accessToken: string }>;
+  revoke(options: { email: string }): Promise<void>;
+}
+const drive = registerPlugin<NotelinDrivePlugin>('NotelinDrive');
+export async function authorizeNativeDrive(silent = false) {
+  if (!isNativeApp) throw new Error('Google Drive 연결은 Android 앱에서 사용할 수 있어요.');
+  return (await drive.authorize({ silent })).accessToken;
+}
+export function revokeNativeDrive(email: string) { return drive.revoke({ email }); }
 const chunkSize = 512 * 1024;
 
 export async function initializeNativeShell() {

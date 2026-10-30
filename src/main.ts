@@ -16,6 +16,8 @@ import { getAppearance, setAppearance, type Appearance } from './ui/appearance';
 import { installDeviceUI } from './ui/device-ui';
 import { isNativeApp, initializeNativeShell, pendingNativeDocuments, readNativeDocument, completeNativeDocument, onNativeDocument, openNativeUpdates, getStudyPanelSide, setStudyPanelSide, type StudyPanelSide, clearStudyLoginCookies, studyAIProvider, studyAIProviders } from './platform/native';
 import { checkNativeUpdate, installNativeUpdate, onNativeUpdateProgress, type NativeUpdate } from './platform/native-updates';
+import { backupToDrive, restoreFromDrive } from './data/google-drive';
+import { disconnectDrive, syncDrive, DriveSyncDeferredError } from './data/drive-sync';
 
 installAppZoomGuard();
 installDeviceUI();
@@ -35,6 +37,18 @@ let updateMessage = '새 버전을 자동으로 확인하고 있어요.';
 let lastUpdateCheck = 0;
 let updateProbeRunning = false;
 let apkUpdate: NativeUpdate | undefined;
+let nativeReady = false, lastAutoSync = 0;
+async function autoSyncDrive() {
+  if (!nativeReady || editor || document.visibilityState !== 'visible' || !navigator.onLine || Date.now() - lastAutoSync < 60_000) return;
+  try {
+    if (!(await db.settings.get('drive-sync-enabled'))?.value) return;
+    lastAutoSync = Date.now();
+    await syncDrive(() => {}, true, id => !editor || editor.note.id !== id);
+    await db.settings.delete('drive-sync-error');
+    await library?.show();
+  }
+  catch (error) { if (!(error instanceof DriveSyncDeferredError)) await db.settings.put({ key: 'drive-sync-error', value: error instanceof Error ? error.message : 'Drive 동기화 실패' }); }
+}
 function showAvailableUpdate() {
   const newlyAvailable = !updateAvailable;
   updateAvailable = true;
@@ -113,10 +127,11 @@ async function probeUpdate() {
   finally { updateProbeRunning = false; }
 }
 window.addEventListener('focus', () => { void probeUpdate(); });
-window.addEventListener('online', () => { void probeUpdate(); });
-document.addEventListener('visibilitychange', () => { void probeUpdate(); });
+window.addEventListener('online', () => { void probeUpdate(); void autoSyncDrive(); });
+document.addEventListener('visibilitychange', () => { void probeUpdate(); if (document.visibilityState === 'visible') void autoSyncDrive(); });
 window.addEventListener('notelin-pause', () => { void editor?.flush().catch(report); });
 setInterval(() => { void probeUpdate(); }, 60 * 1000);
+setInterval(() => { void autoSyncDrive(); }, 5 * 60 * 1000);
 
 async function home() {
   if (editor) await navigation.goHome();
@@ -151,6 +166,7 @@ async function renderRoute(route: AppRoute, direction: Direction) {
     libraryState = { ...libraryState, filter: route.filter };
     library = createLibrary();
     await library.show(); refreshUpdateControls(); window.scrollTo(0, restoreScroll);
+    void autoSyncDrive();
   } else {
     const existing = tabs.find(t => t.id === note!.id);
     if (existing) existing.title = note!.title; else tabs.push({ id: note!.id, title: note!.title });
@@ -177,6 +193,12 @@ function settings() {
     appearanceSection.querySelectorAll<HTMLElement>('[data-appearance]').forEach(button => button.addEventListener('click', () => setAppearance(button.dataset.appearance as Appearance)));
     dialog.querySelector('footer [data-close]')?.remove();
     if (isNativeApp) {
+      const driveConnected = (await db.settings.get('drive-sync-enabled'))?.value as { email?: string; lastSync?: number } | undefined;
+      const driveError = (await db.settings.get('drive-sync-error'))?.value;
+      const driveSection = document.createElement('section');
+      driveSection.className = 'settings-section';
+      driveSection.innerHTML = `<h3>${icon('HardDrive', 18)} Google Drive</h3><p class="muted">노트와 PDF를 계정의 앱 전용 공간에 동기화해요. 연결 후에는 서재를 열 때와 사용 중 주기적으로 확인합니다.</p><p class="muted" id="drive-status" role="status" aria-live="polite">${escape(typeof driveError === 'string' ? driveError : driveConnected?.email ? `${driveConnected.email} · 마지막 동기화 ${driveConnected.lastSync ? new Date(driveConnected.lastSync).toLocaleString('ko-KR') : '기록 없음'}` : '연결하지 않았어요.')}</p><div class="settings-actions drive-actions"><button class="button primary" type="button" data-setting="drive-sync">${driveConnected ? '지금 동기화' : '연결하고 동기화'}</button><button class="button secondary" type="button" data-setting="drive-disconnect" ${driveConnected ? '' : 'hidden'}>자동 동기화 끄기</button></div><div class="settings-actions drive-actions"><button class="button secondary" type="button" data-setting="drive-backup">전체 백업 보관</button><button class="button secondary" type="button" data-setting="drive-restore">백업 사본 복원</button></div>`;
+      dialog.querySelector('[data-setting=backup]')!.closest('.settings-section')!.after(driveSection);
       const browserSection = document.createElement('section');
       browserSection.className = 'settings-section study-browser-section';
       browserSection.innerHTML = `<h3>${icon('Globe2', 18)} 인터넷 · AI 패널</h3><p class="muted">앱 안의 패널에서 노트별로 보던 페이지를 기억해요. 로그인은 웹사이트의 쿠키와 저장소를 사용하며 Notelin은 비밀번호를 별도로 저장하지 않아요.</p><div class="study-browser-privacy"><button type="button" class="button secondary" data-setting="clear-web-cookies">앱 내 로그인 쿠키 삭제</button><p class="muted">패널의 쿠키를 지워요. 사이트 저장 정보는 남을 수 있으며 노트와 PDF는 유지돼요.</p></div>`;
@@ -227,6 +249,41 @@ function settings() {
       const action = el.dataset.setting; el.setAttribute('disabled', '');
       try {
         if (action === 'backup') { await editor?.flush(); const saved = await backup(); toast(saved === false ? '저장을 취소했어요.' : '백업 파일을 만들었어요.'); }
+        if (action === 'drive-sync') {
+          const status = dialog.querySelector('#drive-status')!;
+          status.textContent = 'Google Drive를 확인하고 있어요…';
+          await editor?.flush();
+          try {
+            const result = await syncDrive((done, total) => { if (dialog.isConnected) status.textContent = `동기화 중 ${done}/${total}`; }, false, id => !editor || editor.note.id !== id);
+            await db.settings.delete('drive-sync-error');
+            status.textContent = `${result.email} · 올림 ${result.uploaded} · 가져옴 ${result.downloaded}${result.trashed ? ` · 휴지통 이동 ${result.trashed}` : ''}${result.conflicts ? ` · 충돌 사본 ${result.conflicts}` : ''}`;
+            const button = dialog.querySelector<HTMLElement>('[data-setting=drive-sync]')!;
+            button.textContent = '지금 동기화';
+            dialog.querySelector<HTMLElement>('[data-setting=drive-disconnect]')!.hidden = false;
+            await library?.show();
+          } catch (error) { status.textContent = error instanceof Error ? error.message : '동기화에 실패했어요.'; throw error; }
+        }
+        if (action === 'drive-disconnect') {
+          await disconnectDrive();
+          await db.settings.delete('drive-sync-error');
+          dialog.querySelector('#drive-status')!.textContent = '자동 동기화를 껐어요. 기기와 Drive의 노트는 유지됩니다.';
+          dialog.querySelector<HTMLElement>('[data-setting=drive-sync]')!.textContent = '연결하고 동기화';
+          el.hidden = true;
+        }
+        if (action === 'drive-backup') {
+          await editor?.flush();
+          dialog.querySelector('#drive-status')!.textContent = 'Drive에 백업하고 있어요…';
+          const result = await backupToDrive();
+          dialog.querySelector('#drive-status')!.textContent = `${result.email} · ${Math.max(.1, result.size / 1024 / 1024).toFixed(1)} MB 백업 완료`;
+          toast('Google Drive에 백업했어요.');
+        }
+        if (action === 'drive-restore') {
+          await editor?.flush();
+          dialog.querySelector('#drive-status')!.textContent = 'Drive 백업을 가져오고 있어요…';
+          const result = await restoreFromDrive();
+          toast(`${result.email} 백업을 사본으로 복원했어요.`);
+          dialog.close(); await home();
+        }
         if (action === 'clear-web-cookies') { await clearStudyLoginCookies(); toast('앱 내 로그인 쿠키를 삭제했어요.'); }
         if (action === 'apk-updates') await openNativeUpdates();
         if (action === 'check-apk-update') {
@@ -274,8 +331,10 @@ async function boot() {
   await navigation.start();
   if (isNativeApp) {
     await initializeNativeShell();
+    nativeReady = true;
     await onNativeDocument(() => { void receiveNativeDocuments(); });
     await receiveNativeDocuments();
+    void autoSyncDrive();
   }
   await receiveSharedPdf();
   const estimate = await navigator.storage?.estimate?.();
