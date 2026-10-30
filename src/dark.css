@@ -20,6 +20,13 @@
 :root[data-theme=dark] .button.primary:hover{background:#83a6ff}
 :root[data-theme=dark] :is(.nav-item.active small,.collection-tab>span,.new-note-tile>span){background:#2a4267;color:#bad1ff}
 :root[data-theme=dark] .avatar{border-color:var(--night-surface);box-shadow:0 0 0 1px #425a7c}
+:root[data-theme=dark] .google-profile-account strong{color:var(--night-text)}
+:root[data-theme=dark] .google-profile-label,:root[data-theme=dark] .google-profile-empty p{color:var(--night-muted)}
+:root[data-theme=dark] .google-profile-status{color:#8bc7ae}
+:root[data-theme=dark] .google-profile-menu{border-color:var(--border)}
+:root[data-theme=dark] .google-profile-menu button{color:#c4d4ec}
+:root[data-theme=dark] .google-profile-menu button:hover{background:#263952}
+:root[data-theme=dark] .google-profile-mark{background:#263952;color:#a9c4ff}
 :root[data-theme=dark] .note-title{color:#d4e1f5}
 :root[data-theme=dark] .note-tab{color:#9aaec9}
 :root[data-theme=dark] .editor-header .note-tab.active{background:#263750;color:#bbd0ff;border-color:#435b80}

@@ -145,9 +145,10 @@ export class LibraryView {
   private renderProfile(editing = false) {
     const popover = this.root.querySelector<HTMLElement>('.profile-popover')!;
     if (isNativeApp) {
+      const synced = this.googleAccount?.lastSync ? `마지막 동기화 ${new Date(this.googleAccount.lastSync).toLocaleString('ko-KR')}` : 'Google Drive 연결됨';
       popover.innerHTML = this.googleAccount
-        ? `<h2>Google 계정</h2><div class="profile-summary"><span class="profile-summary-avatar">${escape(this.profileInitial())}</span><strong>${escape(this.googleAccount.email)}</strong></div><p class="muted">노트는 이 기기에 저장되고 Google Drive 앱 전용 공간과 동기화돼요.</p><div class="profile-actions"><button type="button" class="button secondary" data-action="google-sync">지금 동기화</button><button type="button" class="button secondary" data-action="settings">동기화 설정</button><button type="button" class="button secondary" data-action="google-signout">로그아웃</button></div><p class="muted">로그아웃하면 앱의 Google 권한이 철회됩니다. 저장된 노트는 유지돼요.</p>`
-        : `<h2>Google 계정</h2><p class="muted">계정을 연결하면 노트를 Google Drive에 동기화할 수 있어요.</p><button type="button" class="button primary" data-action="google-sync">Google 계정 연결</button>`;
+        ? `<div class="google-profile"><div class="google-profile-account"><span class="profile-summary-avatar">${escape(this.profileInitial())}</span><div><span class="google-profile-label">GOOGLE ACCOUNT</span><strong>${escape(this.googleAccount.email)}</strong></div></div><p class="google-profile-status">${icon('Check', 14)} ${escape(synced)}</p><button type="button" class="button primary google-profile-sync" data-action="google-sync">${icon('RefreshCw', 16)} 지금 동기화</button><div class="google-profile-menu"><button type="button" data-action="settings">${icon('Settings2', 17)} 동기화 설정 ${icon('ChevronRight', 15)}</button><button type="button" data-action="google-signout">${icon('LogOut', 17)} 로그아웃 ${icon('ChevronRight', 15)}</button></div></div>`
+        : `<div class="google-profile google-profile-empty"><span class="google-profile-mark">G</span><h2>Google 계정 연결</h2><p>노트를 Google Drive에 안전하게 동기화하세요.</p><button type="button" class="button primary google-profile-sync" data-action="google-sync">Google 계정 연결 ${icon('ArrowUpRight', 16)}</button></div>`;
       return;
     }
     if (editing) {
