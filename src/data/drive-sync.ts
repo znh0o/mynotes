@@ -3,7 +3,7 @@ import { uid, type Asset, type Folder, type Note, type Page } from './model';
 import { mergeRestoredPens } from './backup-settings';
 import { penCollection } from './pen-presets';
 import { revokeNativeDrive } from '../platform/native';
-import { driveAccount, listDriveFiles, putDriveFile, downloadDriveFile, deleteDriveFile, type DriveFile } from './google-drive';
+import { driveAccount, listDriveFiles, putDriveFile, downloadDriveFile, deleteDriveFile, DrivePermissionError, type DriveFile } from './google-drive';
 
 const notePrefix = 'notelin-v1-note-';
 const assetPrefix = 'notelin-v1-asset-';
@@ -211,13 +211,23 @@ export function syncDrive(onProgress: (done: number, total: number) => void = ()
   return inFlight;
 }
 async function syncImpl(onProgress: (done: number, total: number) => void, silent: boolean, canApply: (id: string) => boolean): Promise<DriveSyncResult> {
-  const { token, email, accountId } = await driveAccount(silent);
+  let { token, email, accountId } = await driveAccount(silent);
   const enabled = (await db.settings.get('drive-sync-enabled'))?.value as { accountId?: string } | undefined;
   if (enabled?.accountId && enabled.accountId !== accountId) throw new Error('다른 Google 계정이 연결돼 있어요. 기존 계정 연결을 먼저 해제해 주세요.');
   const anchorKey = `drive-sync-anchor:${accountId}`;
   const anchor = ((await db.settings.get(anchorKey))?.value as Anchor | undefined) ?? { notes: {} };
   if (!anchor.notes || typeof anchor.notes !== 'object') anchor.notes = {};
-  const files = sortedFiles(await listDriveFiles(token));
+  let initialFiles;
+  try { initialFiles = await listDriveFiles(token); }
+  catch (error) {
+    if (silent || !(error instanceof DrivePermissionError)) throw error;
+    await new Promise(resolve => setTimeout(resolve, 800));
+    const refreshed = await driveAccount(false);
+    if (refreshed.accountId !== accountId) throw new Error('다른 Google 계정이 선택됐어요. 다시 연결해 주세요.');
+    token = refreshed.token; email = refreshed.email; accountId = refreshed.accountId;
+    initialFiles = await listDriveFiles(token);
+  }
+  const files = sortedFiles(initialFiles);
   await syncFolders(token, files, anchor);
   await syncSharedSettings(token, files, anchor);
   const local = new Map((await db.notes.toArray()).filter(note => !note.temporary).map(note => [note.id, note]));

@@ -7,13 +7,18 @@ const backupName = 'Notelin-backup-v1.json';
 const maxRestoreSize = 400 * 1024 * 1024;
 
 export interface DriveFile { id: string; name: string; size?: string; modifiedTime?: string; appProperties?: Record<string, string> }
+export class DrivePermissionError extends Error {
+  constructor(readonly status: number) {
+    super('Google Drive 권한을 확인하지 못했어요. Google 계정과 Drive API 설정을 확인해 주세요.');
+  }
+}
 
 export async function googleRequest(token: string, url: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
   headers.set('Authorization', `Bearer ${token}`);
   const response = await fetch(url, { ...init, headers, redirect: 'follow' });
   if (!response.ok) {
-    if (response.status === 401 || response.status === 403) throw new Error('Google Drive 권한을 확인하지 못했어요. Google 계정과 Drive API 설정을 확인해 주세요.');
+    if (response.status === 401 || response.status === 403) throw new DrivePermissionError(response.status);
     if (response.status === 429) throw new Error('Google Drive 요청이 너무 많아요. 잠시 후 다시 시도해 주세요.');
     throw new Error(`Google Drive 요청에 실패했어요. (${response.status})`);
   }
@@ -39,10 +44,18 @@ async function listBackups(token: string): Promise<DriveFile[]> {
 }
 
 export async function driveAccount(silent = false) {
-  const token = await authorizeNativeDrive(silent);
-  const result = await (await googleRequest(token, 'https://www.googleapis.com/oauth2/v3/userinfo')).json() as { sub?: string; email?: string };
-  if (!result.email || !result.sub) throw new Error('Google 계정을 확인하지 못했어요.');
-  return { token, email: result.email, accountId: result.sub };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const token = await authorizeNativeDrive(silent);
+    try {
+      const result = await (await googleRequest(token, 'https://www.googleapis.com/oauth2/v3/userinfo')).json() as { sub?: string; email?: string };
+      if (!result.email || !result.sub) throw new Error('Google 계정을 확인하지 못했어요.');
+      return { token, email: result.email, accountId: result.sub };
+    } catch (error) {
+      if (silent || attempt || !(error instanceof DrivePermissionError)) throw error;
+      await new Promise(resolve => setTimeout(resolve, 800));
+    }
+  }
+  throw new Error('Google 계정을 확인하지 못했어요.');
 }
 
 export async function putDriveFile(token: string, name: string, blob: Blob, existing?: DriveFile, hash?: string): Promise<DriveFile> {

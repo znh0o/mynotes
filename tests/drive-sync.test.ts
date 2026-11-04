@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const transport = vi.hoisted(() => ({
+  DrivePermissionError: class extends Error { constructor(readonly status: number) { super('Google Drive permission denied'); } },
   driveAccount: vi.fn(async () => ({ token: 'token', email: 'student@example.com', accountId: 'account-one' })),
   listDriveFiles: vi.fn(async () => [] as { id: string; name: string; appProperties?: Record<string, string> }[]),
   putDriveFile: vi.fn(async (_token: string, name: string) => ({ id: 'generated-file-id', name })),
@@ -25,6 +26,15 @@ beforeEach(async () => {
 });
 
 describe('Drive note sync safety', () => {
+  it('refreshes authorization before writing when the first Drive request is denied', async () => {
+    const { note, page } = createNote('국어', '#5482da', null);
+    await db.notes.put(note); await db.pages.put(page);
+    transport.listDriveFiles.mockRejectedValueOnce(new transport.DrivePermissionError(403));
+    const result = await syncDrive();
+    expect(result.uploaded).toBe(1);
+    expect(transport.driveAccount).toHaveBeenCalledTimes(2);
+    expect(transport.putDriveFile.mock.calls.filter(call => call[1] === `notelin-v1-note-${note.id}.json`)).toHaveLength(1);
+  });
   it('uploads local notes with stable IDs and remembers the account only after success', async () => {
     const { note, page } = createNote('수학', '#5482da', null);
     await db.notes.put(note); await db.pages.put(page);
