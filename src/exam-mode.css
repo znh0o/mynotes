@@ -1,4 +1,4 @@
-.laser-overlay{position:absolute;inset:0;width:100%;height:100%;z-index:8;touch-action:none;cursor:crosshair;background:transparent}
+.laser-overlay{position:absolute;inset:0;width:100%;height:100%;z-index:8;pointer-events:none;background:transparent}
 .special-tool[data-action=laser].active{color:#d94154;background:#fcecef}
 .special-tool[data-action=ghost-pen].active{color:#45679d;background:#e9f0fc}
 .ink-toolbar .ghost-eraser-tool{position:relative;color:#72549b;box-shadow:inset 0 0 0 1px #d9cce8}

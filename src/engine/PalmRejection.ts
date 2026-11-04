@@ -22,10 +22,22 @@ export class PalmRejection {
     else this.activePens.delete(event.pointerId);
   }
 
+  private broadContact(event: Pick<PointerEvent, 'width' | 'height'>) {
+    const width = Math.max(1, event.width || 1), height = Math.max(1, event.height || 1);
+    // A normal fingertip can be 25–35 CSS px wide on a tablet. Reject only
+    // contacts large enough to be a palm when no pen is touching the screen.
+    return width >= 48 || height >= 48 || width * height >= 1800;
+  }
+
   rejectTouch(event: Pick<PointerEvent, 'pointerType' | 'width' | 'height'>) {
     if (event.pointerType !== 'touch') return false;
-    const width = Math.max(1, event.width || 1), height = Math.max(1, event.height || 1);
     return this.activePens.size > 0 || this.now() - this.lastPen < 120 ||
-      width >= 30 || height >= 30 || width * height >= 600;
+      this.broadContact(event);
+  }
+
+  rejectNavigationTouch(event: Pick<PointerEvent, 'pointerType' | 'width' | 'height'>) {
+    if (event.pointerType !== 'touch') return false;
+    // Finger panning remains usable while the S Pen is merely hovering.
+    return this.activePens.size > 0 || this.broadContact(event);
   }
 }

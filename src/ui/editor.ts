@@ -1182,7 +1182,7 @@ export class EditorView {
       if (inText && e.pointerType !== 'touch' || this.engine.options.tool === 'text' && e.defaultPrevented) return;
       if (e.pointerType === 'pen' && this.engine.options.tool !== 'hand') return;
       if (e.pointerType === 'touch') {
-        if (this.palmGuard.rejectTouch(e)) return;
+        if (this.palmGuard.rejectNavigationTouch(e)) return;
         if ((this.engine.activePointer !== null || this.companionEngine.activePointer !== null) && !this.engine.options.fingerDrawing) return;
         this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
         if (this.touches.size === 2) {
@@ -1202,7 +1202,7 @@ export class EditorView {
       }
     }, { signal });
     this.viewport.addEventListener('pointermove', e => {
-      if (e.pointerType === 'touch' && !this.touches.has(e.pointerId) && this.palmGuard.rejectTouch(e)) {
+      if (e.pointerType === 'touch' && !this.touches.has(e.pointerId) && this.palmGuard.rejectNavigationTouch(e)) {
         this.touches.delete(e.pointerId);
         if (this.pan?.id === e.pointerId) {
           this.viewport.scrollLeft = this.pan.left; this.viewport.scrollTop = this.pan.top; this.pan = null;

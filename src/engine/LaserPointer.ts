@@ -20,35 +20,35 @@ export class LaserPointer {
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(viewport);
     const signal = this.abort.signal;
-    this.canvas.addEventListener('pointerdown', event => {
-      if (event.pointerType !== 'pen' || !event.isPrimary) return;
+    viewport.addEventListener('pointerdown', event => {
+      if (!this.enabled || event.pointerType !== 'pen' || !event.isPrimary) return;
       event.preventDefault(); event.stopPropagation();
       this.penPresent = true;
       this.pointerId = event.pointerId;
       this.points = [];
-      this.canvas.setPointerCapture(event.pointerId);
+      viewport.setPointerCapture(event.pointerId);
       this.add(event);
-    }, { signal });
-    this.canvas.addEventListener('pointermove', event => {
-      if (event.pointerType !== 'pen') return;
+    }, { signal, capture: true });
+    viewport.addEventListener('pointermove', event => {
+      if (!this.enabled || event.pointerType !== 'pen') return;
       event.stopPropagation();
       this.penPresent = true;
       if (event.pointerId === this.pointerId || this.pointerId === null) this.add(event);
-    }, { signal });
+    }, { signal, capture: true });
     const end = (event: PointerEvent) => {
-      if (event.pointerType !== 'pen') return;
+      if (!this.enabled || event.pointerType !== 'pen') return;
       event.stopPropagation();
       if (event.pointerId !== this.pointerId) return;
       this.pointerId = null;
       if (this.head) this.head.time = performance.now();
       this.penPresent = false;
-      if (this.canvas.hasPointerCapture(event.pointerId)) this.canvas.releasePointerCapture(event.pointerId);
+      if (viewport.hasPointerCapture(event.pointerId)) viewport.releasePointerCapture(event.pointerId);
       this.requestFrame();
     };
-    this.canvas.addEventListener('pointerup', end, { signal });
-    this.canvas.addEventListener('pointercancel', end, { signal });
-    this.canvas.addEventListener('pointerleave', event => {
-      if (event.pointerType !== 'pen') return;
+    viewport.addEventListener('pointerup', end, { signal, capture: true });
+    viewport.addEventListener('pointercancel', end, { signal, capture: true });
+    viewport.addEventListener('pointerleave', event => {
+      if (!this.enabled || event.pointerType !== 'pen') return;
       this.penPresent = false;
       if (this.head) this.head.time = performance.now();
       this.requestFrame();
@@ -112,11 +112,12 @@ export class LaserPointer {
 
   setEnabled(enabled: boolean) {
     if (this.enabled === enabled) return;
+    if (!enabled && this.pointerId !== null && this.viewport.hasPointerCapture(this.pointerId)) this.viewport.releasePointerCapture(this.pointerId);
     this.enabled = enabled; this.canvas.hidden = !enabled;
     this.points = []; this.head = null; this.penPresent = false; this.pointerId = null;
     cancelAnimationFrame(this.frame); this.frame = 0;
     if (enabled) this.resize();
   }
 
-  destroy() { this.abort.abort(); this.observer.disconnect(); cancelAnimationFrame(this.frame); this.canvas.remove(); }
+  destroy() { this.setEnabled(false); this.abort.abort(); this.observer.disconnect(); cancelAnimationFrame(this.frame); this.canvas.remove(); }
 }

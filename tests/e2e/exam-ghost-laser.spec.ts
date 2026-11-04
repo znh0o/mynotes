@@ -101,3 +101,32 @@ test('ghost eraser is isolated, laser is temporary, and exam presets reopen', as
   await page.getByRole('button', { name: '시험 모드', exact: true }).click();
   await expect(page.getByRole('dialog', { name: '시험 모드' }).getByText('국어 모의고사')).toBeVisible();
 });
+
+test('finger pan keeps working after laser contact, pen hover, and tool changes', async ({ page, context }) => {
+  await newNote(page);
+  await page.getByRole('button', { name: '레이저 포인터', exact: true }).click();
+  await expect(page.locator('.laser-overlay')).toHaveCSS('pointer-events', 'none');
+  await page.getByRole('button', { name: '보기 옵션', exact: true }).click();
+  for (let index = 0; index < 3; index++) await page.locator('#view-options-panel [data-action=zoom-in]').click();
+  await page.getByRole('button', { name: '보기 옵션', exact: true }).click();
+  const viewport = page.locator('.paper-viewport');
+  await expect.poll(() => viewport.evaluate(el => el.scrollHeight - el.clientHeight)).toBeGreaterThan(180);
+  const rect = (await viewport.boundingBox())!;
+  const x = rect.x + rect.width / 2, y = rect.y + rect.height / 2;
+  const cdp = await context.newCDPSession(page);
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', pointerType: 'pen', button: 'left', buttons: 1, force: .5, x, y, clickCount: 1 });
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', pointerType: 'pen', button: 'left', buttons: 0, force: 0, x, y, clickCount: 1 });
+  const pan = async (id: number) => {
+    const before = await viewport.evaluate(el => { el.scrollTop = 140; return el.scrollTop; });
+    const contact = (offset: number) => ({ id, x, y: y + offset, radiusX: 15, radiusY: 15, force: .5 });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [contact(55)] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [contact(-70)] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await expect.poll(() => viewport.evaluate(el => el.scrollTop)).toBeGreaterThan(before + 50);
+  };
+  await pan(1);
+  await page.getByRole('button', { name: '형광펜', exact: true }).click();
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', pointerType: 'pen', buttons: 0, force: 0, x, y });
+  await pan(2);
+  await cdp.detach();
+});
