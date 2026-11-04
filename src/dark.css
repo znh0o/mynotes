@@ -44,6 +44,13 @@
 :root[data-theme=dark] .search-field input::placeholder{color:#8498b6}
 :root[data-theme=dark] :is(.modal,.context-menu,.profile-popover,.pen-picker,.color-picker-dialog,.pencil-mode-menu,.writing-options-panel,.eraser-picker,.shape-picker,.image-picker,.view-options-panel,.selection-toolbar,.inline-text-toolbar){background:var(--night-surface);color:var(--night-text);border-color:#3a4e6c;box-shadow:0 18px 55px #0006}
 :root[data-theme=dark] :is(.modal,.color-picker-dialog)::backdrop{background:#040a14ac;backdrop-filter:blur(5px)}
+:root[data-theme=dark] .settings-dialog header{background:var(--night-surface);border-color:var(--border)}
+:root[data-theme=dark] .settings-dialog .settings-section{background:var(--night-surface);border-color:var(--border)}
+:root[data-theme=dark] .settings-dialog .settings-section h3{color:var(--night-text)}
+:root[data-theme=dark] .settings-dialog .settings-section h3 svg{color:var(--night-accent)}
+:root[data-theme=dark] .settings-dialog .settings-section p{color:var(--night-muted)}
+:root[data-theme=dark] .settings-dialog .storage-row{background:var(--night-raised);color:var(--night-muted)}
+:root[data-theme=dark] .settings-dialog .storage-row strong{color:var(--night-text)}
 :root[data-theme=dark] :is(.context-menu button,.pencil-mode-menu button,.pen-arrange-row>button,.pen-preset-row,.pen-edit-name,.pen-edit-name input,.profile-form input,.image-picker-actions button,.inline-text-toolbar label){color:#c4d4ec}
 :root[data-theme=dark] :is(.modal,.profile-popover,.pen-picker,.writing-options-panel,.inline-text-toolbar,.color-picker-dialog) :is(input:not([type=color]):not([type=range]):not([type=checkbox]),select,textarea){background:var(--night-soft);color:var(--night-text);border-color:#3a4e6c}
 :root[data-theme=dark] :is(.paper-options label,.cover-options label){border-color:var(--border)}

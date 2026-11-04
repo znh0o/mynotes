@@ -41,7 +41,15 @@ interface NotelinDrivePlugin {
 const drive = registerPlugin<NotelinDrivePlugin>('NotelinDrive');
 export async function authorizeNativeDrive(silent = false) {
   if (!isNativeApp) throw new Error('Google Drive 연결은 Android 앱에서 사용할 수 있어요.');
-  return (await drive.authorize({ silent })).accessToken;
+  try {
+    return (await drive.authorize({ silent })).accessToken;
+  } catch (error) {
+    // Play Services can briefly reject the first request after scope revocation.
+    // Retry only the interactive authorization request, before any Drive operation.
+    if (silent || !(error instanceof Error) || !error.message.includes('Google Drive 연결에 실패했어요')) throw error;
+    await new Promise(resolve => setTimeout(resolve, 400));
+    return (await drive.authorize({ silent: false })).accessToken;
+  }
 }
 export function revokeNativeDrive(email: string) { return drive.revoke({ email }); }
 const chunkSize = 512 * 1024;

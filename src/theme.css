@@ -321,3 +321,24 @@ html,body,#app,.library-shell,.library-main,.library-content,.modal,.modal-body{
 .ink-toolbar .pen-width-control input::-moz-range-thumb{background:#39424e}
 .ink-toolbar .pen-width-control input::-moz-range-progress{background:#39424e}
 .settings-actions.drive-actions{flex-wrap:wrap;margin-top:9px}
+
+/* Settings are a compact collection of clear, touch-friendly controls. */
+.settings-dialog{width:min(620px,calc(100vw - 24px));max-height:min(820px,92dvh);border-radius:20px}
+.settings-dialog header{position:sticky;top:0;z-index:2;padding:22px 28px 18px;background:#fff;border-bottom:1px solid #e8edf4}
+.settings-dialog header h2{font-size:21px;letter-spacing:-.045em}
+.settings-dialog .modal-body{display:grid;gap:12px;padding:18px 28px 28px}
+.settings-dialog .settings-version{order:-1;margin:0 0 2px;color:#8492a6;font-size:11px}
+.settings-dialog .settings-section{min-width:0;padding:19px 20px 20px;border:1px solid #e6ebf2;border-radius:13px;background:#fff}
+.settings-dialog .settings-section h3{margin:0 0 11px;color:#263c5a;font-size:14px;line-height:1.35;letter-spacing:-.02em}
+.settings-dialog .settings-section h3 svg{color:#5278ae;flex:none}
+.settings-dialog .settings-section p{margin:0 0 13px;color:#6d7e94;font-size:12px;line-height:1.65}
+.settings-dialog .settings-section p:last-child{margin-bottom:0}
+.settings-dialog .storage-row{align-items:center;gap:12px;margin:0 0 12px;padding:12px 13px;border-radius:9px;background:#f5f8fc;color:#50647d;font-size:12px}
+.settings-dialog .storage-row strong{color:#203d68;font-size:13px}
+.settings-dialog .settings-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.settings-dialog .settings-section .button{min-height:38px;height:auto;padding:8px 13px;border-radius:8px;font-size:12px;white-space:normal;text-align:center}
+.settings-dialog .settings-footnote{padding:2px 4px;margin:0;color:#8492a6;line-height:1.6}
+.settings-dialog .appearance-options{margin-top:13px}
+.settings-dialog .appearance-options button{min-height:68px;border-radius:9px}
+.settings-dialog .study-browser-privacy{margin-top:15px;padding-top:15px}
+@media(max-width:520px){.settings-dialog .modal-body{padding:15px;gap:10px}.settings-dialog header{padding:18px 18px 15px}.settings-dialog .settings-section{padding:16px}.settings-dialog .settings-actions .button{flex:1 1 auto}}

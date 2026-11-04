@@ -16,7 +16,7 @@ it('blocks touch near the pen and throughout a stationary pen stroke', () => {
   const pen = { pointerType: 'pen', pointerId: 7, width: 1, height: 1, buttons: 0, pressure: 0, type: 'pointermove' };
   guard.notePen(pen);
   expect(guard.rejectTouch(finger)).toBe(true);
-  now += 801;
+  now += 150; // A deliberate finger pan should respond soon after pen hover.
   expect(guard.rejectTouch(finger)).toBe(false);
   guard.notePen({ ...pen, type: 'pointerdown', buttons: 1, pressure: .4 });
   now += 5000;

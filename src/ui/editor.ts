@@ -1126,7 +1126,7 @@ export class EditorView {
       }
     }, { signal });
     this.viewport.addEventListener('pointermove', e => {
-      if (e.pointerType === 'touch' && this.palmGuard.rejectTouch(e)) {
+      if (e.pointerType === 'touch' && !this.touches.has(e.pointerId) && this.palmGuard.rejectTouch(e)) {
         this.touches.delete(e.pointerId);
         if (this.pan?.id === e.pointerId) {
           this.viewport.scrollLeft = this.pan.left; this.viewport.scrollTop = this.pan.top; this.pan = null;
@@ -1147,13 +1147,19 @@ export class EditorView {
           this.viewport.scrollTop = (p.scrollY + p.centerY) * ratio - p.centerY - ((a.y + b.y) / 2 - p.y);
         });
       } else if (this.pan?.id === e.pointerId) {
-        this.viewport.scrollLeft = this.pan.left - (e.clientX - this.pan.x); this.viewport.scrollTop = this.pan.top - (e.clientY - this.pan.y);
+        const left = this.pan.left - (e.clientX - this.pan.x);
+        const top = this.pan.top - (e.clientY - this.pan.y);
+        this.queueViewportUpdate(() => { this.viewport.scrollLeft = left; this.viewport.scrollTop = top; });
       }
     }, { signal });
     const end = (e: PointerEvent) => {
       this.touches.delete(e.pointerId);
       if (this.touches.size < 2 && this.pinch) { this.pinch = null; this.finishViewportUpdate(); }
-      if (this.pan?.id === e.pointerId) this.pan = null;
+      if (this.pan?.id === e.pointerId) {
+        cancelAnimationFrame(this.viewportFrame); this.viewportFrame = 0;
+        const latest = this.viewportUpdate; this.viewportUpdate = null; latest?.();
+        this.pan = null;
+      }
     };
     this.viewport.addEventListener('pointerup', end, { signal }); this.viewport.addEventListener('pointercancel', end, { signal });
     this.viewport.addEventListener('wheel', e => {

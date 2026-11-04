@@ -25,7 +25,7 @@ export class PalmRejection {
   rejectTouch(event: Pick<PointerEvent, 'pointerType' | 'width' | 'height'>) {
     if (event.pointerType !== 'touch') return false;
     const width = Math.max(1, event.width || 1), height = Math.max(1, event.height || 1);
-    return this.activePens.size > 0 || this.now() - this.lastPen < 800 ||
+    return this.activePens.size > 0 || this.now() - this.lastPen < 120 ||
       width >= 30 || height >= 30 || width * height >= 600;
   }
 }
