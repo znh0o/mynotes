@@ -81,6 +81,12 @@ export class LibraryView {
   }
   private async previews(version: number) {
     for (const note of this.notes.filter(n => !n.thumbnail && !n.deleted).slice(0, 12)) {
+      // Generating PDF and ink previews can occupy the main thread on phones.
+      // Let pending touches and paints finish before starting the next one.
+      await new Promise<void>(resolve => {
+        if ('requestIdleCallback' in window) window.requestIdleCallback(() => resolve(), { timeout: 1200 });
+        else setTimeout(resolve, 100);
+      });
       if (this.abort.signal.aborted || version !== this.previewVersion) return;
       const page = await db.pages.get(note.pageIds[0]);
       if (page) try {
@@ -90,10 +96,20 @@ export class LibraryView {
           const latest = await db.pages.get(page.id); if (!latest || latest.revision !== page.revision) return false;
           await db.notes.update(note.id, { thumbnail: preview }); return true;
         });
-        if (accepted) note.thumbnail = preview;
+        if (accepted) {
+          note.thumbnail = preview;
+          // Rebuilding the whole grid here can remove a button during a touch.
+          const card = [...this.root.querySelectorAll<HTMLButtonElement>('.note-open[data-id]')]
+            .find(button => button.dataset.id === note.id);
+          const cover = card?.querySelector('.cover-preview');
+          if (cover) {
+            const image = document.createElement('img'); image.src = preview;
+            image.alt = '첫 페이지 미리보기'; image.loading = 'lazy';
+            cover.replaceChildren(image);
+          }
+        }
       } catch { /* Preview failure never blocks opening a note. */ }
     }
-    if (!this.abort.signal.aborted && version === this.previewVersion) this.renderResults();
   }
   snapshot(): LibraryState { return { filter: this.filter, query: this.query, sort: this.sort, list: this.list }; }
   setFilter(filter: string) { this.filter = filter; this.renderResults(); }
@@ -120,7 +136,7 @@ export class LibraryView {
       <div class="library-main">
         <header class="library-topbar"><div class="breadcrumb">${button('Menu', '메뉴 열기', 'mobile-menu')}<span>나의 공간</span>${icon('ChevronRight', 13)}<img class="phone-wordmark" src="${import.meta.env.BASE_URL}notelin-wordmark-lockup.png" alt="Notelin" /><strong id="breadcrumb-title">나의 서재</strong></div><div class="topbar-right"><div class="profile-anchor"><button class="avatar" type="button" data-action="profile" aria-label="프로필" aria-expanded="false" aria-controls="profile-popover">${escape(this.profileInitial())}</button><div class="profile-popover" id="profile-popover" role="dialog" aria-label="프로필" hidden></div></div></div></header>
         <main class="library-content">
-          <div class="page-heading"><div><h1 id="library-title">나의 서재<span class="heading-dot">.</span></h1><p id="library-subtitle" hidden></p></div><div class="heading-actions"><button class="button secondary" data-action="import">${icon('Upload', 18)} PDF 가져오기</button><button class="button primary" data-action="new">${icon('Plus', 19)} 새 노트</button></div></div>
+          <div class="page-heading"><div><h1 id="library-title">나의 서재<span class="heading-dot">.</span></h1><p id="library-subtitle" hidden></p></div><div class="heading-actions"><button class="button secondary" data-action="import">${icon('Upload', 18)} PDF 가져오기</button><button class="button primary" data-action="new" aria-label="새 노트">${icon('Plus', 19)}<span>새 노트</span></button></div></div>
           <section class="welcome-banner ${this.updateAvailable ? 'update-banner' : ''}">${this.bannerContent()}</section>
           <section class="recent-section"><div class="section-heading"><h2>${icon('Clock', 18)} 최근 펼쳐본 노트</h2><button class="text-button" data-action="filter" data-id="recent">모두 보기 ${icon('ChevronRight', 15)}</button></div><div id="recent-notes" class="recent-grid"></div></section>
           <section class="notes-section"><div class="collection-toolbar"><div class="collection-tabs"><button class="collection-tab active" data-action="filter" data-id="all">모든 노트 <span>${active.length}</span></button><button class="collection-tab" data-action="filter" data-id="favorites">즐겨찾기 ${icon('Star', 14)}</button></div><div class="collection-controls"><label class="search-field">${icon('Search', 17)}<input id="library-search" type="search" placeholder="노트 검색" aria-label="노트 검색" value="${escape(this.query)}" /></label><label class="sort-field"><select id="sort" aria-label="노트 정렬"><option value="updated">최근 수정순</option><option value="name">이름순</option><option value="created">최근 생성순</option></select>${icon('ChevronDown', 13)}</label><label class="note-density">한 줄<select id="note-columns" aria-label="한 줄 노트 개수"><option value="auto">자동</option><option value="4">4개</option><option value="5">5개</option><option value="6">6개</option></select></label><div class="view-toggle">${button('Grid2X2', '그리드 보기', 'grid')}${button('List', '목록 보기', 'list')}</div></div></div><div id="note-results"></div></section>

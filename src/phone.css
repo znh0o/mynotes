@@ -22,6 +22,7 @@
 :root[data-device-ui=phone] .heading-actions [data-action=import] svg{width:15px;height:15px}
 :root[data-device-ui=phone] .heading-actions [data-action=new]{position:fixed;right:20px;bottom:calc(82px + env(safe-area-inset-bottom));z-index:30;width:52px;height:52px;display:grid;place-items:center;padding:0;border-radius:17px;box-shadow:0 7px 20px #245bc04d;font-size:0}
 :root[data-device-ui=phone] .heading-actions [data-action=new] svg{width:25px;height:25px}
+:root[data-device-ui=phone] .heading-actions [data-action=new] span{display:none}
 :root[data-device-ui=phone] .heading-actions[hidden]{display:none}
 :root[data-device-ui=phone] .welcome-banner:not(.update-banner){display:none}
 :root[data-device-ui=phone] .welcome-banner.update-banner{min-height:0;height:auto;margin:0 0 18px;padding:18px;border-radius:12px}
