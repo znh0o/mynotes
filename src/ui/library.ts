@@ -75,6 +75,12 @@ export class LibraryView {
     const banner = this.root.querySelector('.welcome-banner');
     if (banner) { banner.classList.toggle('update-banner', available); banner.innerHTML = this.bannerContent(); }
   }
+  updateGoogleSyncTime(email: string, lastSync: number) {
+    if (this.googleAccount?.email !== email) return;
+    this.googleAccount.lastSync = lastSync;
+    const popover = this.root.querySelector<HTMLElement>('.profile-popover');
+    if (popover && !popover.hidden) this.renderProfile();
+  }
   private bannerContent() {
     if (this.updateAvailable) return `<div role="status" aria-live="polite"><span class="banner-label"><span></span> 새 버전</span><h2>업데이트가 있어요.</h2><p>노트를 저장한 뒤 새 버전을 적용합니다.</p><button class="button primary banner-update-button" data-action="apply-update" ${this.updateApplying ? 'disabled' : ''}>${icon('RefreshCw', 17)} ${this.updateApplying ? '업데이트 적용 중…' : '지금 업데이트'}</button></div><div class="update-banner-art" aria-hidden="true">${icon('RefreshCw', 72)}<span>NOTELIN</span></div>`;
     return `<div><span class="banner-label"><span></span> A LITTLE SPACE, ENDLESS POSSIBILITIES</span><h2>오늘의 생각을 펼쳐보세요.</h2><p>펜 끝에서 시작되는 새로운 배움.<br>나만의 속도로, 한 페이지씩 채워가요.</p><button class="banner-link" data-action="new">새로운 페이지 시작하기 ${icon('ArrowUpRight', 17)}</button></div><div class="banner-art" aria-hidden="true"><div class="art-shadow"></div><div class="art-notebook back"></div><div class="art-notebook front"><span>small thoughts,<br>big possibilities.</span><i></i><small>NOTELIN / DAILY NOTES</small></div><div class="art-pen"></div><div class="art-star star-one">✧</div><div class="art-star star-two">✧</div><div class="art-dot"></div></div>`;

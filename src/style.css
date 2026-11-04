@@ -39,3 +39,5 @@
 @media(hover:none){.tool-button:hover:not(.active){background:transparent}}
 html,body{overscroll-behavior:none}
 .editor-shell,.paper-viewport{overscroll-behavior:none}
+/* A full-screen backdrop blur stalls dialog presentation on slower phones. */
+html[data-device-ui=phone][data-theme] :is(.modal,.color-picker-dialog)::backdrop{backdrop-filter:none}

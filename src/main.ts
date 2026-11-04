@@ -5,7 +5,7 @@ import './exam-mode.css';
 import { registerSW } from 'virtual:pwa-register';
 import { backup, db, initialize, restore, deletePermanently, discardTemporaryNotes } from './data/store';
 import { importPDF } from './data/pdf';
-import { EditorView } from './ui/editor';
+import type { EditorView } from './ui/editor';
 import { LibraryView, type LibraryState } from './ui/library';
 import { AppHistory, type AppRoute, type Direction } from './ui/history';
 import { finishSlide, slidePreviousView } from './ui/transitions';
@@ -44,9 +44,10 @@ async function autoSyncDrive() {
   try {
     if (!(await db.settings.get('drive-sync-enabled'))?.value) return;
     lastAutoSync = Date.now();
-    await syncDrive(() => {}, true, id => !editor || editor.note.id !== id);
+    const result = await syncDrive(() => {}, true, id => !editor || editor.note.id !== id);
     await db.settings.delete('drive-sync-error');
-    await library?.show();
+    if (result.libraryChanged) await library?.show();
+    else library?.updateGoogleSyncTime(result.email, Date.now());
   }
   catch (error) { if (!(error instanceof DriveSyncDeferredError)) await db.settings.put({ key: 'drive-sync-error', value: error instanceof Error ? error.message : 'Drive 동기화 실패' }); }
 }
@@ -150,6 +151,8 @@ async function renderRoute(route: AppRoute, direction: Direction) {
   }
   const note = route.screen === 'note' ? await db.notes.get(route.id) : undefined;
   if (route.screen === 'note' && (!note || note.deleted)) throw new Error('노트를 찾을 수 없어요.');
+  // Keep the library visible while the editor code loads on first use.
+  const editorModule = route.screen === 'note' ? await import('./ui/editor') : undefined;
   finishSlide(); const previous = root.firstElementChild, oldScroll = window.scrollY, wasEditor = !!editor;
   if (library) { libraryState = library.snapshot(); libraryScroll = oldScroll; library.destroy(); library = undefined; }
   if (editor) {
@@ -172,7 +175,7 @@ async function renderRoute(route: AppRoute, direction: Direction) {
     const existing = tabs.find(t => t.id === note!.id);
     if (existing) existing.title = note!.title; else tabs.push({ id: note!.id, title: note!.title });
     await db.notes.update(note!.id, { opened: Date.now() });
-    editor = new EditorView(root, note!, tabs, open, home, closeTab); await editor.start(); window.scrollTo(0, 0);
+    editor = new editorModule!.EditorView(root, note!, tabs, open, home, closeTab); await editor.start(); window.scrollTo(0, 0);
   }
   slidePreviousView(root, previous, wasEditor && route.screen === 'note' ? 'none' : direction, oldScroll);
 }

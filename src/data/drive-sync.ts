@@ -23,7 +23,7 @@ interface NoteBundle {
   settings: { key: string; value: unknown }[];
 }
 interface Anchor { notes: Record<string, { hash: string; suppressed?: boolean; conflictHash?: string }>; folders?: string; shared?: string }
-export interface DriveSyncResult { email: string; uploaded: number; downloaded: number; conflicts: number; trashed: number }
+export interface DriveSyncResult { email: string; uploaded: number; downloaded: number; conflicts: number; trashed: number; libraryChanged: boolean }
 export class DriveSyncDeferredError extends Error { constructor() { super('필기 화면을 닫은 뒤 동기화를 계속해요.'); } }
 const encode = (value: unknown) => JSON.stringify(value);
 async function sha256(value: string) {
@@ -165,19 +165,21 @@ async function applyRemote(token: string, bundle: NoteBundle, files: Map<string,
 async function syncFolders(token: string, files: Map<string, DriveFile>, anchor: Anchor) {
   const local = (await db.folders.toArray()).sort((a, b) => a.id.localeCompare(b.id));
   const localText = encode(local), localHash = await sha256(localText), remote = files.get(folderFile);
-  if (!remote) { anchor.folders = await putJson(token, folderFile, localText, files); return; }
+  if (!remote) { anchor.folders = await putJson(token, folderFile, localText, files); return false; }
   const text = await remoteText(token, remote, 1024 * 1024);
   const remoteHashValue = await sha256(text);
   const incoming = JSON.parse(text) as Folder[];
   if (!Array.isArray(incoming) || incoming.some(f => !f || !validId(f.id) || typeof f.name !== 'string' || f.name.length > 60 || !color(f.color))) throw new Error('Drive 폴더 정보가 손상됐어요.');
-  if (localHash === remoteHashValue) { anchor.folders = localHash; return; }
+  if (localHash === remoteHashValue) { anchor.folders = localHash; return false; }
   if (localHash === anchor.folders) {
     await db.transaction('rw', db.folders, async () => { await db.folders.clear(); await db.folders.bulkPut(incoming); });
-    anchor.folders = remoteHashValue; return;
+    anchor.folders = remoteHashValue; return true;
   }
   const merged = remoteHashValue === anchor.folders ? local : Array.from(new Map([...incoming, ...local].map(f => [f.id, f])).values()).sort((a, b) => a.id.localeCompare(b.id));
-  await db.folders.bulkPut(merged);
+  const changed = encode(merged) !== localText;
+  if (changed) await db.folders.bulkPut(merged);
   anchor.folders = await putJson(token, folderFile, encode(merged), files);
+  return changed;
 }
 
 type TimerPreset = { id: string; name: string; seconds: number };
@@ -231,7 +233,7 @@ async function syncImpl(onProgress: (done: number, total: number) => void, silen
     initialFiles = await listDriveFiles(token);
   }
   const files = sortedFiles(initialFiles);
-  await syncFolders(token, files, anchor);
+  const foldersChanged = await syncFolders(token, files, anchor);
   await syncSharedSettings(token, files, anchor);
   const local = new Map((await db.notes.toArray()).filter(note => !note.temporary).map(note => [note.id, note]));
   const remote = new Map<string, DriveFile>();
@@ -240,9 +242,11 @@ async function syncImpl(onProgress: (done: number, total: number) => void, silen
     if (match) remote.set(match[1], file);
   }
   const ids = new Set([...local.keys(), ...remote.keys()]);
-  const result: DriveSyncResult = { email, uploaded: 0, downloaded: 0, conflicts: 0, trashed: 0 };
+  const result: DriveSyncResult = { email, uploaded: 0, downloaded: 0, conflicts: 0, trashed: 0, libraryChanged: foldersChanged };
   let done = 0;
   for (const id of ids) {
+    // Leave a turn for input and painting while scanning many handwritten notes.
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
     if (!canApply(id)) { onProgress(++done, ids.size); continue; }
     const note = local.get(id), file = remote.get(id), previous = anchor.notes[id];
     const bundle = note ? await localBundle(note) : undefined;
@@ -301,6 +305,7 @@ async function syncImpl(onProgress: (done: number, total: number) => void, silen
   }
   await db.settings.put({ key: anchorKey, value: anchor });
   await db.settings.put({ key: 'drive-sync-enabled', value: { accountId, email, lastSync: Date.now() } });
+  result.libraryChanged ||= result.downloaded > 0 || result.trashed > 0 || result.conflicts > 0;
   return result;
 }
 

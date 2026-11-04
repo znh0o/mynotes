@@ -32,6 +32,7 @@ describe('Drive note sync safety', () => {
     transport.listDriveFiles.mockRejectedValueOnce(new transport.DrivePermissionError(403));
     const result = await syncDrive();
     expect(result.uploaded).toBe(1);
+    expect(result.libraryChanged).toBe(false);
     expect(transport.driveAccount).toHaveBeenCalledTimes(2);
     expect(transport.putDriveFile.mock.calls.filter(call => call[1] === `notelin-v1-note-${note.id}.json`)).toHaveLength(1);
   });
@@ -92,6 +93,7 @@ describe('Drive note sync safety', () => {
     transport.downloadDriveFile.mockResolvedValue(new Blob([remote], { type: 'application/json' }));
     const result = await syncDrive();
     expect(result.downloaded).toBe(1);
+    expect(result.libraryChanged).toBe(true);
     expect((await db.notes.get(note.id))?.title).toBe('영어');
     expect((await db.pages.get(page.id))?.noteId).toBe(note.id);
     expect((await db.settings.get(`note-text-color:${note.id}`))?.value).toBe('#112233');
