@@ -1,8 +1,13 @@
 .laser-overlay{position:absolute;inset:0;width:100%;height:100%;z-index:8;touch-action:none;cursor:crosshair;background:transparent}
 .special-tool[data-action=laser].active{color:#d94154;background:#fcecef}
-.special-tool[data-action=ghost-pen].active,.special-tool[data-action=ghost-eraser].active{color:#45679d;background:#e9f0fc}
+.special-tool[data-action=ghost-pen].active{color:#45679d;background:#e9f0fc}
+.ink-toolbar .ghost-eraser-tool{position:relative;color:#72549b;box-shadow:inset 0 0 0 1px #d9cce8}
+.ink-toolbar .ghost-eraser-tool.active{background:#eee7f8;color:#5e398b;box-shadow:inset 0 0 0 1px #bda4dd}
+.ink-toolbar .ghost-eraser-tool .ghost-eraser-mark{position:absolute;right:1px;bottom:1px;display:grid;width:12px;height:12px;place-items:center;border-radius:3px;background:#72549b;color:#fff;font-size:9px;font-weight:800;line-height:1}
+.ink-toolbar .ghost-eraser-tool.active .ghost-eraser-mark{background:#5e398b}
 
-.exam-entry{color:#4e6c9b}
+.editor-header .editor-header-actions .exam-entry{display:inline-flex;align-items:center;justify-content:center;gap:4px;width:auto;min-width:52px;height:28px;padding:0 6px;border:1px solid #ffffff40;border-radius:7px;background:#ffffff16;color:#fff}
+.exam-entry-label{font-size:10px;font-weight:700;white-space:nowrap}
 .exam-toolbar{height:52px;display:flex;align-items:center;gap:18px;padding:0 19px;background:#fff;border-bottom:1px solid #dfe6f0;flex:none;z-index:7}
 .exam-leave{display:inline-flex;align-items:center;gap:5px;min-height:38px;padding:0 7px;color:#4b6485;font-size:12px;font-weight:600}
 .exam-title{min-width:0;max-width:25%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#263c59;font-size:13px;font-weight:650}
@@ -31,6 +36,7 @@
 .exam-setup .form-label{margin:0;font-size:12px}
 .exam-setup .form-label input{font-size:14px}
 .exam-save{justify-self:start}
+@media(max-width:760px){.editor-header .editor-header-actions .exam-entry{min-width:30px;width:30px;padding:0}.exam-entry-label{display:none}}
 @media(max-width:620px){.exam-toolbar{gap:6px;padding:0 7px}.exam-title{display:none}.exam-tools button{min-width:53px;padding:0 7px}.exam-tools button span{display:none}.exam-clock{min-width:78px;font-size:12px}}
 :root[data-theme=dark] .exam-toolbar{background:var(--night-surface);border-color:var(--border)}
 :root[data-theme=dark] .exam-leave,:root[data-theme=dark] .exam-title{color:var(--night-text)}
@@ -39,4 +45,6 @@
 :root[data-theme=dark] .exam-preset{background:var(--night-raised);border-color:var(--border)}
 :root[data-theme=dark] .exam-preset button:first-child[aria-pressed=true]{background:#284974;color:#e1edff}
 :root[data-theme=dark] .exam-saved-heading{color:var(--night-text)}
+:root[data-theme=dark] .ink-toolbar .ghost-eraser-tool{color:#cdb9e5;box-shadow:inset 0 0 0 1px #73648a}
+:root[data-theme=dark] .ink-toolbar .ghost-eraser-tool.active{background:#46345f;color:#f6ebff}
 @media(prefers-reduced-motion:reduce){.laser-overlay{transition:none}}

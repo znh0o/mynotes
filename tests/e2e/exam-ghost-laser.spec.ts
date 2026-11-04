@@ -42,6 +42,7 @@ test('ghost eraser is isolated, laser is temporary, and exam presets reopen', as
   expect((await items(page)).some(item => item.ghost === true)).toBe(true);
 
   await page.getByRole('button', { name: '고스트 지우개', exact: true }).click();
+  await expect(page.getByRole('button', { name: '고스트 지우개', exact: true }).locator('.ghost-eraser-mark')).toHaveText('G');
   const box = (await page.locator('#paper-live').boundingBox())!, scale = box.width / 794;
   await page.mouse.move(box.x + 180 * scale, box.y + 150 * scale);
   await page.mouse.down();
@@ -53,10 +54,28 @@ test('ghost eraser is isolated, laser is temporary, and exam presets reopen', as
   await page.getByRole('button', { name: '레이저 포인터', exact: true }).click();
   await expect(page.locator('.laser-overlay')).toBeVisible();
   const laser = (await page.locator('.laser-overlay').boundingBox())!;
-  await page.mouse.move(laser.x + 100, laser.y + 100);
-  await page.mouse.down(); await page.mouse.move(laser.x + 220, laser.y + 130, { steps: 5 }); await page.mouse.up();
+  const cdp = await page.context().newCDPSession(page);
+  const alphaAt = (x: number, y: number) => page.locator('.laser-overlay').evaluate((canvas, point) => {
+    const element = canvas as HTMLCanvasElement, rect = element.getBoundingClientRect();
+    return element.getContext('2d')!.getImageData(
+      Math.floor((point.x - rect.left) * element.width / rect.width),
+      Math.floor((point.y - rect.top) * element.height / rect.height), 1, 1).data[3];
+  }, { x, y });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: laser.x + 100, y: laser.y + 100 }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: laser.x + 180, y: laser.y + 125 }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  expect(await alphaAt(laser.x + 180, laser.y + 125)).toBe(0);
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', pointerType: 'pen', button: 'left', buttons: 1, x: laser.x + 100, y: laser.y + 100, clickCount: 1 });
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', pointerType: 'pen', button: 'left', buttons: 1, x: laser.x + 220, y: laser.y + 130 });
+  await expect.poll(() => alphaAt(laser.x + 220, laser.y + 130), { timeout: 1000 }).toBeGreaterThan(0);
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', pointerType: 'pen', button: 'left', buttons: 0, x: laser.x + 220, y: laser.y + 130, clickCount: 1 });
+  await cdp.detach();
   expect(await items(page)).toHaveLength(1);
 
+  const timerIcon = await page.getByRole('button', { name: '타이머', exact: true }).locator('svg').innerHTML();
+  const examIcon = await page.getByRole('button', { name: '시험 모드', exact: true }).locator('svg').innerHTML();
+  expect(timerIcon).not.toBe(examIcon);
+  await expect(page.getByRole('button', { name: '시험 모드', exact: true }).locator('.exam-entry-label')).toHaveText('시험');
   await page.getByRole('button', { name: '시험 모드', exact: true }).click();
   const setup = page.getByRole('dialog', { name: '시험 모드' });
   await setup.locator('[name=exam-name]').fill('국어 모의고사');

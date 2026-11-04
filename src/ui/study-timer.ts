@@ -48,10 +48,10 @@ export class StudyTimer {
   constructor(private root: HTMLElement, noteId: string) {
     this.stateKey = `study-timer-state:${noteId}`;
     const viewButton = root.querySelector<HTMLElement>('[data-action=view-options]')!;
-    viewButton.insertAdjacentHTML('beforebegin', button('Clock', '타이머', 'timer', 'aria-haspopup="true" aria-expanded="false" aria-controls="study-timer-panel"'));
+    viewButton.insertAdjacentHTML('beforebegin', button('Timer', '타이머', 'timer', 'aria-haspopup="true" aria-expanded="false" aria-controls="study-timer-panel"'));
     this.trigger = root.querySelector<HTMLButtonElement>('[data-action=timer]')!;
     this.trigger.classList.add('study-timer-trigger');
-    root.querySelector('.editor-page-controls')!.insertAdjacentHTML('afterend', `<div class="study-timer-mini" role="group" aria-label="실행 중인 타이머" hidden><button type="button" class="study-timer-mini-time" data-timer-action="open" aria-label="타이머 열기">${icon('Clock', 14)}<span>25:00</span></button><button type="button" class="study-timer-mini-toggle" data-timer-action="mini-toggle" aria-label="일시정지" title="일시정지">${icon('Pause', 14)}</button></div>`);
+    root.querySelector('.editor-page-controls')!.insertAdjacentHTML('afterend', `<div class="study-timer-mini" role="group" aria-label="실행 중인 타이머" hidden><button type="button" class="study-timer-mini-time" data-timer-action="open" aria-label="타이머 열기">${icon('Timer', 14)}<span>25:00</span></button><button type="button" class="study-timer-mini-toggle" data-timer-action="mini-toggle" aria-label="일시정지" title="일시정지">${icon('Pause', 14)}</button></div>`);
     this.mini = root.querySelector<HTMLElement>('.study-timer-mini')!;
     root.querySelector('.editor-header')!.insertAdjacentHTML('beforeend', `<section class="study-timer-panel" id="study-timer-panel" aria-label="타이머" hidden>
       <div class="study-timer-heading"><strong>타이머</strong><button type="button" data-timer-action="close" aria-label="타이머 닫기">${icon('X', 17)}</button></div>

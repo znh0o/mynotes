@@ -23,9 +23,10 @@ export class ExamMode {
     private onTool: (tool: 'pencil' | 'eraser' | 'hand') => void,
     private onExit: () => void) {
     const header = root.querySelector<HTMLElement>('.editor-header-actions')!;
-    header.insertAdjacentHTML('afterbegin', button('Clock', '시험 모드', 'exam-open'));
+    header.insertAdjacentHTML('afterbegin', button('ClipboardCheck', '시험 모드', 'exam-open'));
     this.trigger = header.querySelector<HTMLButtonElement>('[data-action=exam-open]')!;
     this.trigger.classList.add('exam-entry');
+    this.trigger.insertAdjacentHTML('beforeend', '<span class="exam-entry-label" aria-hidden="true">시험</span>');
     this.trigger.addEventListener('click', () => this.openSetup(), { signal: this.abort.signal });
     root.querySelector<HTMLElement>('.editor-shell')!.insertAdjacentHTML('afterbegin',
       `<div class="exam-toolbar" role="toolbar" aria-label="시험 모드 도구" hidden>

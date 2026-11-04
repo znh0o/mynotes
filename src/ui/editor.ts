@@ -188,9 +188,10 @@ export class EditorView {
     if (typeof eraser?.size === 'number' && eraser.size >= 8 && eraser.size <= 100) this.engine.options.eraserSize = eraser.size;
     const eraserButton = this.root.querySelector('[data-action=tool][data-id=eraser]')!;
     eraserButton.insertAdjacentHTML('afterend',
-      `<button class="tool-button special-tool" type="button" data-action="ghost-pen" aria-label="고스트 펜" aria-pressed="false" title="고스트 펜">${icon('Ghost', 22)}<span>고스트</span></button>
-       <button class="tool-button special-tool" type="button" data-action="ghost-eraser" aria-label="고스트 지우개" aria-pressed="false" title="고스트 획만 지우기">${icon('Eraser', 22)}<span>고스트 지우개</span></button>
-       <button class="tool-button special-tool" type="button" data-action="laser" aria-label="레이저 포인터" aria-pressed="false" title="저장되지 않는 레이저 포인터">${icon('Crosshair', 22)}<span>레이저</span></button>`);
+      `<button class="tool-button special-tool" type="button" data-action="ghost-pen" aria-label="고스트 펜" aria-pressed="false" title="고스트 펜 · 전용 지우개로만 지움">${icon('Ghost', 22)}<span>고스트</span></button>
+       <button class="tool-button special-tool ghost-eraser-tool" type="button" data-action="ghost-eraser" aria-label="고스트 지우개" aria-pressed="false" title="고스트 지우개 · 고스트 획만 지움">${icon('Eraser', 22)}<span class="ghost-eraser-mark" aria-hidden="true">G</span><span>고스트 지우개</span></button>
+       <button class="tool-button special-tool" type="button" data-action="laser" aria-label="레이저 포인터" aria-pressed="false" title="S펜 전용 · 저장되지 않는 레이저 포인터">${icon('Crosshair', 22)}<span>레이저</span></button>`);
+    eraserButton.setAttribute('title', '일반 지우개 · 일반 필기만 지움');
     eraserButton.setAttribute('aria-haspopup', 'dialog'); eraserButton.setAttribute('aria-expanded', 'false'); eraserButton.setAttribute('aria-controls', 'eraser-picker');
     const shapeButton = this.root.querySelector('[data-action=tool][data-id=shape]')!;
     shapeButton.setAttribute('aria-haspopup', 'dialog'); shapeButton.setAttribute('aria-expanded', 'false'); shapeButton.setAttribute('aria-controls', 'shape-picker');
@@ -1051,6 +1052,10 @@ export class EditorView {
     this.engine.options.ghostPen = mode === 'ghost-pen';
     this.engine.options.ghostEraser = mode === 'ghost-eraser';
     this.laserPointer?.setEnabled(mode === 'laser');
+    this.toolHint = mode === 'ghost-pen' ? '고스트 펜 · 일반 필기와 분리해 저장'
+      : mode === 'ghost-eraser' ? '고스트 지우개 · 고스트 펜으로 쓴 획만 지움'
+      : '레이저 포인터 · S펜에만 반응 · 노트에 저장되지 않음';
+    const hint = this.root.querySelector<HTMLElement>('#tool-hint'); if (hint) hint.textContent = this.toolHint;
     this.syncSpecialButtons();
   }
   private syncSpecialButtons() {

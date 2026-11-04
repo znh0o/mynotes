@@ -4,6 +4,8 @@ type LaserPoint = { x: number; y: number; time: number };
 export class LaserPointer {
   private canvas = document.createElement('canvas');
   private points: LaserPoint[] = [];
+  private head: LaserPoint | null = null;
+  private penPresent = false;
   private pointerId: number | null = null;
   private frame = 0;
   private observer: ResizeObserver;
@@ -19,27 +21,38 @@ export class LaserPointer {
     this.observer.observe(viewport);
     const signal = this.abort.signal;
     this.canvas.addEventListener('pointerdown', event => {
-      if (!event.isPrimary) return;
+      if (event.pointerType !== 'pen' || !event.isPrimary) return;
       event.preventDefault(); event.stopPropagation();
+      this.penPresent = true;
       this.pointerId = event.pointerId;
       this.points = [];
       this.canvas.setPointerCapture(event.pointerId);
       this.add(event);
     }, { signal });
     this.canvas.addEventListener('pointermove', event => {
+      if (event.pointerType !== 'pen') return;
       event.stopPropagation();
-      if (event.pointerId === this.pointerId || event.pointerType === 'pen' && this.pointerId === null) this.add(event);
+      this.penPresent = true;
+      if (event.pointerId === this.pointerId || this.pointerId === null) this.add(event);
     }, { signal });
     const end = (event: PointerEvent) => {
+      if (event.pointerType !== 'pen') return;
       event.stopPropagation();
       if (event.pointerId !== this.pointerId) return;
       this.pointerId = null;
+      if (this.head) this.head.time = performance.now();
+      this.penPresent = false;
       if (this.canvas.hasPointerCapture(event.pointerId)) this.canvas.releasePointerCapture(event.pointerId);
       this.requestFrame();
     };
     this.canvas.addEventListener('pointerup', end, { signal });
     this.canvas.addEventListener('pointercancel', end, { signal });
-    this.canvas.addEventListener('pointerleave', () => { if (this.pointerId === null) this.points = []; }, { signal });
+    this.canvas.addEventListener('pointerleave', event => {
+      if (event.pointerType !== 'pen') return;
+      this.penPresent = false;
+      if (this.head) this.head.time = performance.now();
+      this.requestFrame();
+    }, { signal });
   }
 
   private resize() {
@@ -52,7 +65,8 @@ export class LaserPointer {
 
   private add(event: PointerEvent) {
     const rect = this.canvas.getBoundingClientRect();
-    this.points.push({ x: event.clientX - rect.left, y: event.clientY - rect.top, time: performance.now() });
+    this.head = { x: event.clientX - rect.left, y: event.clientY - rect.top, time: performance.now() };
+    this.points.push({ ...this.head });
     if (this.points.length > 180) this.points.shift();
     this.requestFrame();
   }
@@ -62,31 +76,44 @@ export class LaserPointer {
   private draw() {
     this.frame = 0;
     const context = this.canvas.getContext('2d'); if (!context) return;
-    const now = performance.now(), duration = this.pointerId === null ? 900 : 1400;
-    this.points = this.points.filter(point => now - point.time < duration);
+    const now = performance.now(), duration = 220;
+    this.points = this.points.filter(point => now - point.time < duration && (!this.head || Math.hypot(this.head.x - point.x, this.head.y - point.y) < 42));
     context.clearRect(0, 0, this.canvas.width, this.canvas.height);
     const scale = this.canvas.width / Math.max(1, this.viewport.clientWidth);
     context.save(); context.scale(scale, scale);
-    context.lineCap = 'round'; context.lineJoin = 'round'; context.strokeStyle = '#e84755';
-    context.shadowColor = '#e84755'; context.shadowBlur = 9; context.lineWidth = 3;
+    context.lineCap = 'round'; context.lineJoin = 'round';
     for (let index = 1; index < this.points.length; index++) {
       const a = this.points[index - 1], b = this.points[index];
-      context.globalAlpha = Math.min(1, (duration - (now - b.time)) / 450);
-      context.beginPath(); context.moveTo(a.x, a.y); context.lineTo(b.x, b.y); context.stroke();
+      const life = Math.max(0, 1 - (now - b.time) / duration);
+      const distance = Math.hypot(b.x - a.x, b.y - a.y), portion = Math.min(1, 24 / Math.max(1, distance));
+      context.beginPath(); context.moveTo(b.x + (a.x - b.x) * portion, b.y + (a.y - b.y) * portion); context.lineTo(b.x, b.y);
+      context.strokeStyle = `rgba(238, 44, 72, ${life * .12})`;
+      context.lineWidth = 15 * life; context.stroke();
+      context.strokeStyle = `rgba(255, 79, 93, ${life * .26})`;
+      context.lineWidth = 4 * life; context.stroke();
     }
-    const last = this.points.at(-1);
-    if (last) {
-      context.globalAlpha = Math.min(1, (duration - (now - last.time)) / 450);
-      context.fillStyle = '#e84755'; context.beginPath(); context.arc(last.x, last.y, 4, 0, Math.PI * 2); context.fill();
+    const head = this.head, life = head ? this.penPresent ? 1 : Math.max(0, 1 - (now - head.time) / 520) : 0;
+    if (head && life) {
+      const halo = context.createRadialGradient(head.x, head.y, 0, head.x, head.y, 18);
+      halo.addColorStop(0, `rgba(255,255,255,${life})`);
+      halo.addColorStop(.16, `rgba(255,61,78,${life})`);
+      halo.addColorStop(.38, `rgba(255,70,90,${life * .38})`);
+      halo.addColorStop(1, 'rgba(255,70,90,0)');
+      context.fillStyle = halo; context.beginPath(); context.arc(head.x, head.y, 18, 0, Math.PI * 2); context.fill();
+      context.strokeStyle = `rgba(224, 37, 62, ${life * .85})`; context.lineWidth = 1.4;
+      context.beginPath(); context.arc(head.x, head.y, 5.5, 0, Math.PI * 2); context.stroke();
+      context.fillStyle = `rgba(255,255,255,${life})`;
+      context.beginPath(); context.arc(head.x, head.y, 2.3, 0, Math.PI * 2); context.fill();
     }
     context.restore();
-    if (this.points.length && this.enabled) this.requestFrame();
+    if (!life) this.head = null;
+    if (this.enabled && (this.points.length || this.head && !this.penPresent)) this.requestFrame();
   }
 
   setEnabled(enabled: boolean) {
     if (this.enabled === enabled) return;
     this.enabled = enabled; this.canvas.hidden = !enabled;
-    this.points = []; this.pointerId = null;
+    this.points = []; this.head = null; this.penPresent = false; this.pointerId = null;
     cancelAnimationFrame(this.frame); this.frame = 0;
     if (enabled) this.resize();
   }
