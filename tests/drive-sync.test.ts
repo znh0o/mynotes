@@ -5,7 +5,7 @@ const transport = vi.hoisted(() => ({
   DrivePermissionError: class extends Error { constructor(readonly status: number) { super('Google Drive permission denied'); } },
   driveAccount: vi.fn(async () => ({ token: 'token', email: 'student@example.com', accountId: 'account-one' })),
   listDriveFiles: vi.fn(async () => [] as { id: string; name: string; appProperties?: Record<string, string> }[]),
-  putDriveFile: vi.fn(async (_token: string, name: string) => ({ id: 'generated-file-id', name })),
+  putDriveFile: vi.fn(async (_token: string, name: string, _blob?: Blob) => ({ id: 'generated-file-id', name })),
   downloadDriveFile: vi.fn(async (_token: string, _file: { id: string }) => new Blob()),
   deleteDriveFile: vi.fn(async () => {}),
 }));
@@ -34,6 +34,13 @@ describe('Drive note sync safety', () => {
     expect(result.uploaded).toBe(1);
     expect(transport.driveAccount).toHaveBeenCalledTimes(2);
     expect(transport.putDriveFile.mock.calls.filter(call => call[1] === `notelin-v1-note-${note.id}.json`)).toHaveLength(1);
+  });
+  it('includes reusable exam settings in shared Drive data', async () => {
+    await db.settings.put({ key: 'exam-mode-presets', value: [{ id: 'exam-one', name: '모의고사', seconds: 1800 }] });
+    await syncDrive();
+    const shared = transport.putDriveFile.mock.calls.find(call => call[1] === 'notelin-v1-shared-settings.json');
+    expect(shared).toBeDefined();
+    expect(JSON.parse(await shared![2]!.text()).exams).toEqual([{ id: 'exam-one', name: '모의고사', seconds: 1800 }]);
   });
   it('uploads local notes with stable IDs and remembers the account only after success', async () => {
     const { note, page } = createNote('수학', '#5482da', null);

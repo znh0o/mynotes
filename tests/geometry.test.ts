@@ -7,6 +7,12 @@ describe('editable ink geometry', () => {
   it('erases the entire stroke when a fast eraser crosses a sparse segment', () => {
     expect(erase([stroke], p(50, -20), p(50, 20), 5, false)).toEqual([]);
   });
+  it('keeps ghost and ordinary strokes in separate eraser lanes', () => {
+    const ghost: Stroke = { ...stroke, id: 'ghost', ghost: true };
+    const items = [stroke, ghost];
+    expect(erase(items, p(50, -20), p(50, 20), 5, false, undefined, item => item.ghost === true)).toEqual([stroke]);
+    expect(erase(items, p(50, -20), p(50, 20), 5, false, undefined, item => item.ghost !== true)).toEqual([ghost]);
+  });
   it('splits a stroke without losing pressure or the surviving end points', () => {
     const pieces = erase([stroke], p(50, -20), p(50, 20), 5, true) as Stroke[];
     expect(pieces).toHaveLength(2); expect(pieces[0].points[0]).toEqual(p(0));

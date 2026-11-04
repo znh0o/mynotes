@@ -1,8 +1,9 @@
 import { penCollection, type PenCollection } from './pen-presets';
+import { examPresets } from './exam-presets';
 import { uid } from './model';
 
 type Setting = { key: string; value: unknown };
-const globals = new Set(['eraser-settings', 'two-page-view', 'hold-to-line', 'samsung-pen-button-toggle', 'library-columns', 'user-profile', 'study-timer-presets', 'study-timer-state']);
+const globals = new Set(['eraser-settings', 'two-page-view', 'hold-to-line', 'samsung-pen-button-toggle', 'library-columns', 'user-profile', 'study-timer-presets', 'study-timer-state', 'exam-mode-presets']);
 const emptyPens = (): PenCollection => ({ selectedId: '', presets: [] });
 
 export function restoredSettings(input: unknown, noteIds: Set<string>, remapped: Map<string, string>): Setting[] {
@@ -13,7 +14,8 @@ export function restoredSettings(input: unknown, noteIds: Set<string>, remapped:
     if (row.key === 'pen-presets') {
       const value = penCollection(row.value, emptyPens());
       if (value.presets.length) result.push({ key: row.key, value });
-    } else if (globals.has(row.key)) result.push({ key: row.key, value: row.value });
+    } else if (row.key === 'exam-mode-presets') result.push({ key: row.key, value: examPresets(row.value) });
+    else if (globals.has(row.key)) result.push({ key: row.key, value: row.value });
     else {
       const match = /^(note-brush|note-palette|note-shape|note-text-color|study-timer-state):([^:]+)(:.*)?$/.exec(row.key);
       if (match && noteIds.has(match[2]) && remapped.has(match[2])) result.push({ key: `${match[1]}:${remapped.get(match[2])}${match[3] || ''}`, value: row.value });

@@ -10,9 +10,10 @@ import { PalmRejection } from './PalmRejection';
 export interface InkOptions {
   tool: Tool; color: string; width: number; fingerDrawing: boolean;
   eraserSize: number; partialEraser: boolean; shape: Shape; pencilDarkness: number; holdToLine: boolean; samsungButtonToggle: boolean;
+  ghostPen: boolean; ghostEraser: boolean;
 }
 export class InkEngine {
-  options: InkOptions = { tool: 'pen', color: '#30445e', width: 3, fingerDrawing: false, eraserSize: 24, partialEraser: false, shape: 'rect', pencilDarkness: .7, holdToLine: true, samsungButtonToggle: false };
+  options: InkOptions = { tool: 'pen', color: '#30445e', width: 3, fingerDrawing: false, eraserSize: 24, partialEraser: false, shape: 'rect', pencilDarkness: .7, holdToLine: true, samsungButtonToggle: false, ghostPen: false, ghostEraser: false };
   page!: Page;
   selected = new Set<string>();
   activePointer: number | null = null;
@@ -171,7 +172,8 @@ export class InkEngine {
   private eraseSegment(a: Point, b: Point) {
     let region: InkRect | undefined;
     const items = erase(this.page.items, a, b, this.options.eraserSize / 2, this.options.partialEraser,
-      stroke => { const box = paintBounds(stroke); region = region ? union(region, box) : box; });
+      stroke => { const box = paintBounds(stroke); region = region ? union(region, box) : box; },
+      stroke => this.options.ghostEraser || this.options.ghostPen ? stroke.ghost === true : stroke.ghost !== true);
     if (items === this.page.items || !region) return;
     this.page.items = items;
     this.dirtyRegion = this.dirtyInk ? this.dirtyRegion && union(this.dirtyRegion, region) : region;
@@ -318,7 +320,8 @@ export class InkEngine {
     else if (['pen', 'fountain', 'pencil', 'highlighter'].includes(tool)) this.stroke = { id: uid(), kind: 'stroke', tool: tool as Stroke['tool'], color: this.options.color,
       width: this.options.width,
       pressure: tool === 'fountain', brushVersion: 2,
-      ...(tool === 'pencil' ? { textureSeed: Math.floor(Math.random() * 0x100000000), pencilDarkness: this.options.pencilDarkness } : {}), points: [p] };
+      ...(tool === 'pencil' ? { textureSeed: Math.floor(Math.random() * 0x100000000), pencilDarkness: this.options.pencilDarkness } : {}),
+      ...(this.options.ghostPen ? { ghost: true as const } : {}), points: [p] };
   }
   private switchSegment(tool: Tool, p: Point) {
     // Settle the ink before erasing it. Keep one undo snapshot for this contact,

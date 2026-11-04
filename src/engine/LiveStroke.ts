@@ -64,9 +64,9 @@ export class LiveStroke {
     ctx.save(); ctx.setLineDash([]); ctx.lineDashOffset = 0;
     if (stroke.tool === 'pencil') {
       ctx.fillStyle = graphitePattern(ctx, stroke.color, stroke.textureSeed, stroke.width);
-      this.paths.forEach((path, i) => { ctx.globalAlpha = pencilOpacities(stroke)[i]; ctx.fill(path); });
+      this.paths.forEach((path, i) => { ctx.globalAlpha = pencilOpacities(stroke)[i] * (stroke.ghost ? .45 : 1); ctx.fill(path); });
     } else {
-      ctx.globalAlpha = stroke.tool === 'highlighter' ? .32 : 1;
+      ctx.globalAlpha = (stroke.tool === 'highlighter' ? .32 : 1) * (stroke.ghost ? .45 : 1);
       ctx.strokeStyle = ctx.fillStyle = stroke.color; ctx.lineWidth = stroke.width; ctx.lineCap = ctx.lineJoin = 'round';
       if (stroke.points.length === 1) { ctx.beginPath(); ctx.arc(stroke.points[0].x, stroke.points[0].y, stroke.width / 2, 0, Math.PI * 2); ctx.fill(); }
       else ctx.stroke(this.paths[0]);

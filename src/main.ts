@@ -1,6 +1,7 @@
 import './style.css';
 import './theme.css';
 import './study-timer.css';
+import './exam-mode.css';
 import { registerSW } from 'virtual:pwa-register';
 import { backup, db, initialize, restore, deletePermanently, discardTemporaryNotes } from './data/store';
 import { importPDF } from './data/pdf';

@@ -32,7 +32,7 @@ export function drawStroke(ctx: CanvasRenderingContext2D, stroke: Stroke) {
   if (!stroke.points.length) return;
   if (stroke.tool === 'pencil' || stroke.tool === 'fountain' && stroke.brushVersion === 2) {
     ctx.save(); ctx.fillStyle = stroke.tool === 'pencil' ? graphitePattern(ctx, stroke.color, stroke.textureSeed, stroke.width) : stroke.color;
-    for (const layer of brushPaths(stroke)) { ctx.globalAlpha = layer.opacity; ctx.fill(layer.path); }
+    for (const layer of brushPaths(stroke)) { ctx.globalAlpha = layer.opacity * (stroke.ghost ? .45 : 1); ctx.fill(layer.path); }
     ctx.restore(); return;
   }
   const pts = smooth(stroke.points);
@@ -40,13 +40,14 @@ export function drawStroke(ctx: CanvasRenderingContext2D, stroke: Stroke) {
   ctx.setLineDash([]); ctx.lineDashOffset = 0;
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   if (stroke.tool === 'highlighter' || !stroke.pressure) {
-    ctx.globalAlpha = stroke.tool === 'highlighter' ? .32 : 1;
+    ctx.globalAlpha = (stroke.tool === 'highlighter' ? .32 : 1) * (stroke.ghost ? .45 : 1);
     ctx.lineWidth = stroke.width;
     ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
     pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
     if (pts.length === 1) { ctx.arc(pts[0].x, pts[0].y, stroke.width / 2, 0, Math.PI * 2); ctx.fill(); }
     else ctx.stroke();
   } else {
+    ctx.globalAlpha = stroke.ghost ? .45 : 1;
     const left: {x: number; y: number}[] = [], right: {x: number; y: number}[] = [];
     const radii = roundedEndRadii(pts, pts.map(p => stroke.width * (.22 + .78 * Math.pow(Math.max(.05, p.p), .65)) / 2), stroke.width);
     for (let i = 0; i < pts.length; i++) {

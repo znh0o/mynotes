@@ -2,6 +2,7 @@ import { db } from './store';
 import { uid, type Asset, type Folder, type Note, type Page } from './model';
 import { mergeRestoredPens } from './backup-settings';
 import { penCollection } from './pen-presets';
+import { examPresets } from './exam-presets';
 import { revokeNativeDrive } from '../platform/native';
 import { driveAccount, listDriveFiles, putDriveFile, downloadDriveFile, deleteDriveFile, DrivePermissionError, type DriveFile } from './google-drive';
 
@@ -77,6 +78,7 @@ function validateBundle(data: unknown): NoteBundle {
       if (item.kind !== 'image' && !color(item.color)) throw new Error('Drive 필기 색상이 올바르지 않아요.');
       if (item.kind === 'stroke' && (!['pen', 'fountain', 'pencil', 'highlighter'].includes(item.tool) || !Array.isArray(item.points) || item.points.length > 1_000_000 || !finite(item.width, 1000) || item.width <= 0 ||
         item.points.some(p => !finite(p.x) || !finite(p.y) || !finite(p.p, 1) || !finite(p.t, 1e15)))) throw new Error('Drive 필기 획이 손상됐어요.');
+      if (item.kind === 'stroke' && item.ghost !== undefined && item.ghost !== true) throw new Error('Drive 고스트 획이 손상됐어요.');
       if (item.kind !== 'stroke' && (![item.x, item.y, item.w, item.h].every(v => finite(v)))) throw new Error('Drive 오브젝트가 손상됐어요.');
       if (item.kind === 'text' && (typeof item.text !== 'string' || item.text.length > 1_000_000 || !finite(item.size, 1000) || item.size <= 0)) throw new Error('Drive 텍스트가 손상됐어요.');
       if (item.kind === 'shape' && (!['line', 'rect', 'ellipse', 'triangle'].includes(item.shape) || !finite(item.width, 1000) || item.width <= 0)) throw new Error('Drive 도형이 손상됐어요.');
@@ -186,20 +188,21 @@ function timerPresets(value: unknown): TimerPreset[] {
     .slice(0, 50).map(item => ({ id: item.id, name: item.name.slice(0, 40), seconds: item.seconds }));
 }
 async function syncSharedSettings(token: string, files: Map<string, DriveFile>, anchor: Anchor) {
-  const [savedPens, savedTimers] = await Promise.all([db.settings.get('pen-presets'), db.settings.get('study-timer-presets')]);
-  const local = { pens: penCollection(savedPens?.value, { selectedId: '', presets: [] }), timers: timerPresets(savedTimers?.value) };
+  const [savedPens, savedTimers, savedExams] = await Promise.all([db.settings.get('pen-presets'), db.settings.get('study-timer-presets'), db.settings.get('exam-mode-presets')]);
+  const local = { pens: penCollection(savedPens?.value, { selectedId: '', presets: [] }), timers: timerPresets(savedTimers?.value), exams: examPresets(savedExams?.value) };
   const localText = encode(local), localHash = await sha256(localText), remote = files.get(sharedFile);
   if (!remote) { anchor.shared = await putJson(token, sharedFile, localText, files); return; }
   const text = await remoteText(token, remote, 1024 * 1024), remoteHashValue = await sha256(text);
   if (localHash === remoteHashValue) { anchor.shared = localHash; return; }
-  const raw = JSON.parse(text) as { pens?: unknown; timers?: unknown };
+  const raw = JSON.parse(text) as { pens?: unknown; timers?: unknown; exams?: unknown };
   if (!raw || typeof raw !== 'object') throw new Error('Drive의 공용 설정이 손상됐어요.');
-  const incoming = { pens: penCollection(raw.pens, { selectedId: '', presets: [] }), timers: timerPresets(raw.timers) };
+  const incoming = { pens: penCollection(raw.pens, { selectedId: '', presets: [] }), timers: timerPresets(raw.timers), exams: examPresets(raw.exams) };
   const merged = localHash === anchor.shared ? incoming : remoteHashValue === anchor.shared ? local : {
     pens: mergeRestoredPens(local.pens, incoming.pens),
     timers: Array.from(new Map([...incoming.timers, ...local.timers].map(item => [item.id, item])).values()).slice(0, 50),
+    exams: Array.from(new Map([...incoming.exams, ...local.exams].map(item => [item.id, item])).values()).slice(0, 30),
   };
-  await db.settings.bulkPut([{ key: 'pen-presets', value: merged.pens }, { key: 'study-timer-presets', value: merged.timers }]);
+  await db.settings.bulkPut([{ key: 'pen-presets', value: merged.pens }, { key: 'study-timer-presets', value: merged.timers }, { key: 'exam-mode-presets', value: merged.exams }]);
   anchor.shared = localHash === anchor.shared ? remoteHashValue : await putJson(token, sharedFile, encode(merged), files);
 }
 

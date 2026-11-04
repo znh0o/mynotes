@@ -52,12 +52,13 @@ export function transform(items: Item[], dx: number, dy: number, scale = 1, orig
 }
 // Resample against the whole swept eraser segment, preserving pressure/time at cuts.
 export function erase(items: Item[], a: Point, b: Point, radius: number, partial: boolean,
-  erased?: (stroke: Stroke) => void): Item[] {
+  erased?: (stroke: Stroke) => void, accepts: (stroke: Stroke) => boolean = () => true): Item[] {
   const area = { x: Math.min(a.x, b.x) - radius, y: Math.min(a.y, b.y) - radius,
     w: Math.abs(b.x - a.x) + radius * 2, h: Math.abs(b.y - a.y) + radius * 2 };
   let changed = false;
   const result = items.flatMap((item): Item[] => {
     if (item.kind !== 'stroke') return [item];
+    if (!accepts(item)) return [item];
     if (!overlaps(area, paintBounds(item))) return [item];
     const r = radius + item.width / 2;
     if (!partial) {

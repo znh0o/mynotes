@@ -18,6 +18,8 @@ import { defaultPenCollection, duplicatePen, isPenKind, penKinds, penNames, type
 import { loadSharedPens, sharedPensKey } from '../data/shared-pens';
 import { bindPhoneEditor } from './phone-chrome';
 import { StudyTimer } from './study-timer';
+import { ExamMode } from './exam-mode';
+import { LaserPointer } from '../engine/LaserPointer';
 import { closeNativeStudyPanel, isNativeApp, openNativeStudyBrowser, openNativeStudyAI, setNativeStudyPanelOccluded, studyAIProvider, studyAILabel, type StudyAIProvider } from '../platform/native';
 
 const shapeChoices: { id: Shape; name: string; drawing: string }[] = [
@@ -80,6 +82,10 @@ export class EditorView {
   private studyBrowserObserver?: MutationObserver;
   private temporaryNoticeTimer?: ReturnType<typeof setTimeout>;
   private studyTimer?: StudyTimer;
+  private examMode?: ExamMode;
+  private laserPointer?: LaserPointer;
+  private specialMode: 'ghost-pen' | 'ghost-eraser' | 'laser' | null = null;
+  private examPrevious?: { tool: Tool; penId: string };
   constructor(private root: HTMLElement, public note: Note,
     private tabs: { id: string; title: string }[], private open: (id: string) => Promise<void>,
     private home: () => Promise<void>, private closeTab: (id: string) => Promise<void>) {
@@ -143,12 +149,14 @@ export class EditorView {
       }
     }, { signal: this.abort.signal });
     window.addEventListener('notelin-native-back', event => {
+      if (this.examMode?.active) { event.preventDefault(); run(() => this.examMode!.exit()); return; }
       if (this.studyPanel && !this.studyPanelOccluded) { event.preventDefault(); run(() => this.closeStudyPanel()); }
     }, { signal: this.abort.signal });
     if (isNativeApp) window.addEventListener('notelin-native-stylus-button', () => {
-      if (!document.querySelector('dialog[open]')) this.togglePenEraser();
+      if (!this.examMode?.active && !document.querySelector('dialog[open]')) this.togglePenEraser();
     }, { signal: this.abort.signal });
     this.viewport = this.root.querySelector('.paper-viewport')!;
+    this.laserPointer = new LaserPointer(this.viewport);
     this.engine = new InkEngine(this.root.querySelector('#paper-ink')!, this.root.querySelector('#paper-live')!, () => this.changed(), count => this.showSelection(count, this.engine),
       (p, tool) => this.insert(p, tool), () => toast('직선으로 정리했어요. 펜을 댄 채 끝점을 움직일 수 있어요.'), () => this.togglePenEraser());
     this.companionEngine = new InkEngine(this.root.querySelector('.spread-ink')!, this.root.querySelector('.spread-live')!,
@@ -179,6 +187,10 @@ export class EditorView {
     if (typeof eraser?.partial === 'boolean') this.engine.options.partialEraser = eraser.partial;
     if (typeof eraser?.size === 'number' && eraser.size >= 8 && eraser.size <= 100) this.engine.options.eraserSize = eraser.size;
     const eraserButton = this.root.querySelector('[data-action=tool][data-id=eraser]')!;
+    eraserButton.insertAdjacentHTML('afterend',
+      `<button class="tool-button special-tool" type="button" data-action="ghost-pen" aria-label="고스트 펜" aria-pressed="false" title="고스트 펜">${icon('Ghost', 22)}<span>고스트</span></button>
+       <button class="tool-button special-tool" type="button" data-action="ghost-eraser" aria-label="고스트 지우개" aria-pressed="false" title="고스트 획만 지우기">${icon('Eraser', 22)}<span>고스트 지우개</span></button>
+       <button class="tool-button special-tool" type="button" data-action="laser" aria-label="레이저 포인터" aria-pressed="false" title="저장되지 않는 레이저 포인터">${icon('Crosshair', 22)}<span>레이저</span></button>`);
     eraserButton.setAttribute('aria-haspopup', 'dialog'); eraserButton.setAttribute('aria-expanded', 'false'); eraserButton.setAttribute('aria-controls', 'eraser-picker');
     const shapeButton = this.root.querySelector('[data-action=tool][data-id=shape]')!;
     shapeButton.setAttribute('aria-haspopup', 'dialog'); shapeButton.setAttribute('aria-expanded', 'false'); shapeButton.setAttribute('aria-controls', 'shape-picker');
@@ -233,6 +245,20 @@ export class EditorView {
     this.setupGestures();
     const rememberedPage = this.note.pageIds.indexOf(this.note.lastPageId ?? '');
     await this.showPage(rememberedPage < 0 ? 0 : rememberedPage);
+    this.examMode = new ExamMode(this.root, this.note.id, tool => {
+      if (!this.examPrevious) {
+        this.examPrevious = { tool: this.engine.options.tool, penId: this.pens.selectedId };
+        if (this.studyPanel) run(() => this.closeStudyPanel());
+      }
+      this.selectTool(tool);
+    }, () => {
+      const previous = this.examPrevious; this.examPrevious = undefined;
+      if (previous) {
+        this.pens.selectedId = previous.penId;
+        this.selectTool(previous.tool);
+      }
+    });
+    await this.examMode.load();
     this.resizeObserver = new ResizeObserver(() => { if (this.fit && this.page) { this.setScale(this.fitScale(), true); void this.renderBackground(); void this.renderSpread(); } });
     this.resizeObserver.observe(this.viewport);
   }
@@ -507,9 +533,11 @@ export class EditorView {
   }
   private click(e: Event) {
     const target = (e.target as Element).closest<HTMLElement>('[data-action]'); if (!target) return;
+    if (this.examMode?.active) return;
     const { action, id } = target.dataset;
     if (action && !['color', 'custom-color', 'palette-edit', 'pen-thinner', 'pen-thicker', 'pencil-mode-menu', 'pencil-mode'].includes(action)) this.textEditor.finish();
     if (action === 'home') run(this.home);
+    if (action === 'ghost-pen' || action === 'ghost-eraser' || action === 'laser') this.selectSpecial(action);
     if (action === 'retry-page') run(() => this.showPage(this.index));
     if (action === 'tab' && id !== this.note.id) run(() => this.open(id!));
     if (action === 'close-tab') run(() => this.closeTab(id!));
@@ -780,6 +808,7 @@ export class EditorView {
     return write;
   }
   private togglePenEraser() {
+    if (this.examMode?.active) return;
     if (!isInkTool(this.engine.options.tool) && this.engine.options.tool !== 'eraser') return;
     const tool = this.engine.options.tool === 'eraser' ? this.previousInkTool : 'eraser';
     this.selectTool(tool);
@@ -979,6 +1008,10 @@ export class EditorView {
     }
   }
   private selectTool(tool: Tool) {
+    this.specialMode = null;
+    this.engine.options.ghostPen = false;
+    this.engine.options.ghostEraser = false;
+    this.laserPointer?.setEnabled(false);
     this.closePencilMode();
     this.root.querySelector<HTMLElement>('.eraser-picker:popover-open')?.hidePopover();
     if (tool !== 'shape') this.root.querySelector<HTMLElement>('.shape-picker:popover-open')?.hidePopover();
@@ -1009,6 +1042,27 @@ export class EditorView {
     const hints: Record<Tool, string> = { pen: '볼펜 · 일정한 굵기 · 선 끝에서 0.6초 멈추면 직선으로', fountain: '만년필 · 필압과 펜촉 방향에 따라 달라지는 굵기', pencil: '연필 · 굵기와 진하기를 직접 조절 · 필압과 관계없이 고정', highlighter: '형광펜 · 펜과 별도 굵기 · 4~32', eraser: '지우개 · 원으로 지우는 범위 표시 · S펜 버튼 안내는 지우개 설정에서', lasso: '올가미 · 둘러싸서 선택한 다음 드래그로 이동', shape: '도형 · 드래그로 반듯한 도형 그리기', text: '타이핑 · 손글씨와 관계없이 페이지 여백 안에서 이어 쓰기 · 본문과 별도 글상자 전환', image: '사진 · 팝업에서 추가 · 사진을 눌러 이동하고 모서리로 크기 조절', hand: '이동 · 드래그로 종이 이동, 두 손가락으로 확대' };
     this.toolHint = hints[tool];
     if (tool === 'text' && this.page && !this.switching && this.textEditor.mode === 'document') this.textEditor.open();
+    this.syncSpecialButtons();
+  }
+  private selectSpecial(mode: 'ghost-pen' | 'ghost-eraser' | 'laser') {
+    if (mode === 'ghost-pen') this.selectTool(this.selectedPen().tool);
+    else this.selectTool(mode === 'ghost-eraser' ? 'eraser' : 'hand');
+    this.specialMode = mode;
+    this.engine.options.ghostPen = mode === 'ghost-pen';
+    this.engine.options.ghostEraser = mode === 'ghost-eraser';
+    this.laserPointer?.setEnabled(mode === 'laser');
+    this.syncSpecialButtons();
+  }
+  private syncSpecialButtons() {
+    this.root.querySelectorAll<HTMLElement>('.special-tool').forEach(button => {
+      const active = button.dataset.action === this.specialMode;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+    const base = this.specialMode === 'ghost-pen' ? this.root.querySelector<HTMLElement>('.pen-tool')
+      : this.specialMode === 'ghost-eraser' ? this.root.querySelector<HTMLElement>('[data-action=tool][data-id=eraser]')
+      : this.specialMode === 'laser' ? this.root.querySelector<HTMLElement>('[data-action=tool][data-id=hand]') : null;
+    base?.classList.remove('active'); base?.setAttribute('aria-pressed', 'false');
   }
   private contextOptions() {
     const tool = this.engine.options.tool;
@@ -1088,6 +1142,10 @@ export class EditorView {
     dialog.querySelector<HTMLInputElement>('[name=query]')!.placeholder = '입력한 텍스트 검색';
   }
   private keyboard(e: KeyboardEvent) {
+    if (this.examMode?.active) {
+      if (!document.querySelector('dialog[open]') && (e.ctrlKey || e.metaKey || ['p', 'e', 'h', 'Delete', 'Backspace'].includes(e.key))) e.preventDefault();
+      return;
+    }
     if (e.key === 'Escape' && !this.root.querySelector<HTMLElement>('#view-options-panel')?.hidden) {
       e.preventDefault(); this.closeViewOptions(); this.root.querySelector<HTMLButtonElement>('[data-action=view-options]')?.focus({ preventScroll: true }); return;
     }
@@ -1227,5 +1285,5 @@ export class EditorView {
       this.syncStudyPanelOverlay();
     } catch (error) { this.setStudyPanel(previous); throw error; }
   }
-  destroy() { this.studyTimer?.destroy(); this.studyBrowserObserver?.disconnect(); if (this.studyPanel) void closeNativeStudyPanel().catch(console.error); this.textEditor?.destroy(); this.previews?.destroy(); this.detail?.destroy(); this.companionDetail?.destroy(); this.cancelViewportUpdate(); clearTimeout(this.thumbTimer); clearTimeout(this.temporaryNoticeTimer); clearTimeout(this.companionThumbTimer); clearTimeout(this.brushTimer); clearTimeout(this.penTimer); this.generation++; this.spreadGeneration++; this.engine?.destroy(); this.companionEngine?.destroy(); this.abort.abort(); this.resizeObserver?.disconnect(); }
+  destroy() { this.examMode?.destroy(); this.laserPointer?.destroy(); this.studyTimer?.destroy(); this.studyBrowserObserver?.disconnect(); if (this.studyPanel) void closeNativeStudyPanel().catch(console.error); this.textEditor?.destroy(); this.previews?.destroy(); this.detail?.destroy(); this.companionDetail?.destroy(); this.cancelViewportUpdate(); clearTimeout(this.thumbTimer); clearTimeout(this.temporaryNoticeTimer); clearTimeout(this.companionThumbTimer); clearTimeout(this.brushTimer); clearTimeout(this.penTimer); this.generation++; this.spreadGeneration++; this.engine?.destroy(); this.companionEngine?.destroy(); this.abort.abort(); this.resizeObserver?.disconnect(); }
 }
