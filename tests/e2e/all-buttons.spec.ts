@@ -9,6 +9,7 @@ for (const pointer of ['pen', 'touch'] as const) test(`every button path respond
   const cdp = await context.newCDPSession(page);
   const tap = async (name: string, role: 'button' | 'menuitem' = 'button') => {
     const target = name === '연필 프리셋' ? page.locator('.pen-preset-row').filter({ hasText: '연필' }) : page.getByRole(role, { name, exact: true }); await expect(target).toBeVisible();
+    await target.scrollIntoViewIfNeeded();
     const r = (await target.boundingBox())!, x = r.x + r.width / 2, y = r.y + r.height / 2;
     if (pointer === 'touch') await page.touchscreen.tap(x, y);
     else {
