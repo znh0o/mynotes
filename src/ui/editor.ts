@@ -260,7 +260,10 @@ export class EditorView {
       if (!page) throw new Error('페이지를 찾을 수 없어요.');
       this.spreadPage = companion;
       await loadImages(page); this.displayPage(page, index);
-      await this.renderBackground(); void this.renderSpread(); await this.renderThumbnails(); this.updateHistory();
+      let rendered = false;
+      for (let attempt = 0; attempt < 3 && !rendered; attempt++) rendered = await this.renderBackground();
+      if (!rendered) throw new Error('페이지 렌더링이 중단됐어요. 다시 시도해 주세요.');
+      void this.renderSpread(); await this.renderThumbnails(); this.updateHistory();
     } catch (error) {
       failed = true;
       loading.classList.add('page-load-error');
@@ -336,10 +339,14 @@ export class EditorView {
       await loadImages(page);
       const ratio = Math.min(Math.max(1, this.scale * devicePixelRatio), Math.sqrt(8000000 / (page.width * page.height)));
       const backgroundCanvas = document.createElement('canvas'); await background(backgroundCanvas, page, ratio);
-      if (generation !== this.spreadGeneration || this.abort.signal.aborted) return;
+      if (generation !== this.spreadGeneration || this.abort.signal.aborted) {
+        backgroundCanvas.width = backgroundCanvas.height = 0;
+        return;
+      }
       const canvas = companion.querySelector<HTMLCanvasElement>('.spread-background')!;
       canvas.width = backgroundCanvas.width; canvas.height = backgroundCanvas.height;
       canvas.getContext('2d')!.drawImage(backgroundCanvas, 0, 0);
+      backgroundCanvas.width = backgroundCanvas.height = 0;
       this.companionEngine.resize();
       this.companionDetail.schedule(0);
       companion.classList.remove('spread-error');
@@ -375,14 +382,20 @@ export class EditorView {
       await this.renderThumbnails();
     });
   }
-  private async renderBackground() {
+  private async renderBackground(): Promise<boolean> {
     const generation = ++this.generation, p = this.page, temp = document.createElement('canvas');
     const ratio = Math.min(Math.max(1, this.scale * devicePixelRatio), Math.sqrt(10000000 / (p.width * p.height)));
-    await background(temp, p, ratio);
-    if (generation !== this.generation || this.abort.signal.aborted) return;
+    try { await background(temp, p, ratio); }
+    catch (error) { temp.width = temp.height = 0; throw error; }
+    if (generation !== this.generation || this.abort.signal.aborted) {
+      temp.width = temp.height = 0;
+      return false;
+    }
     const canvas = this.root.querySelector<HTMLCanvasElement>('#paper-background')!;
     canvas.width = temp.width; canvas.height = temp.height; canvas.getContext('2d')!.drawImage(temp, 0, 0);
     this.detail.schedule(0);
+    temp.width = temp.height = 0;
+    return true;
   }
   private async renderThumbnails() {
     const rows = await db.pages.bulkGet(this.note.pageIds);

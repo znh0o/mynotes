@@ -5,6 +5,7 @@ import type { PDFDocumentProxy } from 'pdfjs-dist';
 
 let pdfModule: Promise<typeof import('pdfjs-dist/legacy/build/pdf.mjs')> | undefined;
 const documents = new Map<string, PDFDocumentProxy>();
+const activePageRenders = new WeakMap<object, number>();
 const pdfOptions = { cMapUrl: `${import.meta.env.BASE_URL}pdf/cmaps/`, cMapPacked: true,
   standardFontDataUrl: `${import.meta.env.BASE_URL}pdf/standard_fonts/`, wasmUrl: `${import.meta.env.BASE_URL}pdf/wasm/` };
 async function pdfjs() {
@@ -63,10 +64,16 @@ export async function background(canvas: HTMLCanvasElement, page: Page, scale: n
   canvas.height = Math.ceil((crop?.h ?? page.height) * scale);
   if (page.pdfAssetId && page.pdfIndex) {
     const doc = await documentFor(page.pdfAssetId), pdfPage = await doc.getPage(page.pdfIndex);
-    await pdfPage.render({ canvas, viewport: pdfPage.getViewport({ scale,
-      offsetX: -(crop?.x ?? 0) * scale, offsetY: -(crop?.y ?? 0) * scale }),
-      background: crop ? page.paperColor : undefined }).promise;
-    pdfPage.cleanup();
+    activePageRenders.set(pdfPage, (activePageRenders.get(pdfPage) ?? 0) + 1);
+    try {
+      await pdfPage.render({ canvas, viewport: pdfPage.getViewport({ scale,
+        offsetX: -(crop?.x ?? 0) * scale, offsetY: -(crop?.y ?? 0) * scale }),
+        background: crop ? page.paperColor : undefined }).promise;
+    } finally {
+      const remaining = (activePageRenders.get(pdfPage) ?? 1) - 1;
+      if (remaining) activePageRenders.set(pdfPage, remaining);
+      else { activePageRenders.delete(pdfPage); pdfPage.cleanup(); }
+    }
   } else {
     ctx.setTransform(scale, 0, 0, scale, -(crop?.x ?? 0) * scale, -(crop?.y ?? 0) * scale);
     drawPaper(ctx, page);
