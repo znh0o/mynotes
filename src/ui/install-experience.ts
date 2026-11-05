@@ -1,9 +1,7 @@
 import { getAppearance, setAppearance, type Appearance } from './appearance';
 import { initInstallDemo } from './install-demo';
 
-type Platform = 'android' | 'ios';
 const siteUrl = 'https://znh0o.github.io/mynotes/';
-const apkUrl = 'https://github.com/znh0o/mynotes/releases/latest/download/Notelin.apk';
 
 export function initInstallExperience(root: HTMLElement) {
   const page = root.querySelector<HTMLElement>('.install-page')!;
@@ -86,60 +84,11 @@ export function initInstallExperience(root: HTMLElement) {
   });
   initInstallDemo(root);
 
-  const ua = navigator.userAgent;
-  const ios = /iPad|iPhone|iPod/.test(ua) || /Macintosh/.test(ua) && navigator.maxTouchPoints > 1;
-  let platform: Platform = ios ? 'ios' : 'android';
   const guide = root.querySelector<HTMLElement>('#install-manual')!;
   // Android is distributed as an APK; suppress the browser's unrelated PWA prompt.
   window.addEventListener('beforeinstallprompt', event => event.preventDefault());
-  const iosDialog = root.querySelector<HTMLDialogElement>('.install-ios-dialog')!;
-  const closeIosDialog = () => iosDialog.close();
-  iosDialog.querySelector<HTMLButtonElement>('.install-ios-close')!.addEventListener('click', closeIosDialog);
-  iosDialog.addEventListener('click', event => { if (event.target === iosDialog) closeIosDialog(); });
-  iosDialog.querySelector<HTMLButtonElement>('.install-ios-copy')!.addEventListener('click', async () => {
-    const status = iosDialog.querySelector<HTMLElement>('.install-ios-status')!;
-    try { await navigator.clipboard.writeText(siteUrl); status.textContent = '설치 주소를 복사했어요. Safari에서 열어주세요.'; }
-    catch {
-      const url = iosDialog.querySelector<HTMLInputElement>('.install-ios-url')!;
-      url.focus(); url.select(); status.textContent = '주소를 길게 눌러 복사한 뒤 Safari에서 열어주세요.';
-    }
-  });
-  const instructions: Record<Platform, { caption: string; description: string; heading: string; manual: string; steps: [string, string][] }> = {
-    android: {
-      caption: 'Android 8 이상 · Galaxy Tab & Phone', description: 'Android 기기에 Notelin을 설치하세요.', heading: 'Notelin 설치 방법',
-      manual: '설치 허용 안내가 표시되면 사용 중인 브라우저의 앱 설치를 허용해 주세요.',
-      steps: [['APK 다운로드','다운로드 버튼을 눌러 설치 파일을 받으세요.'],['다운로드한 파일 열기','브라우저 다운로드 목록이나 ‘내 파일 → 다운로드’에서 Notelin.apk를 여세요.'],['설치 후 시작하기','설치 화면의 안내를 완료한 뒤 Notelin을 실행하세요.']],
-    },
-    ios: {
-      caption: 'iPhone · iPad · Safari 웹 앱(PWA)', description: 'Safari에서 홈 화면에 웹 앱을 추가하세요.', heading: 'iPhone · iPad에 PWA 설치하기',
-      manual: '채팅 앱 안의 브라우저에서는 메뉴가 보이지 않을 수 있어요. 주소를 복사해 Safari에서 열어주세요.',
-      steps: [['Safari에서 열기','iPhone 또는 iPad의 Safari에서 이 페이지를 여세요.'],['공유 → 홈 화면에 추가','공유 버튼을 누르고 ‘홈 화면에 추가’를 선택하세요. ‘웹 앱으로 열기’ 항목이 있으면 켜 주세요.'],['추가한 아이콘으로 실행','‘추가’를 누른 뒤 홈 화면의 Notelin 아이콘을 열면 서재로 이어져요.']],
-    },
-  };
-  function selectPlatform(next: Platform) {
-    platform = next; const info = instructions[next];
-    root.querySelectorAll<HTMLButtonElement>('[data-platform]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.platform === platform)));
-    root.querySelector<HTMLElement>('[data-platform-caption]')!.textContent = info.caption;
-    root.querySelector<HTMLElement>('[data-guide-description]')!.textContent = info.description;
-    root.querySelector<HTMLElement>('[data-guide-heading]')!.textContent = info.heading;
-    root.querySelector<HTMLElement>('[data-guide-steps]')!.innerHTML = info.steps.map(([title,copy],i) => `<li><span>0${i+1}</span><div><strong>${title}</strong><p>${copy}</p></div></li>`).join('');
-    guide.textContent = info.manual; guide.classList.remove('install-manual-emphasis');
-    root.querySelector<HTMLElement>('[data-release]')!.hidden = next !== 'android';
-    root.querySelectorAll<HTMLAnchorElement>('[data-download]').forEach(link => {
-      link.href = platform === 'android' ? apkUrl : '#install-guide';
-      if (platform === 'android') link.setAttribute('download', 'Notelin.apk'); else link.removeAttribute('download');
-      const label = platform === 'android' ? { header: '다운로드', hero: 'Android 앱 다운로드', guide: 'APK 다운로드' }[link.dataset.cta!] : { header: 'PWA 설치', hero: 'PWA 설치하기', guide: 'PWA 설치 안내' }[link.dataset.cta!];
-      link.querySelector('span')!.textContent = label || '앱 설치';
-    });
-  }
-  root.querySelectorAll<HTMLButtonElement>('[data-platform]').forEach(button => button.addEventListener('click', () => selectPlatform(button.dataset.platform as Platform)));
-  selectPlatform(platform);
   root.querySelectorAll<HTMLAnchorElement>('[data-download]').forEach(link => link.addEventListener('click', event => {
-    if (platform !== 'android') {
-      event.preventDefault();
-      if (!iosDialog.open) iosDialog.showModal();
-      iosDialog.querySelector<HTMLElement>('#install-ios-title')!.focus();
-    } else if (!navigator.onLine) {
+    if (!navigator.onLine) {
       event.preventDefault(); guide.textContent = 'APK 다운로드에는 인터넷 연결이 필요해요. 연결한 뒤 다시 눌러 주세요.';
       guide.classList.add('install-manual-emphasis'); guide.scrollIntoView({ behavior: reducedMotion.matches ? 'instant' : 'smooth', block: 'center' });
     }

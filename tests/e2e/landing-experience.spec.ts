@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('iPhone and iPad installation taps open a visible PWA guide while Android keeps the APK route', async ({ browser }) => {
+test('installation page shows only Android downloads and guidance on every browser', async ({ browser }) => {
   for (const [device, userAgent] of [
     ['iPhone', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1'],
     ['iPad', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15'],
@@ -12,21 +12,14 @@ test('iPhone and iPad installation taps open a visible PWA guide while Android k
     try {
       if (device === 'iPad') await context.addInitScript(() => Object.defineProperty(navigator, 'maxTouchPoints', { get: () => 5 }));
       const page = await context.newPage(); await page.goto('./');
-      const modal = page.getByRole('dialog', { name: 'iPhone · iPad에 설치하기' });
-      await expect(page.getByRole('link', { name: 'Android 앱 다운로드' })).toHaveCount(0);
-      await expect(page.getByRole('button', { name: 'Mac', exact: true })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'iPhone · iPad' })).toHaveCount(0);
+      await expect(page.locator('.install-ios-dialog')).toHaveCount(0);
+      await expect(page.getByRole('heading', { name: 'Android 설치 방법' })).toBeVisible();
       for (const selector of ['.install-hero [data-download]', '.install-header [data-download]', '#install-guide [data-download]']) {
         const cta = page.locator(selector);
-        await expect(cta).toHaveAttribute('href', '#install-guide');
-        await cta.tap();
-        await expect(modal).toBeVisible();
-        await expect(modal).toContainText('홈 화면에 추가');
-        await expect(modal.getByRole('heading')).toBeFocused();
-        await modal.getByRole('button', { name: '설치 안내 닫기' }).tap();
-        await expect(modal).toBeHidden();
+        await expect(cta).toHaveAttribute('href', 'https://github.com/znh0o/mynotes/releases/latest/download/Notelin.apk');
       }
-      await page.getByRole('button', { name: 'Android', exact: true }).tap();
-      await expect(page.getByRole('link', { name: 'Android 앱 다운로드' })).toHaveAttribute('href', 'https://github.com/znh0o/mynotes/releases/latest/download/Notelin.apk');
+      await expect(page.locator('.install-guide-details li')).toHaveCount(3);
       expect(await page.evaluate(() => indexedDB.databases())).toEqual([]);
     } finally { await context.close(); }
   }
