@@ -85,6 +85,7 @@ export class EditorView {
   private examMode?: ExamMode;
   private laserPointer?: LaserPointer;
   private specialMode: 'ghost-pen' | 'ghost-eraser' | 'laser' | null = null;
+  private ghostColor = '#30445e';
   private examPrevious?: { tool: Tool; penId: string };
   constructor(private root: HTMLElement, public note: Note,
     private tabs: { id: string; title: string }[], private open: (id: string) => Promise<void>,
@@ -95,12 +96,14 @@ export class EditorView {
     });
   }
   async start() {
-    const [pencilSetting, lineSetting, eraserSetting, penButtonSetting, spreadSetting, paletteSetting, shapeSetting, aiSetting, textColorSetting, ...brushSettings] = await db.settings.bulkGet([
-      'pencil-darkness', 'hold-to-line', 'eraser-settings', 'samsung-pen-button-toggle', 'two-page-view', `note-palette:${this.note.id}`, `note-shape:${this.note.id}`, 'study-ai-provider', `note-text-color:${this.note.id}`,
+    const [pencilSetting, lineSetting, eraserSetting, penButtonSetting, spreadSetting, paletteSetting, shapeSetting, aiSetting, textColorSetting, ghostColorSetting, ...brushSettings] = await db.settings.bulkGet([
+      'pencil-darkness', 'hold-to-line', 'eraser-settings', 'samsung-pen-button-toggle', 'two-page-view', `note-palette:${this.note.id}`, `note-shape:${this.note.id}`, 'study-ai-provider', `note-text-color:${this.note.id}`, 'ghost-pen-color',
       ...inkTools.map(brushKey), ...inkTools.map(tool => `note-brush:${this.note.id}:${tool}`),
     ]);
     inkTools.forEach((tool, index) => this.brushes[tool] = brushProfile(tool, brushSettings[index + inkTools.length]?.value ?? brushSettings[index]?.value, pencilSetting?.value));
     this.pens = await loadSharedPens(this.note.id, defaultPenCollection(this.brushes));
+    this.ghostColor = typeof ghostColorSetting?.value === 'string' && /^#[0-9a-f]{6}$/i.test(ghostColorSetting.value)
+      ? ghostColorSetting.value : this.selectedPen().color;
     this.aiProvider = studyAIProvider(aiSetting?.value);
     this.twoPage = spreadSetting?.value === true;
     if (Array.isArray(paletteSetting?.value) && paletteSetting.value.length === 5 && paletteSetting.value.every((color: unknown) => typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color))) this.palette = paletteSetting.value;
@@ -729,7 +732,13 @@ export class EditorView {
       return;
     }
     this.engine.options.color = color;
-    this.syncColor(); this.rememberBrush();
+    this.syncColor();
+    if (this.specialMode === 'ghost-pen') {
+      this.ghostColor = color;
+      void db.settings.put({ key: 'ghost-pen-color', value: color }).catch(report);
+      return;
+    }
+    this.rememberBrush();
   }
   private activeColor() { return this.engine.options.tool === 'text' ? this.textEditor.color : this.engine.options.color; }
   private syncColor() {
@@ -750,7 +759,7 @@ export class EditorView {
     this.syncColor();
   }
   private setWidth(value: number) {
-    if (!Number.isFinite(value)) return;
+    if (!Number.isFinite(value) || this.specialMode === 'ghost-pen') return;
     const width = this.engine.options.tool === 'highlighter'
       ? Math.max(4, Math.min(32, Math.round(value)))
       : Math.max(.5, Math.min(20, Math.round(value * 2) / 2));
@@ -759,7 +768,7 @@ export class EditorView {
   }
   private get adjustingDarkness() { return this.engine.options.tool === 'pencil' && this.inkAdjustment === 'darkness'; }
   private setInkValue(value: number) {
-    if (!Number.isFinite(value)) return;
+    if (!Number.isFinite(value) || this.specialMode === 'ghost-pen') return;
     if (this.engine.options.tool === 'text') {
       if (!this.textEditor.active) this.textEditor.open();
       this.textEditor.setSize(value); this.syncInkControl(); return;
@@ -978,15 +987,17 @@ export class EditorView {
     this.root.querySelector<HTMLButtonElement>('#ink-adjustment')?.setAttribute('aria-expanded', 'false');
   }
   private syncInkControl() {
+    const ghost = this.specialMode === 'ghost-pen';
     const pencil = this.engine.options.tool === 'pencil', darkness = this.adjustingDarkness, text = this.engine.options.tool === 'text';
     const width = this.engine.options.width, value = text ? this.textEditor.size : darkness ? Math.round(this.engine.options.pencilDarkness * 100) : width;
     const highlighter = this.engine.options.tool === 'highlighter';
     const min = text || darkness ? 10 : highlighter ? 4 : .5;
     const max = text || darkness ? 100 : highlighter ? 32 : 20;
     const slider = this.root.querySelector<HTMLInputElement>('#ink-width')!;
+    slider.disabled = ghost;
     slider.min = String(min); slider.max = String(max); slider.step = text || highlighter ? '1' : darkness ? '5' : '.5'; slider.value = String(value);
-    slider.setAttribute('aria-label', text ? '글자 크기' : darkness ? '연필 진하기' : '펜 굵기');
-    slider.setAttribute('aria-valuetext', text ? `${value}px` : darkness ? `${value}% · 필압과 관계없이 고정` : width.toFixed(1));
+    slider.setAttribute('aria-label', ghost ? '고스트 펜 굵기 고정' : text ? '글자 크기' : darkness ? '연필 진하기' : '펜 굵기');
+    slider.setAttribute('aria-valuetext', ghost ? '1.0 · 고정' : text ? `${value}px` : darkness ? `${value}% · 필압과 관계없이 고정` : width.toFixed(1));
     slider.style.setProperty('--width-progress', `${(value - min) / (max - min) * 100}%`);
     this.root.querySelector<HTMLOutputElement>('#width-value')!.value = text ? String(value) : darkness ? `${value}%` : width.toFixed(1);
     this.root.querySelector<HTMLElement>('#width-preview')!.style.height = `${Math.min(16, width)}px`;
@@ -1003,8 +1014,8 @@ export class EditorView {
     this.root.querySelector('.pen-width-control')!.classList.toggle('pencil-controls', pencil);
     for (const [action, delta] of [['pen-thinner', -1], ['pen-thicker', 1]] as const) {
       const button = this.root.querySelector<HTMLButtonElement>(`[data-action=${action}]`)!;
-      button.disabled = value === (delta < 0 ? min : max);
-      const name = `${text ? '글자 크기' : darkness ? '연필 진하기' : '펜 굵기'} ${delta < 0 ? '줄이기' : '늘리기'}`;
+      button.disabled = ghost || value === (delta < 0 ? min : max);
+      const name = ghost ? '고스트 펜 굵기 1.0 고정' : `${text ? '글자 크기' : darkness ? '연필 진하기' : '펜 굵기'} ${delta < 0 ? '줄이기' : '늘리기'}`;
       button.setAttribute('aria-label', name); button.title = name;
     }
   }
@@ -1051,8 +1062,14 @@ export class EditorView {
     this.specialMode = mode;
     this.engine.options.ghostPen = mode === 'ghost-pen';
     this.engine.options.ghostEraser = mode === 'ghost-eraser';
+    if (mode === 'ghost-pen') {
+      this.engine.options.tool = 'pen';
+      this.engine.options.width = 1;
+      this.engine.options.color = this.ghostColor;
+      this.syncColor(); this.syncInkControl();
+    }
     this.laserPointer?.setEnabled(mode === 'laser');
-    this.toolHint = mode === 'ghost-pen' ? '고스트 펜 · 일반 필기와 분리해 저장'
+    this.toolHint = mode === 'ghost-pen' ? '고스트 펜 · 굵기 1.0 고정 · 색상 선택 가능 · 전용 지우개로만 지움'
       : mode === 'ghost-eraser' ? '고스트 지우개 · 고스트 펜으로 쓴 획만 지움'
       : '레이저 포인터 · S펜에만 반응 · 노트에 저장되지 않음';
     const hint = this.root.querySelector<HTMLElement>('#tool-hint'); if (hint) hint.textContent = this.toolHint;

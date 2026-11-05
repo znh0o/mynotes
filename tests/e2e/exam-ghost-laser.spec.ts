@@ -33,6 +33,32 @@ async function items(page: Page) {
   });
 }
 
+test('ghost pen stays faint at width 1.0 and keeps its own chosen color', async ({ page }) => {
+  await newNote(page);
+  await page.getByRole('button', { name: '펜', exact: true }).click();
+  await page.locator('.pen-preset-row[data-id="starter-2"]').click();
+  await page.getByRole('button', { name: '고스트 펜', exact: true }).click();
+  await expect(page.getByRole('slider', { name: '고스트 펜 굵기 고정' })).toBeDisabled();
+  await expect(page.locator('#width-value')).toHaveText('1.0');
+  await page.locator('[data-action=color][data-id="#cf7d85"]').click();
+  await line(page, 185);
+  await expect.poll(async () => (await items(page)).length).toBe(1);
+  expect((await items(page))[0]).toMatchObject({ ghost: true, tool: 'pen', width: 1, color: '#cf7d85' });
+
+  await page.getByRole('button', { name: '펜', exact: true }).click();
+  await page.locator('.pen-preset-row[data-id="starter-2"]').click();
+  await line(page, 245);
+  await expect.poll(async () => (await items(page)).length).toBe(2);
+  expect((await items(page))[1]).toMatchObject({ tool: 'pencil', width: 3, color: '#30445e' });
+
+  await page.getByRole('button', { name: '서재로 돌아가기' }).click();
+  await page.locator('.note-open').first().click();
+  await expect(page.locator('.page-loading')).toBeHidden();
+  await page.getByRole('button', { name: '고스트 펜', exact: true }).click();
+  await expect(page.locator('[data-action=color][data-id="#cf7d85"]')).toHaveClass(/active/);
+  await expect(page.locator('#width-value')).toHaveText('1.0');
+});
+
 test('ghost eraser is isolated, laser is temporary, and exam presets reopen', async ({ page }) => {
   await newNote(page);
   await line(page, 175);
