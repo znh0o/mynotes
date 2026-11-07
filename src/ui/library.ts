@@ -26,6 +26,11 @@ export class LibraryView {
   private columns: 'auto' | 4 | 5 | 6 = 'auto';
   private abort = new AbortController();
   private previewVersion = 0;
+  private previewObserver?: IntersectionObserver;
+  private previewQueue: string[] = [];
+  private previewQueued = new Set<string>();
+  private previewMissing = new Set<string>();
+  private previewRunning = false;
   private updateAvailable = false;
   private updateApplying = false;
   private profile = emptyProfile();
@@ -67,7 +72,6 @@ export class LibraryView {
     const connected = drive?.value as { email?: unknown; lastSync?: unknown } | undefined;
     this.googleAccount = connected && typeof connected.email === 'string' ? { email: connected.email, lastSync: typeof connected.lastSync === 'number' ? connected.lastSync : undefined } : undefined;
     this.render();
-    void this.previews(++this.previewVersion);
   }
   setUpdateState(available: boolean, applying: boolean) {
     if (this.updateAvailable === available && this.updateApplying === applying) return;
@@ -85,36 +89,73 @@ export class LibraryView {
     if (this.updateAvailable) return `<div role="status" aria-live="polite"><span class="banner-label"><span></span> 새 버전</span><h2>업데이트가 있어요.</h2><p>노트를 저장한 뒤 새 버전을 적용합니다.</p><button class="button primary banner-update-button" data-action="apply-update" ${this.updateApplying ? 'disabled' : ''}>${icon('RefreshCw', 17)} ${this.updateApplying ? '업데이트 적용 중…' : '지금 업데이트'}</button></div><div class="update-banner-art" aria-hidden="true">${icon('RefreshCw', 72)}<span>NOTELIN</span></div>`;
     return `<div><span class="banner-label"><span></span> A LITTLE SPACE, ENDLESS POSSIBILITIES</span><h2>오늘의 생각을 펼쳐보세요.</h2><p>펜 끝에서 시작되는 새로운 배움.<br>나만의 속도로, 한 페이지씩 채워가요.</p><button class="banner-link" data-action="new">새로운 페이지 시작하기 ${icon('ArrowUpRight', 17)}</button></div><div class="banner-art" aria-hidden="true"><div class="art-shadow"></div><div class="art-notebook back"></div><div class="art-notebook front"><span>small thoughts,<br>big possibilities.</span><i></i><small>NOTELIN / DAILY NOTES</small></div><div class="art-pen"></div><div class="art-star star-one">✧</div><div class="art-star star-two">✧</div><div class="art-dot"></div></div>`;
   }
-  private async previews(version: number) {
-    for (const note of this.notes.filter(n => !n.thumbnail && !n.deleted).slice(0, 12)) {
-      // Generating PDF and ink previews can occupy the main thread on phones.
-      // Let pending touches and paints finish before starting the next one.
-      await new Promise<void>(resolve => {
-        if ('requestIdleCallback' in window) window.requestIdleCallback(() => resolve(), { timeout: 1200 });
-        else setTimeout(resolve, 100);
+  private observePreviews() {
+    this.previewObserver?.disconnect();
+    const version = ++this.previewVersion;
+    this.previewQueue = [];
+    this.previewQueued.clear();
+    const missing = this.previewMissing = new Set(this.notes.filter(note => !note.thumbnail && !note.deleted).map(note => note.id));
+    const enqueue = (id: string) => {
+      if (!missing.has(id) || this.previewQueued.has(id) || version !== this.previewVersion) return;
+      this.previewQueued.add(id); this.previewQueue.push(id);
+      void this.previews(version);
+    };
+    const cards = this.root.querySelectorAll<HTMLElement>('.note-open[data-id]');
+    if ('IntersectionObserver' in window) {
+      this.previewObserver = new IntersectionObserver(entries => {
+        for (const entry of entries) if (entry.isIntersecting) enqueue((entry.target as HTMLElement).dataset.id!);
+      }, { rootMargin: '250px' });
+      cards.forEach(card => {
+        if (missing.has(card.dataset.id!)) this.previewObserver!.observe(card);
       });
-      if (this.abort.signal.aborted || version !== this.previewVersion) return;
-      const page = await db.pages.get(note.pageIds[0]);
-      if (page) try {
-        const preview = await thumbnail(page);
-        if (this.abort.signal.aborted || version !== this.previewVersion) return;
-        const accepted = await db.transaction('rw', db.pages, db.notes, async () => {
-          const latest = await db.pages.get(page.id); if (!latest || latest.revision !== page.revision) return false;
-          await db.notes.update(note.id, { thumbnail: preview }); return true;
+    } else cards.forEach((card, index) => {
+      if (index < 8) enqueue(card.dataset.id!);
+    });
+  }
+  private async previews(version: number) {
+    if (this.previewRunning) return;
+    this.previewRunning = true;
+    try {
+      while (this.previewQueue.length && !this.abort.signal.aborted && version === this.previewVersion) {
+        // PDF previews are optional. Wait for an idle frame rather than forcing
+        // a render in the middle of scrolling or tapping on a slower device.
+        await new Promise<void>(resolve => {
+          if ('requestIdleCallback' in window) window.requestIdleCallback(() => resolve());
+          else setTimeout(resolve, 300);
         });
-        if (accepted) {
-          note.thumbnail = preview;
-          // Rebuilding the whole grid here can remove a button during a touch.
-          const card = [...this.root.querySelectorAll<HTMLButtonElement>('.note-open[data-id]')]
-            .find(button => button.dataset.id === note.id);
-          const cover = card?.querySelector('.cover-preview');
-          if (cover) {
-            const image = document.createElement('img'); image.src = preview;
-            image.alt = '첫 페이지 미리보기'; image.loading = 'lazy';
-            cover.replaceChildren(image);
+        if (this.abort.signal.aborted || version !== this.previewVersion) return;
+        const id = this.previewQueue.shift()!;
+        this.previewQueued.delete(id);
+        const note = this.notes.find(item => item.id === id);
+        if (!note || note.thumbnail || note.deleted) continue;
+        try {
+          const page = await db.pages.get(note.pageIds[0]);
+          if (!page) continue;
+          const preview = await thumbnail(page);
+          if (this.abort.signal.aborted || version !== this.previewVersion) return;
+          const accepted = await db.transaction('rw', db.pages, db.notes, async () => {
+            const latest = await db.pages.get(page.id); if (!latest || latest.revision !== page.revision) return false;
+            await db.notes.update(note.id, { thumbnail: preview }); return true;
+          });
+          if (accepted) {
+            note.thumbnail = preview;
+            this.previewMissing.delete(note.id);
+            // Rebuilding the whole grid here can remove a button during a touch.
+            const card = [...this.root.querySelectorAll<HTMLButtonElement>('.note-open[data-id]')]
+              .find(button => button.dataset.id === note.id);
+            if (card) this.previewObserver?.unobserve(card);
+            const cover = card?.querySelector('.cover-preview');
+            if (cover) {
+              const image = document.createElement('img'); image.src = preview;
+              image.alt = '첫 페이지 미리보기'; image.loading = 'lazy';
+              cover.replaceChildren(image);
+            }
           }
-        }
-      } catch { /* Preview failure never blocks opening a note. */ }
+        } catch { /* Preview failure never blocks opening a note. */ }
+      }
+    } finally {
+      this.previewRunning = false;
+      if (this.previewQueue.length && !this.abort.signal.aborted) void this.previews(this.previewVersion);
     }
   }
   snapshot(): LibraryState { return { filter: this.filter, query: this.query, sort: this.sort, list: this.list }; }
@@ -244,6 +285,7 @@ export class LibraryView {
     this.root.querySelector<HTMLSelectElement>('#note-columns')!.value = String(this.columns);
     this.root.querySelector('#note-results')!.innerHTML = `<div class="notes-grid ${this.list ? 'list-view' : ''}" ${gridSetting}>${cards}</div>${!notes.length ? `<div class="empty-state">${icon(this.filter === 'trash' ? 'Trash2' : 'BookOpen', 40)}<h3>${this.query ? '검색 결과가 없어요' : '아직 노트가 없어요'}</h3></div>` : ''}`;
     this.root.querySelectorAll('.view-toggle button').forEach(e => e.classList.toggle('active', (e as HTMLElement).dataset.action === (this.list ? 'list' : 'grid')));
+    this.observePreviews();
   }
   private click(event: Event) {
     const target = (event.target as Element).closest<HTMLElement>('[data-action]'); if (!target) return;
@@ -326,5 +368,5 @@ export class LibraryView {
       { label: '휴지통으로 이동', icon: 'Trash2', danger: true, action: () => confirmAction('휴지통으로 이동할까요?', '휴지통에서 언제든 다시 복구할 수 있어요.', '이동', async () => { await db.notes.update(id, { deleted: Date.now() }); await this.show(); }) }
     ]);
   }
-  destroy() { this.phoneCleanup?.(); this.abort.abort(); }
+  destroy() { this.phoneCleanup?.(); this.previewObserver?.disconnect(); this.abort.abort(); }
 }

@@ -29,6 +29,12 @@ export class PagePreviews {
       elements.forEach(element => this.observer!.observe(element));
     } else elements.forEach((element, i) => { if (i < 8) enqueue(element.dataset.pageId!); });
   }
+  pause() {
+    this.observer?.disconnect();
+    this.pending = [];
+    this.queued.clear();
+    clearTimeout(this.timer);
+  }
   private show(id: string, preview: string, revision: number) {
     if (this.stopped) return;
     const button = [...this.container.querySelectorAll<HTMLElement>('[data-page-id]')].find(el => el.dataset.pageId === id);
@@ -44,7 +50,7 @@ export class PagePreviews {
     this.running = true;
     try {
       while (this.pending.length && !this.stopped) {
-        if (this.busy()) break;
+        if (this.sidebar.hidden || this.busy()) break;
         const id = this.pending.shift()!;
         try {
           const page = await db.pages.get(id); if (!page) continue;
@@ -65,7 +71,7 @@ export class PagePreviews {
       }
     } finally {
       this.running = false;
-      if (!this.stopped && this.pending.length) this.timer = setTimeout(() => void this.work(), 180);
+      if (!this.stopped && !this.sidebar.hidden && this.pending.length) this.timer = setTimeout(() => void this.work(), 180);
     }
   }
   destroy() { this.stopped = true; clearTimeout(this.timer); this.observer?.disconnect(); this.pending = []; this.queued.clear(); }

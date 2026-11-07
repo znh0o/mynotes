@@ -159,7 +159,8 @@ export class DetailRenderer {
       y1 <= tile.y + tile.h - (tile.y + tile.h < page.height ? guard : 0)) return;
     const x = Math.max(0, x0 - margin), y = Math.max(0, y0 - margin);
     const w = Math.min(page.width, x1 + margin) - x, h = Math.min(page.height, y1 + margin) - y;
-    const ratio = Math.min(targetRatio, Math.sqrt(8000000 / (w * h)));
+    const pixelBudget = document.documentElement.dataset.deviceUi === 'phone' ? 3500000 : 8000000;
+    const ratio = Math.min(targetRatio, Math.sqrt(pixelBudget / (w * h)));
     if (ratio <= baseRatio * 1.04) { this.release(); return; }
     const generation = ++this.generation, temp = document.createElement('canvas');
     await background(temp, page, ratio, { x, y, w, h });

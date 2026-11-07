@@ -124,3 +124,30 @@ test('zoomed PDF and ink use a sharp visible tile instead of enlarging the cappe
   await expect(detail).toBeHidden();
   await expect.poll(() => detail.evaluate((canvas: HTMLCanvasElement) => canvas.width)).toBe(0);
 });
+
+test.describe('phone display', () => {
+  test.use({ deviceScaleFactor: 3, viewport: { width: 390, height: 844 } });
+
+  test('high zoom keeps the visible page sharp within a phone-sized canvas budget', async ({ page }) => {
+    await page.goto('./');
+    await page.getByRole('button', { name: '새 노트', exact: true }).click();
+    await page.getByRole('button', { name: '노트 만들기', exact: true }).click();
+    await expect(page.locator('.page-loading')).toBeHidden();
+    await expect(page.locator('#page-thumbnails')).toBeEmpty();
+    await page.locator('.paper-viewport').dispatchEvent('wheel', { deltaY: -700, ctrlKey: true });
+    await page.locator('.paper-viewport').dispatchEvent('wheel', { deltaY: -700, ctrlKey: true });
+    await expect(page.locator('#zoom-value')).toHaveText('400%');
+    await expect(page.locator('.paper-surface .paper-detail')).toBeVisible();
+    const pixels = await page.evaluate(() => {
+      const ink = document.querySelector<HTMLCanvasElement>('#paper-ink')!;
+      const background = document.querySelector<HTMLCanvasElement>('#paper-background')!;
+      const detail = document.querySelector<HTMLCanvasElement>('.paper-surface .paper-detail')!;
+      return { ink: ink.width * ink.height, background: background.width * background.height,
+        detail: detail.width * detail.height, density: detail.width / detail.getBoundingClientRect().width };
+    });
+    expect(pixels.ink).toBeLessThan(5100000);
+    expect(pixels.background).toBeLessThan(5100000);
+    expect(pixels.detail).toBeLessThan(3600000);
+    expect(pixels.density).toBeGreaterThan(2.8);
+  });
+});

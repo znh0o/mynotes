@@ -36,7 +36,7 @@ if (!release) {
   const revision = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
   release = await api('/releases', 'POST', {
     tag_name: tag, target_commitish: revision, name: `Notelin ${version} — Android`, draft: true, prerelease: false,
-    body: 'Android 설치형 Notelin입니다.\n\n- 타이머의 실행 상태와 남은 시간은 노트마다 독립적으로 저장합니다. 노트를 바꾸거나 앱을 다시 열어도 해당 노트의 타이머가 이어집니다.\n- 이름을 붙여 저장한 타이머 목록은 모든 노트에서 공용으로 사용합니다.\n- 이전 버전의 공용 실행 상태는 처음 연 노트로 한 번만 옮깁니다. 기존 노트와 필기 데이터는 유지합니다.\n\n타이머 완료 알림은 Notelin이 열려 있을 때 표시됩니다. Android가 앱을 완전히 종료한 상태의 시스템 알림은 지원하지 않습니다.\n\n첫 설치와 업데이트의 마지막 확인은 Android 시스템에서 진행합니다.',
+    body: 'Android 설치형 Notelin입니다.\n\n- 서재에서 화면에 보이는 노트의 표지만 한가할 때 생성해 휴대폰의 터치 반응을 개선했습니다.\n- 닫힌 페이지 목록의 미리보기 작업을 멈추고, 목록을 열 때 필요한 미리보기를 표시합니다.\n- 휴대폰 확대 화면의 전체 페이지 메모리 사용량을 줄이고, 보이는 영역은 선명하게 유지합니다.\n- 자동 Google Drive 동기화가 서재 표시와 필기에 겹치지 않도록 조정했습니다.\n\n기존 노트와 로그인 정보는 유지됩니다. 실제 속도는 기기와 PDF 크기에 따라 다를 수 있습니다.',
   });
 }
 for (const [assetName, content, type] of [[name, bytes, 'application/vnd.android.package-archive'], [`${name}.sha256`, Buffer.from(checksum), 'text/plain'], ['Notelin.apk', bytes, 'application/vnd.android.package-archive']]) {

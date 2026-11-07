@@ -247,13 +247,17 @@ async function syncImpl(onProgress: (done: number, total: number) => void, silen
   for (const id of ids) {
     // Leave a turn for input and painting while scanning many handwritten notes.
     await new Promise<void>(resolve => setTimeout(resolve, 0));
-    if (!canApply(id)) { onProgress(++done, ids.size); continue; }
+    if (!canApply(id)) {
+      if (silent) throw new DriveSyncDeferredError();
+      onProgress(++done, ids.size); continue;
+    }
     const note = local.get(id), file = remote.get(id), previous = anchor.notes[id];
     const bundle = note ? await localBundle(note) : undefined;
     const localText = bundle ? encode(bundle) : undefined;
     const localHash = localText ? await sha256(localText) : undefined;
     const cloudHash = file ? await remoteHash(token, file) : undefined;
     const tombstone = (await db.settings.get(`drive-delete:${id}`))?.value === true;
+    if (silent && !canApply(id)) throw new DriveSyncDeferredError();
     if (bundle && file) {
       if (localHash === cloudHash) anchor.notes[id] = { hash: localHash! };
       else if (previous?.conflictHash === cloudHash) {

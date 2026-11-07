@@ -99,6 +99,7 @@ test('imported PDF opens with the sidebar closed and shows real previews when re
   await (await chooser).setFiles({ name: '미리보기 검증.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await doc.save()) });
   await expect(page.locator('#app .page-loading')).toBeHidden();
   await expect(page.locator('.page-sidebar')).toBeHidden();
+  await expect(page.locator('#page-thumbnails')).toBeEmpty();
   await page.getByRole('button', { name: '페이지 목록', exact: true }).click();
   await expect(page.locator('#page-thumbnails img')).toHaveCount(3, { timeout: 15000 });
   const previews = await page.locator('#page-thumbnails img').evaluateAll((images: HTMLImageElement[]) => images.map(i => ({ src: i.src, width: i.naturalWidth })));
@@ -110,5 +111,9 @@ test('imported PDF opens with the sidebar closed and shows real previews when re
   await page.screenshot({ path: '../MyNotes-pdf-sidebar.png' });
   await page.getByRole('button', { name: '서재로 돌아가기', exact: true }).click(); await expect(page.locator('#library-title')).toBeVisible();
   await page.getByRole('button', { name: '미리보기 검증 열기', exact: true }).click();
-  await expect(page.locator('#app .page-loading')).toBeHidden(); await expect(page.locator('#page-thumbnails img')).toHaveCount(3);
+  await expect(page.locator('#app .page-loading')).toBeHidden();
+  await expect(page.locator('.page-sidebar')).toBeHidden();
+  await expect(page.locator('#page-thumbnails')).toBeEmpty();
+  await page.getByRole('button', { name: '페이지 목록', exact: true }).click();
+  await expect(page.locator('#page-thumbnails img')).toHaveCount(3);
 });

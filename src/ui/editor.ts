@@ -367,7 +367,8 @@ export class EditorView {
     const companion = this.root.querySelector<HTMLElement>('.spread-companion')!;
     try {
       await loadImages(page);
-      const ratio = Math.min(Math.max(1, this.scale * devicePixelRatio), Math.sqrt(8000000 / (page.width * page.height)));
+      const pixelBudget = document.documentElement.dataset.deviceUi === 'phone' ? 4000000 : 8000000;
+      const ratio = Math.min(Math.max(1, this.scale * devicePixelRatio), Math.sqrt(pixelBudget / (page.width * page.height)));
       const backgroundCanvas = document.createElement('canvas'); await background(backgroundCanvas, page, ratio);
       if (generation !== this.spreadGeneration || this.abort.signal.aborted) {
         backgroundCanvas.width = backgroundCanvas.height = 0;
@@ -414,7 +415,8 @@ export class EditorView {
   }
   private async renderBackground(): Promise<boolean> {
     const generation = ++this.generation, p = this.page, temp = document.createElement('canvas');
-    const ratio = Math.min(Math.max(1, this.scale * devicePixelRatio), Math.sqrt(10000000 / (p.width * p.height)));
+    const pixelBudget = document.documentElement.dataset.deviceUi === 'phone' ? 5000000 : 10000000;
+    const ratio = Math.min(Math.max(1, this.scale * devicePixelRatio), Math.sqrt(pixelBudget / (p.width * p.height)));
     try { await background(temp, p, ratio); }
     catch (error) { temp.width = temp.height = 0; throw error; }
     if (generation !== this.generation || this.abort.signal.aborted) {
@@ -428,10 +430,14 @@ export class EditorView {
     return true;
   }
   private async renderThumbnails() {
-    const rows = await db.pages.bulkGet(this.note.pageIds);
-    if (this.abort.signal.aborted) return;
-    this.root.querySelector('#page-thumbnails')!.innerHTML = rows.map((p, i) => p ? `<div class="page-thumb-row ${i === this.index ? 'active' : this.twoPage && i === this.companionIndex() ? 'spread-visible' : ''}"><button class="page-thumb" data-action="page" data-id="${i}" data-page-id="${p.id}" aria-label="${i + 1}페이지"><div class="page-thumb-paper ${p.paper}" style="aspect-ratio:${p.width}/${p.height}">${p.thumbnail ? `<img src="${p.thumbnail}" alt="${i + 1}페이지 미리보기"/>` : `<span>${p.pdfAssetId ? 'PDF' : paperNames[p.paper]}</span>`}</div><span>${i + 1}</span></button>${button('MoreHorizontal', `${i + 1}페이지 메뉴`, 'page-menu', `data-id="${i}"`)}</div>` : '').join('');
+    const sidebar = this.root.querySelector<HTMLElement>('.page-sidebar')!;
     this.root.querySelector('.page-sidebar-heading > span')!.textContent = String(this.note.pageIds.length);
+    // A hidden sidebar must not fetch every page or build an image-heavy DOM
+    // whenever the user turns a page or finishes a stroke.
+    if (sidebar.hidden) return;
+    const rows = await db.pages.bulkGet(this.note.pageIds);
+    if (this.abort.signal.aborted || sidebar.hidden) return;
+    this.root.querySelector('#page-thumbnails')!.innerHTML = rows.map((p, i) => p ? `<div class="page-thumb-row ${i === this.index ? 'active' : this.twoPage && i === this.companionIndex() ? 'spread-visible' : ''}"><button class="page-thumb" data-action="page" data-id="${i}" data-page-id="${p.id}" aria-label="${i + 1}페이지"><div class="page-thumb-paper ${p.paper}" style="aspect-ratio:${p.width}/${p.height}">${p.thumbnail ? `<img src="${p.thumbnail}" alt="${i + 1}페이지 미리보기"/>` : `<span>${p.pdfAssetId ? 'PDF' : paperNames[p.paper]}</span>`}</div><span>${i + 1}</span></button>${button('MoreHorizontal', `${i + 1}페이지 메뉴`, 'page-menu', `data-id="${i}"`)}</div>` : '').join('');
     this.previews.observe(rows);
   }
   private showSelection(count: number, engine: InkEngine) {
@@ -453,6 +459,7 @@ export class EditorView {
     else this.companionDetail.refreshInk(page);
     page.thumbnail = undefined;
     void this.queue.saveImmutable(page).catch(report);
+    if (this.root.querySelector<HTMLElement>('.page-sidebar')!.hidden) return;
     if (page.id === this.page.id) {
       clearTimeout(this.thumbTimer);
       this.thumbTimer = setTimeout(() => run(() => this.saveThumbnail(page)), 1400);
@@ -644,7 +651,7 @@ export class EditorView {
     }
     if (action === 'undo') this.editingEngine.undo();
     if (action === 'redo') this.editingEngine.redo();
-    if (action === 'sidebar') { const sidebar = this.root.querySelector<HTMLElement>('.page-sidebar')!; sidebar.hidden = !sidebar.hidden; target.setAttribute('aria-expanded', String(!sidebar.hidden)); target.classList.toggle('active', !sidebar.hidden); if (this.fit) this.setScale(this.fitScale(), true); }
+    if (action === 'sidebar') { const sidebar = this.root.querySelector<HTMLElement>('.page-sidebar')!; sidebar.hidden = !sidebar.hidden; target.setAttribute('aria-expanded', String(!sidebar.hidden)); target.classList.toggle('active', !sidebar.hidden); if (!sidebar.hidden) void this.renderThumbnails(); else { this.previews.pause(); clearTimeout(this.thumbTimer); clearTimeout(this.companionThumbTimer); } if (this.fit) this.setScale(this.fitScale(), true); }
     if (action === 'zoom-in') this.zoom(this.scale * 1.2);
     if (action === 'zoom-out') this.zoom(this.scale / 1.2);
     if (action === 'fit') { this.setScale(this.fitScale(), true); run(() => this.renderBackground()); void this.renderSpread(); }

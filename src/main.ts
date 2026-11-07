@@ -14,7 +14,7 @@ import { checkForUpdate, applyWaitingUpdate, hasReadyUpdate, updateRepairUrl } f
 import { version as appVersion } from '../package.json';
 import { installAppZoomGuard } from './ui/app-zoom';
 import { getAppearance, setAppearance, type Appearance } from './ui/appearance';
-import { installDeviceUI } from './ui/device-ui';
+import { installDeviceUI, isPhoneUI } from './ui/device-ui';
 import { isNativeApp, initializeNativeShell, pendingNativeDocuments, readNativeDocument, completeNativeDocument, onNativeDocument, openNativeUpdates, getStudyPanelSide, setStudyPanelSide, type StudyPanelSide, clearStudyLoginCookies, studyAIProvider, studyAIProviders } from './platform/native';
 import { checkNativeUpdate, installNativeUpdate, onNativeUpdateProgress, type NativeUpdate } from './platform/native-updates';
 import { backupToDrive, restoreFromDrive } from './data/google-drive';
@@ -38,18 +38,31 @@ let updateMessage = '새 버전을 자동으로 확인하고 있어요.';
 let lastUpdateCheck = 0;
 let updateProbeRunning = false;
 let apkUpdate: NativeUpdate | undefined;
-let nativeReady = false, lastAutoSync = 0;
+let nativeReady = false, lastAutoSync = 0, autoSyncPending = false;
 async function autoSyncDrive() {
-  if (!nativeReady || editor || document.visibilityState !== 'visible' || !navigator.onLine || Date.now() - lastAutoSync < 60_000) return;
+  if (!nativeReady || autoSyncPending || editor || document.visibilityState !== 'visible' || !navigator.onLine || Date.now() - lastAutoSync < 60_000) return;
+  autoSyncPending = true;
   try {
     if (!(await db.settings.get('drive-sync-enabled'))?.value) return;
+    // Give the library its first paint and a phone's touch input priority.
+    if (isPhoneUI()) {
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      await new Promise<void>(resolve => {
+        if ('requestIdleCallback' in window) window.requestIdleCallback(() => resolve());
+        else setTimeout(resolve, 200);
+      });
+    }
+    if (editor || document.visibilityState !== 'visible' || !navigator.onLine) return;
     lastAutoSync = Date.now();
-    const result = await syncDrive(() => {}, true, id => !editor || editor.note.id !== id);
+    const result = await syncDrive(() => {}, true, () => !editor);
     await db.settings.delete('drive-sync-error');
     if (result.libraryChanged) await library?.show();
     else library?.updateGoogleSyncTime(result.email, Date.now());
   }
-  catch (error) { if (!(error instanceof DriveSyncDeferredError)) await db.settings.put({ key: 'drive-sync-error', value: error instanceof Error ? error.message : 'Drive 동기화 실패' }); }
+  catch (error) {
+    if (error instanceof DriveSyncDeferredError) lastAutoSync = 0;
+    else await db.settings.put({ key: 'drive-sync-error', value: error instanceof Error ? error.message : 'Drive 동기화 실패' });
+  } finally { autoSyncPending = false; }
 }
 function showAvailableUpdate() {
   const newlyAvailable = !updateAvailable;
